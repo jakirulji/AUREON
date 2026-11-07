@@ -253,6 +253,58 @@ void MoveEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<E
   result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
 }
 
+
+#ifndef FOFX_RECYCLEONDELETE
+#define FOFX_RECYCLEONDELETE 0x00080000
+#endif
+
+void MoveToTrash(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  const auto* root = GetString(args, "rootId");
+  const auto* entry_arg = GetString(args, "entryId");
+  const auto* parent_arg = GetString(args, "parentId");
+  if (!root || !entry_arg || !parent_arg || root->empty() || entry_arg->empty() || parent_arg->empty()) {
+    result->Error("invalid_arguments", "The selected item and parent folder are required."); return;
+  }
+  std::error_code ec;
+  const auto base = std::filesystem::canonical(PathFromUtf8(*root), ec);
+  if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
+  const auto source_input = std::filesystem::absolute(PathFromUtf8(*entry_arg), ec).lexically_normal();
+  if (ec || source_input == base) { result->Error("invalid_target", "The selected root itself cannot be moved to the Recycle Bin."); return; }
+  const auto parent = std::filesystem::canonical(source_input.parent_path(), ec);
+  if (ec || !IsWithinRoot(base, parent)) { result->Error("outside_root", "The selected item is outside the selected AUREON root."); return; }
+  const auto expected_parent = std::filesystem::canonical(PathFromUtf8(*parent_arg), ec);
+  if (ec || expected_parent != parent) { result->Error("invalid_parent", "The item is not inside the supplied current folder."); return; }
+  const auto status = std::filesystem::symlink_status(source_input, ec);
+  if (ec || std::filesystem::is_symlink(status) ||
+      (!std::filesystem::is_regular_file(status) && !std::filesystem::is_directory(status))) {
+    result->Error("unsupported_item", "Symbolic links and unsupported filesystem items cannot be moved to the Recycle Bin."); return;
+  }
+  const auto source = std::filesystem::canonical(source_input, ec);
+  if (ec || !IsWithinRoot(base, source)) { result->Error("outside_root", "The selected item is outside the selected AUREON root."); return; }
+  const HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  const bool uninitialize = init == S_OK || init == S_FALSE;
+  if (FAILED(init) && init != RPC_E_CHANGED_MODE) {
+    result->Error("recycle_bin_unavailable", "Windows Recycle Bin could not be initialized. The item was not deleted."); return;
+  }
+  ComPtr<IFileOperation> operation;
+  ComPtr<IShellItem> shell_item;
+  HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&operation));
+  if (SUCCEEDED(hr)) hr = SHCreateItemFromParsingName(source.c_str(), nullptr, IID_PPV_ARGS(&shell_item));
+  if (SUCCEEDED(hr)) hr = operation->SetOperationFlags(FOF_NOCONFIRMATION | FOF_ALLOWUNDO | FOFX_RECYCLEONDELETE);
+  if (SUCCEEDED(hr)) hr = operation->DeleteItem(shell_item.Get(), nullptr);
+  if (SUCCEEDED(hr)) hr = operation->PerformOperations();
+  BOOL aborted = FALSE;
+  if (SUCCEEDED(hr)) {
+    const HRESULT aborted_hr = operation->GetAnyOperationsAborted(&aborted);
+    if (FAILED(aborted_hr)) hr = aborted_hr;
+  }
+  if (uninitialize) CoUninitialize();
+  if (aborted || FAILED(hr) || std::filesystem::exists(source, ec) || ec) {
+    result->Error("recycle_bin_unavailable", "Windows could not confirm that the item reached the Recycle Bin. No permanent-delete fallback was attempted."); return;
+  }
+  result->Success(EncodableValue(true));
+}
+
 void RenameEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   const auto* root = GetString(args, "rootId");
   const auto* entry = GetString(args, "entryId");
@@ -401,6 +453,7 @@ void AureonLocalFilesPlugin::HandleMethodCall(
   }
   if (call.method_name() == "copyFile") { CopyFileVerified(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return; }
   if (call.method_name() == "moveEntry") { MoveEntry(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return; }
+  if (call.method_name() == "moveToTrash") { MoveToTrash(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return; }
   if (call.method_name() == "renameEntry") {
     RenameEntry(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return;
   }

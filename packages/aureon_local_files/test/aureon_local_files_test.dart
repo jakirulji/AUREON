@@ -75,6 +75,16 @@ void main() {
       sourceParentId: 'nested-folder', targetParentId: 'root-doc'), 'moved-document-id');
   });
 
+  test('move to trash sends item and parent identities', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'moveToTrash');
+      expect(call.arguments, {'rootId': 'root-uri', 'entryId': 'file-id', 'parentId': 'folder-id'});
+      return null;
+    });
+    const root = AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc');
+    await files.moveToTrash(root: root, entryId: 'file-id', parentId: 'folder-id');
+  });
+
   test('rename and create folder send scoped identities', () async {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {

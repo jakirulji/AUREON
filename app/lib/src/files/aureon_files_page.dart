@@ -166,6 +166,40 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     }
   }
 
+
+  Future<void> _moveToTrash(AureonLocalEntry entry) async {
+    final root = _root;
+    if (root == null || _levels.isEmpty) return;
+    final parent = _levels.last;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Move to Trash?'),
+        content: Text('Move "${entry.name}" to the system Recycle Bin/Trash? It may be recoverable there.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Move to Trash')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _files.moveToTrash(root: root, entryId: entry.id, parentId: parent.id);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Moved to the Windows Recycle Bin. Restore it there if needed.')),
+        );
+      }
+    } on PlatformException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? error.code)),
+        );
+      }
+    }
+  }
+
   Future<void> _rename(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null) return;
@@ -330,9 +364,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                       if (action == 'rename') { _rename(e); }
                       if (action == 'copy' && !e.isDirectory) { _copyFile(e); }
                       if (action == 'move_up' && _levels.length > 1) { _moveToParent(e); }
+                      if (action == 'trash') { _moveToTrash(e); }
                     },
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                      const PopupMenuItem(value: 'trash', child: Text('Move to Trash / Recycle Bin')),
                       if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
                       if (_levels.length > 1) const PopupMenuItem(value: 'move_up', child: Text('Move to parent folder')),
                     ],

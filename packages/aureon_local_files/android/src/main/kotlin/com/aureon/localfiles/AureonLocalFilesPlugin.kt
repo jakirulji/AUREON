@@ -58,6 +58,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "renameEntry" -> renameEntry(call, result)
             "copyFile" -> copyFile(call, result)
             "moveEntry" -> moveEntry(call, result)
+            "moveToTrash" -> moveToTrash(call, result)
             "createFolder" -> createFolder(call, result)
             else -> result.notImplemented()
         }
@@ -274,6 +275,19 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 }
             }
         }.start()
+    }
+
+
+    private fun moveToTrash(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val entryId = call.argument<String>("entryId")
+        val parentId = call.argument<String>("parentId")
+        if (root.isNullOrBlank() || entryId.isNullOrBlank() || parentId.isNullOrBlank()) {
+            result.error("invalid_arguments", "The selected item and parent folder are required.", null)
+            return
+        }
+        // SAF has no portable recoverable-trash contract. Never substitute deleteDocument().
+        result.error("unsupported", "This Android document provider does not expose a recoverable Trash operation. Nothing was deleted.", null)
     }
 
     private fun renameEntry(call: MethodCall, result: MethodChannel.Result) {

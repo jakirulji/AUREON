@@ -94,6 +94,12 @@ class AureonLocalFiles {
     return value;
   }
 
+  Future<void> moveToTrash({required AureonLocalRoot root, required String entryId, required String parentId}) async {
+    await _channel.invokeMethod<void>('moveToTrash', <String, Object?>{
+      'rootId': root.rootId, 'entryId': entryId, 'parentId': parentId,
+    });
+  }
+
   Future<String> renameEntry({required AureonLocalRoot root, required String entryId, required String newName}) async {
     final value = await _channel.invokeMethod<Object?>('renameEntry', <String, Object?>{
       'rootId': root.rootId, 'entryId': entryId, 'newName': newName,

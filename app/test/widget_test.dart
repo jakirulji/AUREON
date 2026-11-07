@@ -208,6 +208,32 @@ void main() {
     expect(find.text('Moved "notes.txt" to "Home".'), findsOneWidget);
   });
 
+  testWidgets('Files page asks before moving an item to Trash', (tester) async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'pickRoot') return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
+      if (call.method == 'listChildren') return [{'id': 'file-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}];
+      if (call.method == 'moveToTrash') return null;
+      return null;
+    });
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
+    await tester.tap(find.byType(OutlinedButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to Trash / Recycle Bin'));
+    await tester.pumpAndSettle();
+    expect(find.text('Move "notes.txt" to the system Recycle Bin/Trash? It may be recoverable there.'), findsOneWidget);
+    expect(calls.where((call) => call.method == 'moveToTrash'), isEmpty);
+    await tester.tap(find.text('Move to Trash').last);
+    await tester.pumpAndSettle();
+    expect(calls.where((call) => call.method == 'moveToTrash'), hasLength(1));
+    expect(calls.firstWhere((call) => call.method == 'moveToTrash').arguments, {
+      'rootId': 'root', 'entryId': 'file-1', 'parentId': 'root-doc',
+    });
+  });
+
   testWidgets('AUREON dashboard still renders', (tester) async {
     await tester.pumpWidget(const AureonApp());
     expect(find.text('AUREON'), findsOneWidget);
