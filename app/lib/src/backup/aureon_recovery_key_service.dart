@@ -231,10 +231,12 @@ class CredentialVaultCryptoService {
     if (bundle.vaultId != keySet.vaultId || bundle.generation != keySet.generation) {
       throw const FormatException('Recovery key set and Vault Recovery Bundle generation do not match.');
     }
-    final key = keySet.keys.where((entry) => entry.id == manualKeyId).firstOrNull;
-    if (key == null) throw const FormatException('Selected manual recovery key is not part of this key set.');
-    final envelope = bundle.manualKeyEnvelopes.where((entry) => entry.keyId == manualKeyId).firstOrNull;
-    if (envelope == null) throw const FormatException('No matching wrapped DEK envelope exists for this key.');
+    final matchingKeys = keySet.keys.where((entry) => entry.id == manualKeyId).toList();
+    if (matchingKeys.length != 1) throw const FormatException('Selected manual recovery key is not part of this key set.');
+    final matchingEnvelopes = bundle.manualKeyEnvelopes.where((entry) => entry.keyId == manualKeyId).toList();
+    if (matchingEnvelopes.length != 1) throw const FormatException('No matching wrapped DEK envelope exists for this key.');
+    final key = matchingKeys.single;
+    final envelope = matchingEnvelopes.single;
     final dek = await _recovery.unwrapVaultDek(
       manualKey: key.value,
       keyId: key.id,
