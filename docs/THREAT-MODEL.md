@@ -129,3 +129,14 @@ The accepted direction is [ADR-0005](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.m
 - Android Keystore and Windows OS-protected storage protect the locally unlocked vault.
 - Do not describe Worker Secrets as KMS/HSM. Protect the Worker account, secret provisioning and deployment pipeline as critical trust boundaries.
 - Independent security review is mandatory before enabling production server-assisted credential recovery.
+
+
+## 10. Independent dual-recovery controls
+
+- The provider credential vault DEK has two independent wrapped envelopes: one protected by a user-held random 256-bit Manual Recovery Key and one protected by a separate Cloudflare Worker Secret-derived KEK.
+- Manual Recovery Key material must never be transmitted to Cloudflare or persisted in server-side storage. Manual unwrap occurs locally on the client.
+- Cloudflare outage recovery requires a current encrypted Recovery Bundle or cached encrypted vault snapshot outside the Cloudflare control plane. The Manual Recovery Key by itself cannot recreate missing ciphertext.
+- The portable bundle contains encrypted credential records, wrapped DEK envelopes, non-secret metadata and version/integrity data only. It must not contain plaintext credentials, DEK, Manual Recovery Key or Worker Secret.
+- Cloudflare recovery remains a server trust boundary. Verify Firebase identity, verified email, recent reauthentication, step-up where available, one-time challenge, cooldown, notification, rate limits, device/session revocation and audit.
+- Test both paths independently: manual-key recovery with Worker/D1 unreachable; Cloudflare recovery when manual key is unavailable; stale-bundle reconciliation; wrong-key/tamper/downgrade rejection; secret rotation and loss.
+- E2E file-content keys remain separate and client-controlled; neither provider-vault recovery path can decrypt file contents.
