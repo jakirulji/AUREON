@@ -79,10 +79,24 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       expect(call.method, 'moveToTrash');
       expect(call.arguments, {'rootId': 'root-uri', 'entryId': 'file-id', 'parentId': 'folder-id'});
-      return null;
+      return {'id': 'trashed-id', 'name': 'notes.txt', 'trashFolderId': 'trash-id',
+        'originalParentId': 'folder-id', 'trashedAt': 1700000000000};
     });
     const root = AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc');
-    await files.moveToTrash(root: root, entryId: 'file-id', parentId: 'folder-id');
+    final moved = await files.moveToTrash(root: root, entryId: 'file-id', parentId: 'folder-id');
+    expect(moved.id, 'trashed-id');
+    expect(moved.trashFolderId, 'trash-id');
+    expect(moved.originalParentId, 'folder-id');
+  });
+
+  test('permanent Trash deletion sends scoped identities', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'deleteTrashEntry');
+      expect(call.arguments, {'rootId': 'root-uri', 'entryId': 'trash-item', 'trashFolderId': 'trash-folder'});
+      return true;
+    });
+    const root = AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc');
+    await files.deleteTrashEntry(root: root, entryId: 'trash-item', trashFolderId: 'trash-folder');
   });
 
   test('rename and create folder send scoped identities', () async {
