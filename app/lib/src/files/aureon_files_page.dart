@@ -130,6 +130,42 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     }
   }
 
+
+  Future<void> _moveToParent(AureonLocalEntry entry) async {
+    final root = _root;
+    if (root == null || _levels.length < 2) return;
+    final sourceParent = _levels.last;
+    final targetParent = _levels[_levels.length - 2];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Move to parent folder?'),
+        content: Text('Move "${entry.name}" from "${sourceParent.name}" to "${targetParent.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Move')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _files.moveEntry(root: root, entryId: entry.id,
+        sourceParentId: sourceParent.id, targetParentId: targetParent.id);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Moved "${entry.name}" to "${targetParent.name}".')),
+        );
+      }
+    } on PlatformException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? error.code)),
+        );
+      }
+    }
+  }
+
   Future<void> _rename(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null) return;
@@ -293,10 +329,12 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                     onSelected: (action) {
                       if (action == 'rename') { _rename(e); }
                       if (action == 'copy' && !e.isDirectory) { _copyFile(e); }
+                      if (action == 'move_up' && _levels.length > 1) { _moveToParent(e); }
                     },
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'rename', child: Text('Rename')),
                       if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
+                      if (_levels.length > 1) const PopupMenuItem(value: 'move_up', child: Text('Move to parent folder')),
                     ],
                   ),
                   onTap: e.isDirectory ? () => _open(e) : () => _openFile(e),

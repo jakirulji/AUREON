@@ -174,6 +174,40 @@ void main() {
     expect(find.text('Copy completed and SHA-256 verified. Original preserved.'), findsOneWidget);
   });
 
+  testWidgets('Files page moves an item to its parent only after confirmation', (tester) async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'pickRoot') return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
+      if (call.method == 'listChildren') {
+        final parent = (call.arguments as Map)['parentId'];
+        if (parent == 'root-doc') return [{'id': 'folder-1', 'name': 'Projects', 'isDirectory': true}];
+        return [{'id': 'file-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}];
+      }
+      if (call.method == 'moveEntry') return 'moved-1';
+      return null;
+    });
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
+    await tester.tap(find.byType(OutlinedButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Projects'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to parent folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Move "notes.txt" from "Projects" to "Home"?'), findsOneWidget);
+    expect(calls.where((call) => call.method == 'moveEntry'), isEmpty);
+    await tester.tap(find.text('Move').last);
+    await tester.pumpAndSettle();
+    final move = calls.firstWhere((call) => call.method == 'moveEntry');
+    expect(move.arguments, {
+      'rootId': 'root', 'entryId': 'file-1',
+      'sourceParentId': 'folder-1', 'targetParentId': 'root-doc',
+    });
+    expect(find.text('Moved "notes.txt" to "Home".'), findsOneWidget);
+  });
+
   testWidgets('AUREON dashboard still renders', (tester) async {
     await tester.pumpWidget(const AureonApp());
     expect(find.text('AUREON'), findsOneWidget);

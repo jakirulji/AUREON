@@ -197,6 +197,62 @@ void CopyFileVerified(const EncodableMap* args, std::unique_ptr<flutter::MethodR
   result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
 }
 
+
+void MoveEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  const auto* root = GetString(args, "rootId");
+  const auto* entry_arg = GetString(args, "entryId");
+  const auto* source_parent_arg = GetString(args, "sourceParentId");
+  const auto* target_parent_arg = GetString(args, "targetParentId");
+  if (!root || !entry_arg || !source_parent_arg || !target_parent_arg ||
+      root->empty() || entry_arg->empty() || source_parent_arg->empty() ||
+      target_parent_arg->empty() || *source_parent_arg == *target_parent_arg) {
+    result->Error("invalid_arguments", "A source item and two different parent folders are required.");
+    return;
+  }
+  std::error_code ec;
+  const auto base = std::filesystem::canonical(PathFromUtf8(*root), ec);
+  if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
+  const auto source_input = std::filesystem::absolute(PathFromUtf8(*entry_arg), ec).lexically_normal();
+  if (ec || source_input == base) { result->Error("invalid_target", "The selected root itself cannot be moved."); return; }
+  const auto source_parent = std::filesystem::canonical(source_input.parent_path(), ec);
+  if (ec || !IsWithinRoot(base, source_parent)) {
+    result->Error("outside_root", "The source parent is outside the selected root."); return;
+  }
+  const auto expected_source_parent = std::filesystem::canonical(PathFromUtf8(*source_parent_arg), ec);
+  if (ec || expected_source_parent != source_parent) {
+    result->Error("invalid_source_parent", "The source item is not in the supplied current folder."); return;
+  }
+  const auto target_parent = std::filesystem::canonical(PathFromUtf8(*target_parent_arg), ec);
+  if (ec || !IsWithinRoot(base, target_parent) || !std::filesystem::is_directory(target_parent, ec) || ec) {
+    result->Error("outside_root", "The destination folder is not accessible inside the selected root."); return;
+  }
+  const auto status = std::filesystem::symlink_status(source_input, ec);
+  if (ec || std::filesystem::is_symlink(status) ||
+      (!std::filesystem::is_regular_file(status) && !std::filesystem::is_directory(status))) {
+    result->Error("unsupported_item", "Symbolic links and unsupported filesystem items cannot be moved here."); return;
+  }
+  const auto source = std::filesystem::canonical(source_input, ec);
+  if (ec || !IsWithinRoot(base, source)) {
+    result->Error("outside_root", "The source item is outside the selected root."); return;
+  }
+  if (std::filesystem::is_directory(status) && IsWithinRoot(source, target_parent)) {
+    result->Error("invalid_destination", "A folder cannot be moved into itself or one of its descendants."); return;
+  }
+  const auto target = target_parent / source.filename();
+  if (std::filesystem::exists(target, ec) || ec) {
+    result->Error("conflict", "An item with that name already exists. Nothing was overwritten."); return;
+  }
+  if (!MoveFileW(source.c_str(), target.c_str())) {
+    const DWORD error = GetLastError();
+    result->Error(error == ERROR_NOT_SAME_DEVICE ? "unsupported" : "move_failed",
+        error == ERROR_NOT_SAME_DEVICE ? "Windows cannot move this item across volumes without a copy-and-verify workflow." :
+        "Windows could not move the item. The source was preserved.");
+    return;
+  }
+  const auto value = target.u8string();
+  result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
+}
+
 void RenameEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   const auto* root = GetString(args, "rootId");
   const auto* entry = GetString(args, "entryId");
@@ -344,6 +400,7 @@ void AureonLocalFilesPlugin::HandleMethodCall(
     return;
   }
   if (call.method_name() == "copyFile") { CopyFileVerified(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return; }
+  if (call.method_name() == "moveEntry") { MoveEntry(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return; }
   if (call.method_name() == "renameEntry") {
     RenameEntry(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return;
   }

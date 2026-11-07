@@ -57,6 +57,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "openFile" -> openFile(call, result)
             "renameEntry" -> renameEntry(call, result)
             "copyFile" -> copyFile(call, result)
+            "moveEntry" -> moveEntry(call, result)
             "createFolder" -> createFolder(call, result)
             else -> result.notImplemented()
         }
@@ -196,6 +197,81 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                     else -> "copy_failed"
                 }
                 Handler(Looper.getMainLooper()).post { result.error(code, error.message ?: "Copy failed; source preserved.", null) }
+            }
+        }.start()
+    }
+
+
+    private fun moveEntry(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val entryId = call.argument<String>("entryId")
+        val sourceParentId = call.argument<String>("sourceParentId")
+        val targetParentId = call.argument<String>("targetParentId")
+        if (root.isNullOrBlank() || entryId.isNullOrBlank() ||
+            sourceParentId.isNullOrBlank() || targetParentId.isNullOrBlank() ||
+            sourceParentId == targetParentId) {
+            result.error("invalid_arguments", "A source item and two different parent folders are required.", null)
+            return
+        }
+        val resolver = activityBinding?.activity?.contentResolver
+        if (resolver == null) {
+            result.error("no_activity", "The Android activity is unavailable.", null)
+            return
+        }
+        Thread {
+            try {
+                val treeUri = Uri.parse(root)
+                val rootId = DocumentsContract.getTreeDocumentId(treeUri)
+                val rootDocument = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId)
+                val source = DocumentsContract.buildDocumentUriUsingTree(treeUri, entryId)
+                val sourceParent = DocumentsContract.buildDocumentUriUsingTree(treeUri, sourceParentId)
+                val targetParent = DocumentsContract.buildDocumentUriUsingTree(treeUri, targetParentId)
+                fun insideRoot(document: Uri, id: String): Boolean =
+                    id == rootId || DocumentsContract.isChildDocument(resolver, rootDocument, document)
+                if (!insideRoot(source, entryId) || !insideRoot(sourceParent, sourceParentId) ||
+                    !insideRoot(targetParent, targetParentId)) {
+                    throw SecurityException("Source or destination is outside the selected folder.")
+                }
+                var displayName: String? = null
+                resolver.query(source, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) displayName = cursor.getString(0)
+                } ?: throw IllegalStateException("The source item cannot be inspected.")
+                val name = displayName ?: throw IllegalStateException("The source item has no name.")
+                var foundSource = false
+                resolver.query(
+                    DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, sourceParentId),
+                    arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null
+                )?.use { cursor ->
+                    val idColumn = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+                    while (cursor.moveToNext()) if (cursor.getString(idColumn) == entryId) foundSource = true
+                } ?: throw IllegalStateException("The source parent cannot be listed.")
+                if (!foundSource) throw SecurityException("The source item is not inside the supplied source folder.")
+                resolver.query(
+                    DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, targetParentId),
+                    arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    val nameColumn = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+                    while (cursor.moveToNext()) {
+                        if (cursor.getString(nameColumn).equals(name, ignoreCase = true)) {
+                            throw FileAlreadyExistsException("An item with that name already exists. Nothing was overwritten.")
+                        }
+                    }
+                } ?: throw IllegalStateException("The destination folder cannot be listed.")
+                val moved = DocumentsContract.moveDocument(resolver, source, sourceParent, targetParent)
+                    ?: throw UnsupportedOperationException("This document provider does not support native move. The source was not deleted.")
+                Handler(Looper.getMainLooper()).post {
+                    result.success(DocumentsContract.getDocumentId(moved))
+                }
+            } catch (error: Exception) {
+                val code = when (error) {
+                    is SecurityException -> "permission_denied"
+                    is FileAlreadyExistsException -> "conflict"
+                    is UnsupportedOperationException -> "unsupported"
+                    else -> "move_failed"
+                }
+                Handler(Looper.getMainLooper()).post {
+                    result.error(code, error.message ?: "Move failed; source preserved.", null)
+                }
             }
         }.start()
     }

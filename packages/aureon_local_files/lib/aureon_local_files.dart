@@ -85,6 +85,15 @@ class AureonLocalFiles {
     return value;
   }
 
+  Future<String> moveEntry({required AureonLocalRoot root, required String entryId, required String sourceParentId, required String targetParentId}) async {
+    final value = await _channel.invokeMethod<Object?>('moveEntry', <String, Object?>{
+      'rootId': root.rootId, 'entryId': entryId,
+      'sourceParentId': sourceParentId, 'targetParentId': targetParentId,
+    });
+    if (value is! String || value.isEmpty) throw const FormatException('Native move returned an invalid identity.');
+    return value;
+  }
+
   Future<String> renameEntry({required AureonLocalRoot root, required String entryId, required String newName}) async {
     final value = await _channel.invokeMethod<Object?>('renameEntry', <String, Object?>{
       'rootId': root.rootId, 'entryId': entryId, 'newName': newName,

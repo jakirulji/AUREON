@@ -88,5 +88,5 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - Added explicit create-folder and rename operations to the local file bridge and Files UI.
 - Android SAF folder selection now requests persistable read/write grants; provider-specific unsupported operations are reported without fallback or data loss.
 - Windows operations validate canonical paths remain inside the selected root, validate leaf names, and reject collisions before mutation.
-- No overwrite, delete, copy, move, recycle or automatic cleanup was introduced.
-- Dart bridge tests cover operation arguments and identities; Android/Windows CI must pass before considering this increment validated.
+- Verified file copy is implemented on Android SAF and Windows; SHA-256 read-back/source-stability checks and collision protection are in place. CI Run #40 (42392380319) passed Android and Windows analyze/test/compile jobs.
+- A native one-level move-to-parent operation is implemented in the bridge/UI. Android calls DocumentsContract.moveDocument and refuses unsupported providers; Windows uses MoveFileW with no overwrite semantics. No copy/delete fallback or permanent-delete path exists. Move requires explicit confirmation and rejects destination collisions. This increment awaits CI validation.
