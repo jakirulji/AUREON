@@ -120,7 +120,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     var draft = initial;
     return showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text(title),
-      content: TextField(autofocus: true, controller: null,
+      content: TextFormField(initialValue: initial, autofocus: true,
         decoration: InputDecoration(labelText: label), onChanged: (value) => draft = value,
         onSubmitted: (value) => Navigator.of(context).pop(value),
       ),
