@@ -4,6 +4,7 @@ import 'package:aureon/src/backup/aureon_metadata_store.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folder_store.dart';
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeKeyStore implements AureonMetadataKeyStore {
   String? value;
@@ -18,6 +19,7 @@ void main() {
   late Directory root;
   late AureonVirtualFolderStore store;
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     root = await Directory.systemTemp.createTemp('aureon-virtual-folder-test-');
     store = AureonVirtualFolderStore(
       metadataStore: AureonMetadataStore(rootDirectory: root, keyStore: _FakeKeyStore()),
