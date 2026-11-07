@@ -1,6 +1,6 @@
 # ADR-0003 — Android Local Data and Native Integration Boundary
 
-**Status:** Recommended for A0/A1 implementation; prototype validation pending  
+**Status:** Recommended; Room/WorkManager prototype committed under ../android-spike; CI validation pending  
 **Date:** 2026-11-07
 
 ## Decision
@@ -57,6 +57,10 @@ Use **Room 2.8.5 as the authoritative Android local persistence layer**, owned b
 - Pigeon 29.1.1; generated Dart/Kotlin bindings are build artifacts from a checked-in interface definition, not hand-maintained string channels.
 
 These versions are candidate pins, not yet validated in an Android build. Re-check current stable SDK and Play policy before release.
+
+## Current prototype
+
+See [Android Storage Spike](../../android-spike/README.md). It contains the Room transfer checkpoint schema/DAO/repository, WorkManager constraints, database close/reopen test and a cleanup-eligibility gate. The prototype does not delete files and its envelope byte arrays are test placeholders, not production encryption. CI has not yet confirmed this Android build.
 
 ## Validation spike
 
