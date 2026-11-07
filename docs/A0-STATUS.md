@@ -128,3 +128,12 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - App Trash client supports an injected AUREON session-token provider and concrete HTTPS transport, but it is not yet mounted in the Files/Trash UI. The app still has no Master Account login/session lifecycle, and no deployed API base URL or credential-broker endpoint.
 - Important: the current Trash record API accepts provider outcome references from an authenticated client. Before production enablement, move provider mutations behind a backend coordinator that obtains provider credentials from the isolated broker and records only backend-confirmed receipts; do not treat client-supplied receipt strings as proof of provider mutation.
 - No production KMS/HSM integration, OAuth refresh implementation, provider operation coordinator, production deployment, or live Google Drive test has been completed. CI success proves compilation/schema tests only, not end-to-end cross-device sync.
+
+
+## Backend runtime CI verification (2026-11-08)
+
+- Latest backend runtime/session/provider-adapter correction run #42402686383 completed successfully. PostgreSQL migration + database smoke tests, backend tests and backend build all passed.
+- This verifies the corrected Google Drive URL-encoded item-ID path and the fail-closed credential-broker boundary in CI. It does not prove a hosted deployment, live Google OAuth, cross-device Trash sync or real provider mutation.
+- No Android APK or Windows EXE artifacts were created or uploaded.
+- Next production-critical backend work remains: server-side provider Trash command coordinator, real credential broker with managed KMS/HSM, OAuth refresh/rotation and consented provider-account inventory. The current client-supplied provider outcome reference must not be accepted as proof of provider mutation in production.
+- Owner-facing hosting decision and a no-purchase-until-approved deployment checklist are recorded in `docs/DEPLOYMENT-AND-OWNER-ACTIONS.md`.
