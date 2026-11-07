@@ -10,7 +10,7 @@ This document records the required experience for restoring linked cloud account
 - AUREON Master Account stores linked-provider inventory and the secure credential references needed to restore provider access on another authorized device.
 - After signing into AUREON on a new device, AUREON restores the linked account list and attempts to establish provider API sessions without asking the user to manually add each account again.
 - User should not routinely re-enter provider passwords.
-- If the provider requires fresh interactive authentication (MFA, consent renewal, suspicious-login challenge, revoked/expired refresh token or conditional-access check), AUREON pauses only the affected account and asks the user to complete the provider's official challenge. User may manually enter an email verification code or authenticator code when the provider asks.
+- If the provider requires fresh interactive authentication (MFA, consent renewal, suspicious-login challenge, revoked/expired refresh token or conditional-access check), AUREON pauses only the affected account and asks the user to complete the provider's official challenge. User completes the challenge on the provider's official authorization page and may manually enter an email verification or authenticator code there. AUREON must not read Gmail, inspect authenticator apps, collect TOTP seeds or bypass MFA.
 - AUREON must never scrape Gmail inboxes, read authenticator databases, capture OTPs automatically, collect provider passwords or bypass MFA. No Gmail mailbox-read scope is requested merely to retrieve a verification code.
 - After successful challenge, securely update the credential vault and resume eligible queued operations.
 
@@ -20,7 +20,7 @@ This document records the required experience for restoring linked cloud account
 
 Proposed design:
 - Provider refresh tokens are stored server-side only as authenticated encrypted envelopes using envelope encryption backed by a managed KMS/HSM-backed key service.
-- Access tokens are short-lived and held in memory where feasible; do not persist them unless provider-specific requirements demand it.
+- Refresh tokens never leave the backend vault. Short-lived access tokens may be issued over TLS to the authenticated Kotlin/native provider adapter when direct provider API calls require them; keep them in native process memory only, never persist/log them or expose them to Flutter UI.
 - Credential service is isolated from ordinary API modules, with dedicated service identity and least-privilege access.
 - Decryption is permitted only for provider-token broker operations; tokens are never returned to Flutter UI or general client APIs.
 - Bind encrypted credentials to immutable account ID, provider type and credential version as authenticated context.
