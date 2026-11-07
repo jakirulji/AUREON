@@ -21,19 +21,19 @@ This list separates engineering work that can be completed in the repository fro
 
 ## 2. Master Account sign-in and recovery
 
-**Recommendation:** passkey-first sign-in, one-time offline recovery codes, device-bound rotating sessions. Offer password fallback only if the product owner decides it is needed for users who cannot use passkeys. Email alone must not unlock provider refresh credentials or E2E file keys.
+**Accepted direction:** Firebase Spark Email/Password with verified email for Master Account sign-in; SMS excluded. Add passkeys/trusted-device step-up where feasible. Email-only recovery is a weaker fallback and must include cooldown, notifications, rate limits and device/session revocation. Email recovery can restore only the provider credential vault, never E2E file-content keys.
 
 **Owner decision:** Approve passkey-first as the default; decide later whether password fallback is required before public launch.
 
 ## 3. Provider OAuth callback and credential vault
 
-**Recommendation:** backend HTTPS callback, backend-held PKCE verifier protected as a short-lived transaction, provider refresh token stored in a user-consented isolated credential broker using managed KMS/HSM. No provider passwords, OTP harvesting or Gmail/Authenticator access.
+**Accepted direction:** provider credentials stored as AES-256-GCM encrypted envelopes in Cloudflare D1; a narrowly scoped Cloudflare Worker broker unwraps the per-vault DEK using a Worker Secret-derived key after authorization. This is not HSM/KMS and grants the Worker runtime a real decryption capability. No provider passwords, OTP harvesting or Gmail/Authenticator access.
 
 **Owner decision:** approve the product behavior and separate vault consent UX. This approval does not replace Google app verification, provider terms review or independent security testing.
 
-## 4. Hosting, KMS and monthly budget
+## 4. Hosting and zero-cost platform
 
-**Recommendation:** managed PostgreSQL 18, managed KMS/HSM, secret manager, workload identity, encrypted backups and a separately deployed credential broker. Benchmark Singapore first for latency from Bangladesh, but do not select it without cost and legal review.
+**Accepted direction:** Firebase Authentication Spark + Cloudflare Workers + Cloudflare D1, initially using provider default domains and no purchased custom domain. This avoids OCI payment-card onboarding but has hard free-tier quotas and is not a permanent availability or $0 guarantee. Worker Secrets are not KMS/HSM.
 
 **Owner decisions required:**
 - Preferred cloud vendor (AWS, Google Cloud, Azure or another provider).
@@ -71,7 +71,7 @@ Do not publish a generic privacy policy as if these details were already known.
 The following are already recommended or validated and should not be reopened without evidence:
 - PostgreSQL 18 schema baseline and additive migration strategy.
 - Kotlin/Ktor modular-monolith backend starting point.
-- Separate credential-broker workload identity for KMS decrypt.
+- Isolated credential-broker code path within Cloudflare Worker, with explicit acknowledgement that Worker Secret is not HSM/KMS.
 - Room-owned Android local database with Pigeon boundary.
 - Transfer Coordinator plus provider-native upload/download adapters.
 - No automatic deletion of local originals.
