@@ -22,7 +22,7 @@ ALTER TABLE provider_credentials
         CHECK (encryption_algorithm IN ('AES-256-GCM', 'AES-128-GCM', 'other-reviewed')),
     ADD COLUMN credential_version bigint NOT NULL DEFAULT 1
         CHECK (credential_version > 0),
-    ADD COLUMN credential_status text NOT NULL DEFAULT 'active'
+    ADD COLUMN credential_status text NOT NULL DEFAULT 'reauth_required'
         CHECK (credential_status IN ('active', 'refreshing', 'reauth_required', 'revocation_pending', 'revoked', 'vault_unavailable')),
     ADD COLUMN consented_at timestamptz,
     ADD COLUMN last_refresh_attempt_at timestamptz,
@@ -34,7 +34,9 @@ ALTER TABLE provider_credentials
     ADD CONSTRAINT ck_provider_credentials_refresh_lease
         CHECK ((refresh_lease_id IS NULL) = (refresh_lease_expires_at IS NULL)),
     ADD CONSTRAINT ck_provider_credentials_refreshing_lease
-        CHECK (credential_status <> 'refreshing' OR refresh_lease_id IS NOT NULL);
+        CHECK (credential_status <> 'refreshing' OR refresh_lease_id IS NOT NULL),
+    ADD CONSTRAINT ck_provider_credentials_active_consent
+        CHECK (credential_status NOT IN ('active', 'refreshing') OR consented_at IS NOT NULL);
 
 CREATE INDEX ix_provider_credentials_refresh_lease
     ON provider_credentials(refresh_lease_expires_at)
