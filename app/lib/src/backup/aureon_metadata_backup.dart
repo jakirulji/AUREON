@@ -458,11 +458,7 @@ class AureonMetadataRestorePlanner {
 
   int _countPending(List<AureonMetadataFolder> folders) =>
       folders.fold<int>(0, (sum, folder) =>
-        sum + folder.files.length + _countPending(folders: folder.folders));
-
-  int _countPending({required List<AureonMetadataFolder> folders}) =>
-      folders.fold<int>(0, (sum, folder) =>
-        sum + folder.files.length + _countPending(folders: folder.folders));
+        sum + folder.files.length + _countPending(folder.folders));
 }
 
 void _validateUniqueFolderIds(List<AureonMetadataFolder> roots) {
