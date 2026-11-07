@@ -73,6 +73,29 @@ void main() {
     expect(snapshot.rootFolders.map((folder) => folder.name), ['Root']);
   });
 
+  test('favorites, tags and explicit file/folder order persist', () async {
+    await store.createFolder('A');
+    await store.createFolder('B');
+    var snapshot = await store.load();
+    final first = snapshot.rootFolders.first;
+    final second = snapshot.rootFolders.last;
+    await store.addFileToFolder(first.id, ProviderFileReference(provider: ProviderKind.googleDrive, providerAccountId: 'drive', accountLabel: 'Work', providerItemId: 'file-a', name: 'a.pdf'));
+    await store.addFileToFolder(first.id, ProviderFileReference(provider: ProviderKind.googleDrive, providerAccountId: 'drive', accountLabel: 'Work', providerItemId: 'file-b', name: 'b.pdf'));
+    snapshot = await store.load();
+    final fileA = snapshot.rootFolders.first.files.first.reference.stableKey;
+    await store.toggleFavorite(first.id, fileA);
+    await store.addTagToFile(first.id, fileA, 'priority');
+    await store.reorderFile(first.id, fileA, 1);
+    await store.reorderFolder(second.id, 0);
+    snapshot = await store.load();
+    expect(snapshot.rootFolders.first.name, 'B');
+    final reordered = snapshot.rootFolders.last.files;
+    expect(reordered.first.reference.name, 'b.pdf');
+    expect(reordered.last.favorite, isTrue);
+    expect(reordered.last.tags, contains('priority'));
+    expect(reordered.last.order, 1);
+  });
+
   test('duplicate sibling names are rejected but names may repeat in other branches', () async {
     await store.createFolder('Projects');
     var snapshot = await store.load();
