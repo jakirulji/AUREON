@@ -15,6 +15,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — historical managed-KMS proposal; superseded for the current no-card personal deployment by ADR-0005 and the Cloudflare/Firebase direction.
 - [ADR-0005 Zero-cost Credential Vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md) — accepted Worker-Secret-wrapped provider credential vault with server-assisted recovery; not HSM/KMS or zero-knowledge.
 - [ADR-0006 Firebase and Cloudflare Free Platform](./adr/ADR-0006-FIREBASE-CLOUDFLARE-FREE-PLATFORM.md) — selected no-card platform direction; TypeScript Worker + D1 migration required.
+- [ADR-0007 Dual Credential Vault Recovery](./adr/ADR-0007-DUAL-CREDENTIAL-VAULT-RECOVERY.md) — independent Manual Recovery Key and Cloudflare-assisted recovery with portable encrypted bundle.
 - [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; Android first vertical slice plus parallel Windows workstream after shared contracts freeze.
 - [Windows File Manager Specification](./WINDOWS-FILE-MANAGER-SPEC.md) — accepted product direction; native filesystem spike started.
 
