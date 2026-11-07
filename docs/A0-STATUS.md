@@ -7,6 +7,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 ## 1. Work completed in the repository
 
+- [A0 Owner Decisions](./A0-OWNER-DECISIONS.md) — remaining owner approvals and recommended defaults.
+
 - [A0 Threat Model](./THREAT-MODEL.md) — STRIDE register, security invariants, separate credential-broker workload requirement and required test evidence.
 - [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory and policy framework; public policy/legal review remains open.
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and offline recovery-code recommendation; owner approval pending.
