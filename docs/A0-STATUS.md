@@ -162,3 +162,12 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - Critical migration: the existing Ktor/PostgreSQL backend cannot run unchanged on Cloudflare Workers/D1. A TypeScript Worker API and D1 schema/migration/test suite must be built and validated before client cutover. Keep the existing backend prototype until parity and security tests pass.
 - Worker Secret is not an HSM; maintain a protected offline emergency copy and versioned rotation/restore drills. Loss of both the Worker Secret and its emergency copy can make provider credentials unrecoverable.
 - No cloud resource has been provisioned, no billing upgrade has been enabled, and no production deployment has occurred. This documentation decision is not implementation or deployment evidence.
+
+
+## Independent dual-recovery owner requirement (2026-11-08)
+
+- Owner clarified that AUREON must not be Cloudflare-dependent for provider credential vault recovery.
+- ADR-0007 adds two independent DEK wrapping paths: owner-held random 256-bit Manual Recovery Key and Cloudflare Worker Secret-derived recovery key.
+- The Manual Recovery Key works locally and is never sent to Cloudflare. Cloudflare recovery is the alternate route if the manual key is lost.
+- A portable encrypted Recovery Bundle must be exportable and storable outside Cloudflare. The manual key alone cannot restore ciphertext that is unavailable; bundle freshness must be visible and stale imports reconciled safely.
+- Both recovery paths are architecture requirements only; no dual-envelope code, bundle export/import, Worker recovery, or cloud deployment is implemented yet.
