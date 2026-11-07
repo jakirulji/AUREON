@@ -266,7 +266,9 @@ Decisions required before implementation:
 - Added metadata-first inventory API contracts and virtual category views; provider originals remain untouched.
 - Clarified that Google Photos albums are not Drive folders and are represented only where provider APIs expose them.
 - Added PostgreSQL 18 CI migration/smoke-test steps; execution result remains unverified.
-- Recommended Kotlin/JVM + Ktor 3.6.1 modular monolith provisionally, pending a reproducible architecture spike.
+- Added Ktor 3.6.1 / Kotlin 2.4.21 backend spike scaffold and CI workflow; test run requires triage before the stack can be verified.
+- Added passkey-first Master Account recovery recommendation, Room/Pigeon Android data-boundary ADR, KMS/hosting operations ADR and A1 vertical-slice backlog.
+- OpenAPI formal validation and V001+V002 PostgreSQL 18 migration/smoke checks passed in GitHub Actions.
 
 ## 16. Transfer Engine and Performance Architecture
 
@@ -386,7 +388,11 @@ Performance targets must be measured on representative devices and networks; do 
 - [V001 PostgreSQL baseline](./migrations/V001__initial_schema.sql) and [V002 vault/inventory migration](./migrations/V002__vault-and-provider-inventory.sql) — additive schema evolution; V002 must run after V001.
 - [Android Native OAuth and Credential Lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) — provider callback patterns, user-consented credential vault, cross-device restoration and refresh safety.
 - [OpenAPI v1 contract](./openapi/v1.yaml) — identity, provider authorization, inventory, file catalog, sync and transfer control-plane endpoints.
-- [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md) — provisional Kotlin/Ktor modular-monolith recommendation and required proof-of-concept gates.
+- [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md) — Kotlin/Ktor modular-monolith recommendation and proof-of-concept gates.
+- [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first recommendation, device-bound sessions and separate recovery domains.
+- [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room as Kotlin-owned source of truth and Pigeon bridge for Flutter.
+- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — credential-vault KMS boundary, deployment requirements and open vendor/region decisions.
+- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — proposed implementation sequence after A0 exit.
 
 ## 18. Plan maintenance
 
