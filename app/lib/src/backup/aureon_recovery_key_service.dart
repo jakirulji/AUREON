@@ -149,7 +149,7 @@ class VaultRecoveryBundle {
       if (entry is! Map) throw const FormatException('Invalid manual key envelope.');
       return ManualKeyEnvelope.fromJson(entry.cast<String, Object?>());
     }).toList();
-    if (parsedEnvelopes.map((entry) => entry.keyId).toSet().length != keyCount) {
+    if (parsedEnvelopes.map((entry) => entry.keyId).toSet().length != 5) {
       throw const FormatException('Recovery bundle manual key envelope IDs must be unique.');
     }
     final cloudflare = json['cloudflareEnvelope'] is Map
