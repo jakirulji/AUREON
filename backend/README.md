@@ -9,6 +9,8 @@ This is a disposable A0 architecture spike, **not a production backend**.
 - Public liveness endpoint.
 - Protected sample route with an injected session-authentication boundary.
 - Deny-all default authenticator: no real login, JWT issuer, database or provider OAuth is implemented.
+- A KMS data-key port with a test proving KMS failure blocks the credential operation and zeroes the plaintext test key after use.
+- An in-memory compare-and-swap refresh-lease model with concurrent acquisition and stale-worker tests. This is not a PostgreSQL implementation.
 - Tests prove that missing/invalid credentials are rejected and a test-only injected authenticator can authorize a request.
 
 ## Run
@@ -28,7 +30,7 @@ Then request:
 
 ## Security boundary
 
-Do not add real secrets, production credentials, provider tokens, KMS key material or user data to this spike. The test token exists only inside an isolated unit test. Production authentication must use server-issued revocable sessions bound to registered devices. Credential-vault, KMS, PostgreSQL repositories, OAuth callback handling and outbox processing are deliberately not represented as complete here.
+Do not add real secrets, production credentials, provider tokens, KMS key material or user data to this spike. The test token exists only inside an isolated unit test. Production authentication must use server-issued revocable sessions bound to registered devices. Credential-vault encryption, a real KMS adapter, PostgreSQL repositories/transactions, OAuth callback handling, device-key verification and outbox processing are deliberately not represented as complete here. The KMS and lease code is an interface/model only.
 
 ## Exit status
 
