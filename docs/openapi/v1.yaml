@@ -76,6 +76,15 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [Identity]
+      operationId: revokeCurrentSession
+      summary: Revoke the current session
+      responses:
+        '204':
+          description: Session revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /auth/session/refresh:
     post:
       tags: [Identity]
@@ -95,16 +104,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /auth/session:
-    delete:
-      tags: [Identity]
-      operationId: revokeCurrentSession
-      summary: Revoke the current session
-      responses:
-        '204':
-          description: Session revoked.
         '401':
           $ref: '#/components/responses/Unauthorized'
   /me:
@@ -351,6 +350,33 @@ paths:
                 $ref: '#/components/schemas/FilePage'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /files:
+    post:
+      tags: [Files]
+      operationId: createFileRecord
+      summary: Create a logical file metadata record
+      description: Creates catalog metadata only; file bytes are uploaded through the selected provider adapter from the client.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFileRequest'
+      responses:
+        '201':
+          description: Logical file record created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /files/{fileId}:
     get:
       tags: [Files]
