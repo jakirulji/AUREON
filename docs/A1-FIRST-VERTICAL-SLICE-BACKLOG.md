@@ -63,3 +63,8 @@ This workstream may proceed alongside Android implementation. It does not block 
 - AI file classification or content analysis.
 - Automatic provider quota pooling or file sharding.
 - Automatic deletion of local originals.
+
+
+## Shared platform contract gate
+
+Before substantial Windows and Android feature work proceeds in parallel, both adapters must align with [Shared Android/Windows Platform Contracts](./SHARED-PLATFORM-CONTRACTS.md). The contract covers logical file/version identity, provider capability reporting, durable transfer states, verification evidence, error taxonomy, encryption envelope interoperability and the no-auto-delete invariant. It is a proposed freeze baseline, not a claim of completed implementation.
