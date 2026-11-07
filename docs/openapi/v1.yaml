@@ -618,6 +618,127 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /trash/items:
+    get:
+      tags: [Sync]
+      operationId: listTrashItems
+      summary: List provider-backed items currently in AUREON Trash
+      description: |
+        Returns cloud-provider Trash records for the authenticated Master Account.
+        Device-local SAF/Win32 paths and local-only Trash entries are never uploaded.
+        This endpoint lists metadata only and never invokes a provider API.
+      parameters:
+        - name: providerAccountId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Current cloud Trash page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashItemPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Sync]
+      operationId: recordTrashItem
+      summary: Record a provider-confirmed Trash operation
+      description: |
+        Call only after the provider adapter confirms the remote item was moved
+        into provider Trash or an AUREON-managed provider folder. The server records
+        metadata and emits a sync change; it never moves or deletes provider bytes.
+        The operation ID makes retries idempotent.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrashItemCreateRequest'
+      responses:
+        '201':
+          description: Trash metadata recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /trash/items/{trashItemId}/restore:
+    post:
+      tags: [Sync]
+      operationId: recordTrashRestore
+      summary: Record a provider-confirmed restore
+      description: Client completes the provider restore first. This endpoint changes only AUREON metadata state and is safe to retry with the same operation ID.
+      parameters:
+        - name: trashItemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrashItemTransitionRequest'
+      responses:
+        '200':
+          description: Restore state recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /trash/items/{trashItemId}/purge:
+    post:
+      tags: [Sync]
+      operationId: recordTrashPurge
+      summary: Record a provider-confirmed permanent deletion
+      description: Client completes permanent deletion and receives provider confirmation first. This metadata endpoint never issues a provider delete.
+      parameters:
+        - name: trashItemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrashItemTransitionRequest'
+      responses:
+        '200':
+          description: Permanent-deletion state recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /sync/changes:
     get:
       tags: [Sync]
@@ -1396,6 +1517,89 @@ components:
         acceptedAt:
           type: string
           format: date-time
+    TrashItemCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [operationId, providerAccountId, providerItemId, trashMode]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        providerAccountId:
+          type: string
+          format: uuid
+        providerItemId:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        originalParentProviderItemId:
+          type: [string, 'null']
+          maxLength: 1024
+        trashMode:
+          type: string
+          enum: [provider_native, provider_folder]
+        trashContainerProviderItemId:
+          type: [string, 'null']
+          maxLength: 1024
+    TrashItemTransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [operationId, expectedRowVersion]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        expectedRowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    TrashItem:
+      type: object
+      required: [id, providerAccountId, providerItemId, originalParentProviderItemId, trashMode, trashContainerProviderItemId, status, trashedAt, rowVersion]
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerAccountId:
+          type: string
+          format: uuid
+        providerItemId:
+          type: string
+        originalParentProviderItemId:
+          type: [string, 'null']
+        trashMode:
+          type: string
+          enum: [provider_native, provider_folder]
+        trashContainerProviderItemId:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [trashed, restored, permanently_deleted]
+        trashedAt:
+          type: string
+          format: date-time
+        restoredAt:
+          type: [string, 'null']
+          format: date-time
+        permanentlyDeletedAt:
+          type: [string, 'null']
+          format: date-time
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    TrashItemPage:
+      type: object
+      required: [items, nextCursor, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrashItem'
+        nextCursor:
+          type: string
+        hasMore:
+          type: boolean
     SyncChange:
       type: object
       required: [sequence, entityType, entityId, changeType, changedAt]
@@ -1405,12 +1609,12 @@ components:
           format: int64
         entityType:
           type: string
-          enum: [file, provider_account, device, setting]
+          enum: [file, provider_account, device, setting, trash_item]
         entityId:
           type: string
         changeType:
           type: string
-          enum: [created, updated, tombstoned, revoked]
+          enum: [created, updated, tombstoned, revoked, restored, permanently_deleted]
         payload:
           type: [object, 'null']
           additionalProperties: true

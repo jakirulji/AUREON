@@ -41,6 +41,7 @@ erDiagram
   USERS ||--o{ IDEMPOTENCY_RECORDS : deduplicates
   USERS ||--o{ AUDIT_EVENTS : records
   USERS ||--o{ OUTBOX_EVENTS : emits
+  PROVIDER_ACCOUNTS ||--o{ TRASH_ITEMS : tracks
 ```
 
 ## Table contracts
@@ -65,6 +66,7 @@ erDiagram
 | `idempotency_records` | Safe request replay/reconciliation | unique user + operation key; request hash mismatch is conflict |
 | `audit_events` | Security and lifecycle audit | append-only at application level; redacted details |
 | `outbox_events` | Reliable asynchronous event dispatch | lease/attempt tracking; payload references, never secrets |
+| `trash_items` | Cross-device metadata for provider-backed Trash | ownership constraints, idempotent operation ID, one active record per provider object, row version |
 
 ## Provider inventory semantics
 
@@ -131,3 +133,14 @@ erDiagram
 - Provider-specific album/media membership capabilities and Photos Picker UX.
 - Migration runner and rollback/forward-fix policy.
 
+
+
+## Provider-backed Trash and cross-device sync
+
+- V003 adds the trash_items table for cloud-provider objects only. It stores provider/account/item IDs, original provider parent, Trash mode, provider Trash-container ID where applicable, lifecycle timestamps and row version.
+- The client must complete a provider-native Trash or provider-folder move and receive provider confirmation before creating the server record. Restore/purge metadata transitions are posted only after the corresponding provider action is confirmed.
+- Operation IDs make retries idempotent. A partial unique index permits only one active Trash record per provider object; after confirmed restore, the object may be trashed again in a new lifecycle.
+- The authenticated account owns every record. Composite foreign keys prevent cross-user account, item and device references. Clients never submit a user ID.
+- Names, local paths, Windows paths, SAF tree URIs, content:// URIs and file bytes are not stored. Display names are resolved from provider inventory.
+- Local-only files remain local-only. SAF/Win32 IDs and selected folder bookmarks are device-specific and are not portable; uploading them would create misleading Trash entries that another device cannot safely restore.
+- These records are metadata, not provider commands. Provider adapters perform actions and report confirmed outcomes. Provider retention/expiry remains authoritative.

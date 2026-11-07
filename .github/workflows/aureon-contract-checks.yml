@@ -71,6 +71,12 @@ jobs:
         run: |
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 \
             -f docs/migrations/V002__vault-and-provider-inventory.sql
+      - name: Apply V003 provider Trash metadata
+        env:
+          PGPASSWORD: aureon_ci_only
+        run: |
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 \
+            -f docs/migrations/V003__provider-trash-sync.sql
       - name: Verify V001 baseline constraints
         env:
           PGPASSWORD: aureon_ci_only
@@ -83,3 +89,9 @@ jobs:
         run: |
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 \
             -f tests/database/V002_vault_inventory_smoke.sql
+      - name: Verify V003 provider Trash constraints
+        env:
+          PGPASSWORD: aureon_ci_only
+        run: |
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 \
+            -f tests/database/V003_provider_trash_smoke.sql
