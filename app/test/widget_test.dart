@@ -13,10 +13,12 @@ void main(){
    if(call.method=='pickRoot') {
     return {'rootId':'content://tree/root','rootDocumentId':'root-doc','displayName':'Documents'};
    }
-   if(call.method=='listChildren')return [
-    {'id':'folder-1','name':'Projects','isDirectory':true},
-    {'id':'file-1','name':'notes.txt','isDirectory':false,'sizeBytes':42}
-   ];
+   if(call.method=='listChildren') {
+    return [
+     {'id':'folder-1','name':'Projects','isDirectory':true},
+     {'id':'file-1','name':'notes.txt','isDirectory':false,'sizeBytes':42}
+    ];
+   }
    return null;
   });
   await tester.pumpWidget(const MaterialApp(home:AureonFilesPage()));
