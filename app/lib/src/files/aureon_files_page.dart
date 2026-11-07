@@ -188,18 +188,22 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       final moved = await _files.moveToTrash(root: root, entryId: entry.id, parentId: parent.id);
       final prefs = await SharedPreferences.getInstance();
       final rootKey = base64Url.encode(utf8.encode(root.rootId)).replaceAll('=', '');
-      if (moved.mode == 'managed') await prefs.setString('aureon.trash.folder.$rootKey', moved.trashFolderId);
-      await prefs.setString('aureon.trash.meta.$rootKey.${moved.id}', jsonEncode({
-        'originalParentId': moved.originalParentId,
-        'originalName': moved.name,
-        'trashedAt': moved.trashedAt,
-        'mode': moved.mode,
-      }));
+      if (moved.mode == 'managed') {
+        await prefs.setString('aureon.trash.folder.$rootKey', moved.trashFolderId);
+        await prefs.setString('aureon.trash.meta.$rootKey.${moved.id}', jsonEncode({
+          'originalParentId': moved.originalParentId,
+          'originalName': moved.name,
+          'trashedAt': moved.trashedAt,
+          'mode': moved.mode,
+        }));
+      }
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Moved to AUREON Trash. Original data is preserved.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(moved.mode == 'windows'
+            ? 'Moved to the Windows Recycle Bin.'
+            : 'Moved to AUREON Trash. Original data is preserved.'),
+        ));
       }
     } on PlatformException catch (error) {
       if (mounted) {
