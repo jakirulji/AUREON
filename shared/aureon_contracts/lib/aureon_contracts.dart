@@ -270,7 +270,7 @@ class ProviderFileReference {
   final int? sizeBytes;
   final String? webUrl;
 
-  String get stableKey => '${provider.name}:$providerAccountId:$providerItemId';
+  String get stableKey => '${provider.name}|${providerAccountId.length}:$providerAccountId|${providerItemId.length}:$providerItemId';
 
   Map<String, Object?> toJson() => {
     'provider': provider.name,
@@ -286,8 +286,10 @@ class ProviderFileReference {
 
   factory ProviderFileReference.fromJson(Map<String, Object?> json) {
     final providerName = json['provider'] as String?;
-    final provider = ProviderKind.values.where((value) => value.name == providerName).firstOrNull;
-    if (provider == null) throw const FormatException('Unknown provider kind.');
+    if (!ProviderKind.values.any((value) => value.name == providerName)) {
+      throw const FormatException('Unknown provider kind.');
+    }
+    final provider = ProviderKind.values.firstWhere((value) => value.name == providerName);
     final accountId = json['providerAccountId'] as String?;
     final itemId = json['providerItemId'] as String?;
     final name = json['name'] as String?;
