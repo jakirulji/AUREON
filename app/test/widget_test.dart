@@ -40,7 +40,7 @@ void main() {
       return null;
     });
 
-    await tester.pumpWidget(const MaterialApp(home: AureonFilesPage()));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
     await tester.tap(find.byType(OutlinedButton));
     await tester.pumpAndSettle();
 
@@ -77,7 +77,7 @@ void main() {
       return null;
     });
 
-    await tester.pumpWidget(const MaterialApp(home: AureonFilesPage()));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
     await tester.pumpAndSettle();
 
     expect(listedParent, 'root-doc');
@@ -100,7 +100,7 @@ void main() {
       }
       return null;
     });
-    await tester.pumpWidget(const MaterialApp(home: AureonFilesPage()));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
     await tester.tap(find.byType(OutlinedButton));
     await tester.pumpAndSettle();
     expect(find.text('alpha.txt'), findsOneWidget);
