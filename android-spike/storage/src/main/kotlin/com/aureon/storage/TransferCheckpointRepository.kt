@@ -40,6 +40,9 @@ class TransferCheckpointRepository(private val dao: TransferJobDao) {
         }
     }
 
+    suspend fun recoveryPlan(): List<RecoveryDecision> =
+        TransferRecoveryPlanner.plan(dao.listResumable())
+
     suspend fun canOfferSourceCleanup(operationId: String): Boolean =
         dao.canOfferSourceCleanup(operationId)
 }

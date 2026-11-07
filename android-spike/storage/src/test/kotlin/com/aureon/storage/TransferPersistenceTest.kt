@@ -53,6 +53,40 @@ class TransferPersistenceTest {
     }
 
     @Test
+    fun recoveryAfterDatabaseReopenReconcilesInFlightInsteadOfBlindlyReuploading() = runBlocking {
+        val first = openDatabase()
+        first.transferJobDao().upsert(
+            testJob("operation-uploading", acknowledgedBytes = 512, totalBytes = 1024)
+        )
+        first.transferJobDao().upsert(
+            testJob("operation-queued", acknowledgedBytes = 0, totalBytes = 2048)
+                .copy(status = "queued", updatedAtEpochMs = 2000)
+        )
+        first.transferJobDao().upsert(
+            testJob("operation-auth", acknowledgedBytes = 128, totalBytes = 512)
+                .copy(status = "waiting_for_auth", updatedAtEpochMs = 3000)
+        )
+        first.close()
+
+        val reopened = openDatabase()
+        val repository = TransferCheckpointRepository(reopened.transferJobDao())
+        val plan = repository.recoveryPlan().associateBy { it.operationId }
+
+        assertEquals(RecoveryAction.RECONCILE_PROVIDER_SESSION,
+            plan["operation-uploading"]?.action)
+        assertEquals(512L, plan["operation-uploading"]?.acknowledgedBytes)
+        assertEquals(RecoveryAction.ENQUEUE, plan["operation-queued"]?.action)
+        assertEquals(RecoveryAction.HOLD_FOR_AUTH, plan["operation-auth"]?.action)
+
+        // Planning recovery is read-only: it never rewrites a checkpoint or starts a transfer.
+        assertEquals("uploading",
+            reopened.transferJobDao().getById("operation-uploading")?.status)
+        assertEquals(512L,
+            reopened.transferJobDao().getById("operation-uploading")?.acknowledgedBytes)
+        reopened.close()
+    }
+
+    @Test
     fun sourceCleanupCannotBeOfferedBeforeRemoteVerificationAndExplicitPermission() = runBlocking {
         val database = openDatabase()
         val repository = TransferCheckpointRepository(database.transferJobDao())

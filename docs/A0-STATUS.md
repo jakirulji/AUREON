@@ -50,7 +50,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
 | E2E encryption | Open | Protocol proposal exists; recovery design approval, cross-platform test vectors and independent cryptographic review remain |
 | Android platform | Provisional ADR | Minimum API 26 / prototype target API 36; release-time SDK policy and OEM matrix still require validation |
-| Local data layer | Prototype in progress | Room checkpoint persistence, cleanup eligibility gate, WorkManager constraints scaffold, Pigeon bridge and FlutterEngine plugin lifecycle source exist. Live FlutterEngine↔Dart round-trip, process-death/reboot/OEM recovery, real WorkManager scheduling, SAF and Keystore integration remain |
+| Local data layer | Prototype in progress | Room checkpoint persistence, cleanup eligibility gate, WorkManager constraints scaffold, Pigeon bridge and FlutterEngine plugin lifecycle source exist. A read-only post-reopen recovery planner now distinguishes queued work from in-flight uploads requiring provider-session reconciliation and auth-blocked jobs; CI validation is pending. Live FlutterEngine↔Dart round-trip, actual provider reconciliation, process-death/reboot/OEM testing, real WorkManager scheduling, SAF and Keystore integration remain |
 | Windows platform | Prototype in progress | C++20 directory enumeration passes Windows CI; safe rename/move/copy/recycle-bin operations, ACL/path error mapping, Cloud Files API sync-root/hydration tests and supported shell integration remain |
 | Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
 | Privacy and legal | Baseline drafted; approval open | Data inventory, consent, retention and subprocessor framework documented; jurisdiction, actual retention, public privacy policy and legal review remain |
@@ -61,7 +61,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 1. Keep OpenAPI and PostgreSQL 18 contract checks green on every relevant change.
 2. Preserve the validated V001/V002 baseline; future schema changes must use new ordered migrations and regression tests.
 3. Extend the backend OAuth exchange path with provider-specific validation and callback transaction binding; keep credentials out of logs and UI.
-4. Complete Android FlutterEngine↔Dart round-trip integration, process-death recovery and SAF tests.
+4. Validate the Android post-reopen recovery planner, then complete FlutterEngine↔Dart round-trip integration, provider-session reconciliation, process-death/reboot tests and SAF tests.
 5. Validate the Shell recycle-bin integration test, then add a disposable-user-profile Cloud Files API sync-root/hydration integration harness.
 6. Resolve Master Account auth/recovery, OAuth scopes/callback, KMS/hosting/cost, privacy/legal and E2E recovery decisions with the owner.
 7. Obtain independent security review of the credential broker, credential vault and E2E key recovery; then conduct the A0 exit review. Do not start A1 before this review.

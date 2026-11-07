@@ -11,7 +11,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 - Generated Dart API is written to `pigeon/lib/src/aureon_storage_api.g.dart`; generated Kotlin API is written into the Android storage module under `com.aureon.storage.generated`.
 - `AureonStorageHostApiImpl` implements the generated Kotlin host contract and connects transfer lookup/pause/resume calls to the Room repository. The generated Kotlin API compiles against Flutter’s Android embedding (`flutter.jar`).
 - AureonStoragePlugin registers and unregisters the generated Pigeon handler per FlutterEngine. Plugin lifecycle and host implementation are compile/unit-test validated; a live FlutterEngine-to-Dart round trip and Flutter application shell are still open.
-- Tests close and reopen the Room database, verify persisted checkpoint state, and exercise Pigeon host API metadata mapping plus pause/resume state transitions.
+- Tests close and reopen the Room database, verify persisted checkpoint state, and build a read-only recovery plan. In-flight uploads are marked for provider-session reconciliation, not blindly re-enqueued; auth-blocked jobs remain held.
 - Source cleanup can only be offered after remote verification, explicit user opt-in and a granted OS permission.
 
 ## Security and lifecycle boundaries
@@ -19,7 +19,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 - Source URI and provider upload-session references are represented as encrypted-envelope byte arrays in the schema; the byte arrays in this spike are test fixtures, not production ciphertext.
 - No method deletes a local source file. This prototype only computes whether a cleanup offer is eligible.
 - No actual provider transfer, Android Keystore wrapping, production WorkManager scheduling, SAF picker or Flutter UI is implemented yet. Pigeon generation is exercised in CI; the generated source files are created during the build.
-- A database close/reopen test is not a full Android process-death/reboot/OEM test.
+- The recovery planner is deterministic scaffolding; it does not yet query a real provider session or schedule actual WorkManager execution. A database close/reopen test is not a full Android process-death/reboot/OEM test.
 
 ## Build
 

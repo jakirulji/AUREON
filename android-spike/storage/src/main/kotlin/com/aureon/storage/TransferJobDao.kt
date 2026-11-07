@@ -84,6 +84,15 @@ interface TransferJobDao {
     )
     suspend fun canOfferSourceCleanup(operationId: String): Boolean
 
-    @Query("SELECT * FROM transfer_jobs WHERE status IN ('queued', 'uploading', 'paused') ORDER BY updatedAtEpochMs")
+    @Query(
+        """
+        SELECT * FROM transfer_jobs
+        WHERE status IN (
+            'queued', 'uploading', 'finalizing', 'verifying', 'paused',
+            'waiting_for_network', 'waiting_for_auth', 'waiting_for_quota', 'retry_wait'
+        )
+        ORDER BY updatedAtEpochMs
+        """
+    )
     suspend fun listResumable(): List<TransferJobEntity>
 }
