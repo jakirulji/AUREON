@@ -55,6 +55,11 @@ jobs:
         run: |
           flutter pub get
           flutter test
+      - name: Test shared cross-platform contracts
+        working-directory: shared/aureon_contracts
+        run: |
+          dart pub get
+          dart test
       - name: Analyze, test and compile
         working-directory: ${{ runner.temp }}/aureon-android
         run: |
@@ -97,6 +102,12 @@ jobs:
         run: |
           flutter pub get
           flutter test
+      - name: Test shared cross-platform contracts
+        shell: pwsh
+        working-directory: shared/aureon_contracts
+        run: |
+          dart pub get
+          dart test
       - name: Analyze, test and compile
         shell: pwsh
         working-directory: ${{ runner.temp }}/aureon-windows
