@@ -99,8 +99,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (name == null || name.trim().isEmpty) return;
     try {
       await _files.createFolder(root: root, parentId: _levels.last.id, name: name.trim());
-      await AureonOperationHistory.record(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
     } on PlatformException catch (error) {
       await AureonOperationHistory.record(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), succeeded: false, errorCode: error.code);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
@@ -119,8 +119,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       await _files.copyFile(root: root, sourceId: entry.id,
         parentId: _levels.last.id, targetName: name.trim());
-      await AureonOperationHistory.record(kind: 'copy', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'copy', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Copy completed and SHA-256 verified. Original preserved.')),
@@ -157,8 +157,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       await _files.moveEntry(root: root, entryId: entry.id,
         sourceParentId: sourceParent.id, targetParentId: targetParent.id);
-      await AureonOperationHistory.record(kind: 'move', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: _levels.take(_levels.length - 1).map((x) => x.name).join(' / '), succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'move', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: _levels.take(_levels.length - 1).map((x) => x.name).join(' / '), succeeded: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Moved "${entry.name}" to "${targetParent.name}".')),
@@ -206,8 +206,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           'mode': moved.mode,
         }));
       }
-      await AureonOperationHistory.record(kind: 'trash', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: moved.mode == 'windows' ? 'Windows Recycle Bin' : 'AUREON Trash', succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'trash', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: moved.mode == 'windows' ? 'Windows Recycle Bin' : 'AUREON Trash', succeeded: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(moved.mode == 'windows'
@@ -250,8 +250,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (name == null || name.trim().isEmpty || name.trim() == entry.name) return;
     try {
       await _files.renameEntry(root: root, entryId: entry.id, newName: name.trim());
-      await AureonOperationHistory.record(kind: 'rename', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'rename', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
     } on PlatformException catch (error) {
       await AureonOperationHistory.record(kind: 'rename', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: false, errorCode: error.code);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
@@ -500,8 +500,8 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
           sourceParentId: folderId, targetParentId: meta['originalParentId'] as String);
         await prefs.remove(_metaKey(entry.id));
       }
-      await AureonOperationHistory.record(kind: 'restore', itemName: entry.name, sourceLocation: 'AUREON Trash', destinationLocation: 'Original folder', succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'restore', itemName: entry.name, sourceLocation: 'AUREON Trash', destinationLocation: 'Original folder', succeeded: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Restored "${entry.name}" to its original folder.')),
@@ -542,8 +542,8 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(_metaKey(entry.id));
       }
-      await AureonOperationHistory.record(kind: 'permanent_delete', itemName: entry.name, sourceLocation: 'AUREON Trash', succeeded: true);
       await _load();
+      await AureonOperationHistory.record(kind: 'permanent_delete', itemName: entry.name, sourceLocation: 'AUREON Trash', succeeded: true);
     } on PlatformException catch (error) {
       await AureonOperationHistory.record(kind: 'permanent_delete', itemName: entry.name, sourceLocation: 'AUREON Trash', succeeded: false, errorCode: error.code);
       if (mounted) {
