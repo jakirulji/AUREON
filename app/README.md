@@ -1,17 +1,26 @@
-# AUREON App Preview
+# AUREON App
 
-This directory contains the first cross-platform Flutter UI shell. Android and Windows platform folders are generated in CI so this source remains a shared Flutter layer.
+This directory contains the shared Flutter application layer. Android and Windows host projects are generated in CI while the platform integration work is being developed.
 
 ## Current scope
 
 - Responsive AUREON navigation and dark visual system.
-- Storage overview, recent-file layout and prototype status notice.
-- CI creates a debug Android APK and a Windows release bundle for visual review.
+- Storage overview and recent-file layout.
+- Explicit prototype state: displayed file rows and storage cards are sample data.
+
+## Validation
+
+The app validation workflow runs Flutter dependency resolution, static analysis, widget tests and platform compilation for Android and Windows. It does **not** upload or retain APK/EXE artifacts. Final installable builds will be produced once the agreed implementation scope is complete.
 
 ## Important limitation
 
-This is a UI preview only. File rows and storage cards are explicitly sample data. No real filesystem browsing, SAF access, Windows filesystem adapter connection, cloud OAuth, uploads, downloads or sync are wired into this UI yet. Do not use it to manage real files.
+This is not yet a functional file manager. Real Android SAF browsing, Windows filesystem browsing, cloud OAuth, uploads, downloads, sync and production security integrations are not connected to the UI. Do not use it to manage real files.
 
-## Local build
+## Local validation
 
-Generate the platform scaffolding, then run flutter pub get, flutter test, flutter build apk --debug or flutter build windows --release.
+Generate the desired platform scaffolding, then run:
+
+- `flutter pub get`
+- `flutter analyze`
+- `flutter test`
+- `flutter build apk --debug` or `flutter build windows --release` when platform compilation is needed.
