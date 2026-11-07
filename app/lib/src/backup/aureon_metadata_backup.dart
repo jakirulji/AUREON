@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:cryptography/cryptography.dart';
@@ -340,7 +339,7 @@ class AureonMetadataRestorePlanner {
     final views = _mergeViews(current.savedViews, backup.savedViews, conflicts);
     final merged = AureonMetadataSnapshot(
       snapshotId: backup.snapshotId,
-      generation: max(current.generation, backup.generation) + 1,
+      generation: (current.generation > backup.generation ? current.generation : backup.generation) + 1,
       createdAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
       rootFolders: mergedRoots,
       virtualFolders: virtuals,
