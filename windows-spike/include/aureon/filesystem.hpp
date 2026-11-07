@@ -28,6 +28,8 @@ enum class OperationError {
     destination_exists,
     unsafe_source_type,
     permission_denied,
+    integrity_mismatch,
+    hash_unavailable,
     io_error,
 };
 
@@ -35,21 +37,20 @@ struct OperationResult {
     bool success{};
     OperationError error{OperationError::none};
     std::filesystem::path resulting_path;
+    std::string sha256_hex;
 };
 
 std::vector<Entry> enumerate(const std::filesystem::path& directory,
                              const EnumerateOptions& options = {});
 
-// Rename within the same parent directory. The destination is never overwritten.
 OperationResult rename_entry(const std::filesystem::path& source,
                              const std::wstring& new_name);
 
-// Move into an existing directory. Cross-volume moves fail safely; no copy/delete fallback.
 OperationResult move_entry(const std::filesystem::path& source,
                            const std::filesystem::path& destination_directory);
 
-// Copy a regular file through a temporary sibling and atomic rename where supported.
-// Source is preserved and existing destinations are never overwritten.
+// Copies a regular file via a temporary sibling, verifies source stability and
+// destination SHA-256, then promotes it without overwriting an existing file.
 OperationResult copy_file_safely(const std::filesystem::path& source,
                                  const std::filesystem::path& destination);
 

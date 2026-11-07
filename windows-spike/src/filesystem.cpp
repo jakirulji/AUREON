@@ -1,6 +1,13 @@
 #include "aureon/filesystem.hpp"
 
+#include <Windows.h>
+#include <bcrypt.h>
+
 #include <algorithm>
+#include <array>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <system_error>
 
 namespace aureon::filesystem {
@@ -28,7 +35,70 @@ bool is_within(const std::filesystem::path& child,
 }
 
 OperationResult failure(OperationError error) {
-    return OperationResult{false, error, {}};
+    return OperationResult{false, error, {}, {}};
+}
+
+bool sha256_file(const std::filesystem::path& path,
+                 std::array<unsigned char, 32>& digest) {
+    BCRYPT_ALG_HANDLE algorithm = nullptr;
+    BCRYPT_HASH_HANDLE hash = nullptr;
+    DWORD object_size = 0;
+    DWORD bytes_written = 0;
+    std::vector<unsigned char> hash_object;
+    bool success = false;
+
+    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0)
+        != 0) {
+        return false;
+    }
+
+    if (BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH,
+                          reinterpret_cast<PUCHAR>(&object_size),
+                          sizeof(object_size), &bytes_written, 0) != 0) {
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+        return false;
+    }
+
+    hash_object.resize(object_size);
+    if (BCryptCreateHash(algorithm, &hash, hash_object.data(), object_size,
+                         nullptr, 0, 0) != 0) {
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+        return false;
+    }
+
+    std::ifstream input(path, std::ios::binary);
+    if (input) {
+        std::array<char, 64 * 1024> buffer{};
+        bool read_ok = true;
+        while (input) {
+            input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+            const auto count = input.gcount();
+            if (count > 0 &&
+                BCryptHashData(hash,
+                    reinterpret_cast<PUCHAR>(buffer.data()),
+                    static_cast<ULONG>(count), 0) != 0) {
+                read_ok = false;
+                break;
+            }
+        }
+        read_ok = read_ok && input.eof();
+        success = read_ok &&
+            BCryptFinishHash(hash, digest.data(),
+                             static_cast<ULONG>(digest.size()), 0) == 0;
+    }
+
+    BCryptDestroyHash(hash);
+    BCryptCloseAlgorithmProvider(algorithm, 0);
+    return success;
+}
+
+std::string to_hex(const std::array<unsigned char, 32>& digest) {
+    std::ostringstream output;
+    output << std::hex << std::setfill('0');
+    for (const auto byte : digest) {
+        output << std::setw(2) << static_cast<unsigned int>(byte);
+    }
+    return output.str();
 }
 
 }  // namespace
@@ -108,7 +178,7 @@ OperationResult rename_entry(const std::filesystem::path& source,
     std::error_code ec;
     std::filesystem::rename(source, destination, ec);
     if (ec) return failure(map_error(ec));
-    return OperationResult{true, OperationError::none, destination};
+    return OperationResult{true, OperationError::none, destination, {}};
 }
 
 OperationResult move_entry(const std::filesystem::path& source,
@@ -143,7 +213,7 @@ OperationResult move_entry(const std::filesystem::path& source,
 
     std::filesystem::rename(source, destination, ec);
     if (ec) return failure(map_error(ec));
-    return OperationResult{true, OperationError::none, destination};
+    return OperationResult{true, OperationError::none, destination, {}};
 }
 
 OperationResult copy_file_safely(const std::filesystem::path& source,
@@ -167,6 +237,11 @@ OperationResult copy_file_safely(const std::filesystem::path& source,
     temporary += L".aureon-partial";
     if (entry_exists(temporary)) return failure(OperationError::destination_exists);
 
+    std::array<unsigned char, 32> source_before{};
+    if (!sha256_file(source, source_before)) {
+        return failure(OperationError::hash_unavailable);
+    }
+
     const bool copied = std::filesystem::copy_file(
         source, temporary, std::filesystem::copy_options::none, ec);
     if (ec || !copied) {
@@ -175,13 +250,30 @@ OperationResult copy_file_safely(const std::filesystem::path& source,
         return failure(ec ? map_error(ec) : OperationError::io_error);
     }
 
+    std::array<unsigned char, 32> source_after{};
+    std::array<unsigned char, 32> destination_hash{};
+    const bool source_hash_ok = sha256_file(source, source_after);
+    const bool destination_hash_ok = sha256_file(temporary, destination_hash);
+    if (!source_hash_ok || !destination_hash_ok) {
+        std::error_code cleanup_error;
+        std::filesystem::remove(temporary, cleanup_error);
+        return failure(OperationError::hash_unavailable);
+    }
+
+    if (source_before != source_after || source_after != destination_hash) {
+        std::error_code cleanup_error;
+        std::filesystem::remove(temporary, cleanup_error);
+        return failure(OperationError::integrity_mismatch);
+    }
+
     std::filesystem::rename(temporary, destination, ec);
     if (ec) {
         std::error_code cleanup_error;
         std::filesystem::remove(temporary, cleanup_error);
         return failure(map_error(ec));
     }
-    return OperationResult{true, OperationError::none, destination};
+    return OperationResult{true, OperationError::none, destination,
+                           to_hex(destination_hash)};
 }
 
 }  // namespace aureon::filesystem

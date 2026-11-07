@@ -78,6 +78,8 @@ int main() {
                   "copied file exists");
     ok &= require(fs::exists(root / "Move Target" / "renamed.txt"),
                   "copy preserves original source");
+    ok &= require(copied.sha256_hex.size() == 64,
+                  "returns a 64-character SHA-256 digest");
     ok &= require(
         aureon::filesystem::copy_file_safely(
             root / "Move Target" / "renamed.txt", root / "Copy Target" / "copy.txt").error ==
