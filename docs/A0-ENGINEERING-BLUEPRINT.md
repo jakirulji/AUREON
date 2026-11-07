@@ -412,6 +412,8 @@ Do not infinite-retry permanent failures. Honor provider Retry-After and use bou
 
 ## 9. Encryption and key hierarchy (design proposal)
 
+**Detailed design proposal:** [E2E Encryption and Recovery Design](./E2E-ENCRYPTION-AND-RECOVERY-DESIGN.md). The proposal is not production-approved; primitive selection, recovery protocol and cross-platform test vectors remain open.
+
 Target: client-side E2E encryption. This section requires a dedicated cryptographic review before implementation.
 
 - Generate a random data-encryption key (DEK) per file version.
