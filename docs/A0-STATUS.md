@@ -27,7 +27,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | Data model | [DATA-MODEL](./DATA-MODEL.md) | V001/V002 entities and ownership invariants documented |
 | Database schema | [V001](./migrations/V001__initial_schema.sql), [V002](./migrations/V002__vault-and-provider-inventory.sql) | Additive SQL drafts committed |
 | Database tests | [V001 smoke](../tests/database/V001_schema_smoke.sql), [V002 smoke](../tests/database/V002_vault_inventory_smoke.sql) | Both smoke-test suites passed in GitHub Actions run #42370296201 on PostgreSQL 18 |
-| API | [OpenAPI v1](./openapi/v1.yaml) | OAuth vault, short-lived native access-token broker, provider inventory and album contracts added; structural review found no duplicate paths/operation IDs and no unresolved component references |
+| API | [OpenAPI v1](./openapi/v1.yaml) | OAuth vault, short-lived native access-token broker, provider inventory and album contracts added; formal OpenAPI validator passed in GitHub Actions run #42370296201 |
 | OAuth | [Provider OAuth Matrix](./PROVIDER-OAUTH-MATRIX.md), [Android OAuth lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) | Backend refresh-token vault target, native access-token boundary, consent and refresh concurrency documented |
 | Existing cloud content | [Cloud Restore and Legacy Import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) | Drive hierarchy, metadata-first inventory, virtual categories and Photos album constraints documented |
 | E2E encryption | [E2E Encryption and Recovery](./E2E-ENCRYPTION-AND-RECOVERY-DESIGN.md) | Proposal exists; independent crypto review and test vectors remain |
@@ -52,8 +52,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 ## 3. Immediate execution order
 
-1. Observe and resolve the OpenAPI/PostgreSQL CI run. Do not mark validation complete without the actual run and job evidence.
-2. Review V001/V002 against PostgreSQL 18 behavior. If CI exposes an issue, add a new migration or amend V002 only while it remains unapplied; never rewrite V001.
+1. Keep OpenAPI and PostgreSQL 18 contract checks green on every relevant change.
+2. Preserve the validated V001/V002 baseline; future schema changes must use new ordered migrations and regression tests.
 3. Extend the Ktor spike with PostgreSQL transactional refresh-lease repository tests, provider OAuth code exchange, outbox processing and container build.
 4. Decide Master Account authentication/recovery, KMS deployment and first-provider OAuth scope/callback mode.
 5. Obtain independent security review of the isolated credential broker, credential vault and E2E key recovery.
