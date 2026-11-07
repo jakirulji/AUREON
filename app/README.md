@@ -15,7 +15,7 @@ The app validation workflow runs Flutter dependency resolution, static analysis,
 
 ## Important limitation
 
-This is not yet a functional file manager. Real Android SAF browsing, Windows filesystem browsing, cloud OAuth, uploads, downloads, sync and production security integrations are not connected to the UI. Do not use it to manage real files.
+The Files screen now performs real, read-only local directory browsing on Android and Windows and remembers the selected folder in app-local preferences. It cannot yet open file contents, modify files, connect cloud accounts, upload, download or sync. Storage overview and recent-file cards still use sample data. Do not treat it as a finished replacement for File Explorer.
 
 ## Local validation
 
