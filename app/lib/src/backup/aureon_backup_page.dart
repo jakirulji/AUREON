@@ -24,7 +24,8 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   ManualRecoveryKeySet? _keySet;
   bool _busy = false;
-  String _status = 'Recovery and metadata backup are stored separately from cloud-provider credentials.';
+  String _status = 'Recovery key and metadata backup tools are available. Live credential-vault recovery is not connected yet.';
+  List<String> _restoreConflicts = const [];
 
   String _newVaultId() {
     final random = Random.secure();
@@ -200,7 +201,10 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     await _metadataStore.save(result.snapshot);
     await _virtualFolders.save(result.snapshot.virtualFolders);
     if (mounted) {
-      setState(() => _status = 'Metadata restored as a merge. ${result.pendingProviderReferences} provider references are pending account re-link and re-index; ${result.conflicts.length} conflicts were retained for review.');
+      setState(() {
+        _restoreConflicts = result.conflicts;
+        _status = 'Metadata restored as a merge. ${result.pendingProviderReferences} provider references are pending account re-link and re-index; ${result.conflicts.length} conflicts need review.';
+      });
     }
   });
 
@@ -237,10 +241,9 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
               OutlinedButton.icon(onPressed: _busy ? null : _exportEncryptedKeyFile, icon: const Icon(Icons.lock_outline), label: const Text('Export .key')),
               OutlinedButton.icon(onPressed: _busy ? null : _importEncryptedKeyFile, icon: const Icon(Icons.file_open_outlined), label: const Text('Import .key')),
             ]),
-            TextButton(onPressed: _busy ? null : _generateKeys, child: const Text('Generate a new key generation')),
           ],
           const SizedBox(height: 8),
-          const Text('The TXT contains plaintext secrets. The .key file encrypts all five keys using Argon2id + AES-256-GCM. Keep the .key passphrase separately. A .key file alone is not the encrypted vault bundle.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
+          const Text('The TXT contains plaintext secrets. The .key file encrypts all five keys using Argon2id + AES-256-GCM. Keep the .key passphrase separately. A .key file alone is not the encrypted vault bundle. The live provider-credential vault, DEK provisioning, Cloudflare envelope and recovery-bundle export/import are not connected yet.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
         ],
       ),
       const SizedBox(height: 14),
@@ -275,6 +278,11 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
           Expanded(child: Text(_status, style: const TextStyle(fontSize: 12))),
         ]),
       ),
+      if (_restoreConflicts.isNotEmpty)
+        ExpansionTile(
+          title: Text('Restore conflicts (${_restoreConflicts.length})'),
+          children: _restoreConflicts.map((conflict) => ListTile(dense: true, leading: const Icon(Icons.warning_amber_outlined, color: Color(0xFFFFC477)), title: Text(conflict, style: const TextStyle(fontSize: 12)))).toList(),
+        ),
       if (_busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
     ],
   );
