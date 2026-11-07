@@ -170,3 +170,42 @@ void main() {
     expect(evidence.eligible, isFalse);
   });
 }
+
+  group('AUREON virtual folders', () {
+    ProviderFileReference makeFile(String account, String item) => ProviderFileReference(
+      provider: ProviderKind.googleDrive,
+      providerAccountId: account,
+      accountLabel: account,
+      providerItemId: item,
+      name: 'report.pdf',
+      providerParentId: 'original-parent',
+    );
+
+    test('one logical folder can contain files from multiple provider accounts', () {
+      final folder = AureonVirtualFolder(
+        id: 'folder-1', name: 'Projects', createdAtEpochMs: 100,
+      ).add(makeFile('drive-a', 'item-a')).add(makeFile('drive-b', 'item-b'));
+      expect(folder.items, hasLength(2));
+      expect(folder.items.map((item) => item.providerAccountId).toSet(), {'drive-a', 'drive-b'});
+      expect(folder.items.every((item) => item.providerParentId == 'original-parent'), isTrue);
+    });
+
+    test('membership is idempotent and scoped by provider account identity', () {
+      final first = makeFile('drive-a', 'same-item');
+      final second = makeFile('drive-b', 'same-item');
+      final folder = AureonVirtualFolder(
+        id: 'folder-2', name: 'Mixed', createdAtEpochMs: 100,
+      ).add(first).add(first).add(second);
+      expect(folder.items, hasLength(2));
+      expect(folder.remove(first.stableKey).items.single.providerAccountId, 'drive-b');
+    });
+
+    test('virtual folder serialization round trips stable provider identity', () {
+      final folder = AureonVirtualFolder(
+        id: 'folder-3', name: 'Archive', createdAtEpochMs: 123,
+      ).add(makeFile('dropbox-account', 'dropbox-object'));
+      final restored = AureonVirtualFolder.fromJson(folder.toJson());
+      expect(restored.id, folder.id);
+      expect(restored.items.single.stableKey, folder.items.single.stableKey);
+    });
+  });
