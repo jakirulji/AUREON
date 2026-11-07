@@ -6,6 +6,7 @@ on:
     paths:
       - "app/**"
       - "packages/aureon_local_files/**"
+      - "shared/aureon_contracts/**"
       - ".github/workflows/aureon-app-preview.yml"
   pull_request:
     paths:
@@ -36,6 +37,7 @@ jobs:
       - name: Prepare local-files plugin package
         shell: bash
         run: mkdir -p "$RUNNER_TEMP/packages" && cp -R packages/aureon_local_files "$RUNNER_TEMP/packages/aureon_local_files"
+          cp -R shared/aureon_contracts "$RUNNER_TEMP/packages/aureon_contracts"
       - name: Generate Android host project
         shell: bash
         run: |
@@ -73,6 +75,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/packages" | Out-Null
           Copy-Item packages/aureon_local_files "$env:RUNNER_TEMP/packages/aureon_local_files" -Recurse
+          Copy-Item shared/aureon_contracts "$env:RUNNER_TEMP/packages/aureon_contracts" -Recurse
       - name: Generate Windows host project
         shell: pwsh
         run: |
