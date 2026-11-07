@@ -106,7 +106,7 @@ void main() {
     final result = AureonMetadataRestorePlanner().merge(
       current: AureonMetadataSnapshot(snapshotId: 'current', generation: 1, createdAtEpochMs: 1),
       backup: backup,
-      liveProviderStableKeys: {'googleDrive|15:drive-account-01|16:provider-item-01'},
+      liveProviderFiles: {_file('drive-account-01', 'provider-item-01', 'current-name.pdf').stableKey: _file('drive-account-01', 'provider-item-01', 'current-name.pdf')},
     );
     expect(result.snapshot.virtualFolders.single.items, hasLength(1));
     expect(result.snapshot.virtualFolders.single.items.single.providerItemId, 'provider-item-01');
