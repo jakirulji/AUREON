@@ -5,8 +5,9 @@ This directory contains the shared Flutter application layer. Android and Window
 ## Current scope
 
 - Responsive AUREON navigation and dark visual system.
-- Storage overview and recent-file layout.
-- Explicit prototype state: displayed file rows and storage cards are sample data.
+- Read-only local folder browsing through the Android SAF and Windows native folder picker.
+- Selected folder bookmark is stored in app-local preferences and restored on next launch; Android's persisted SAF read grant remains the authority to access it.
+- Storage overview and recent-file layout still contain sample data.
 
 ## Validation
 
