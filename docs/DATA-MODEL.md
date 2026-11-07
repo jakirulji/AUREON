@@ -117,7 +117,7 @@ erDiagram
 
 - [V001 initial schema](./migrations/V001__initial_schema.sql): identity, devices, provider accounts, base vault envelope, catalog, sync and coordination.
 - [V002 vault and provider inventory](./migrations/V002__vault-and-provider-inventory.sql): credential-envelope lifecycle metadata, OAuth transactions, account-wide inventory cursors, provider items and provider-native albums.
-- V001 is immutable; future changes are additive migrations. Both migrations must be applied in order and tested on PostgreSQL 16 through CI before production use. No live database is provisioned.
+- V001 is immutable; future changes are additive migrations. Both migrations must be applied in order and tested on PostgreSQL 18 through CI before production use. No live database is provisioned.
 
 ## Open decisions
 
