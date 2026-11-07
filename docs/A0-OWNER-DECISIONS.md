@@ -89,3 +89,12 @@ The following are already recommended or validated and should not be reopened wi
 - The encrypted Recovery Bundle must be exportable and storable outside Cloudflare. A bundle stored only in D1 is not an independent fallback.
 - The two recovery KEK hierarchies must be cryptographically independent. E2E file-content keys remain separate and client-controlled.
 - Recovery must be tested under Cloudflare outage and manual-key-loss scenarios before production.
+
+## Provider re-link and organization disaster recovery — owner requirement (2026-11-08)
+
+- Even if all five Manual Recovery Keys and the encrypted .key export are lost, the user must be able to reconnect cloud providers through official OAuth and rebuild the current file index from provider APIs.
+- Re-indexing must preserve the provider's actual folder hierarchy and must not move, rename, duplicate or delete existing provider files.
+- AUREON-only organization (tags, favorites, virtual collections, custom views/sort, sync preferences and other user-created metadata) must have an independent encrypted backup, separate from provider credentials and all recovery-key material.
+- The independent metadata backup must be available outside the Cloudflare-only failure domain and cached encrypted on authorized devices. It must not contain provider tokens, recovery keys, DEKs, E2E content keys or device-specific filesystem permissions/paths.
+- Restore is a conflict-aware merge keyed by stable provider account subject + provider object ID. Provider state remains authoritative for current files and folder hierarchy.
+- If the metadata backup is also lost, provider re-link can still restore current provider files and original provider folder structure, but AUREON-only organization cannot be guaranteed. Device-local folders and OS permissions must be selected again on each device.
