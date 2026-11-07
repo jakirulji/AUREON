@@ -274,7 +274,7 @@ paths:
         The app posts the authorization code, state and PKCE verifier once over
         authenticated TLS. The backend validates the one-time transaction, exchanges
         the code and stores the refresh credential only as a KMS-wrapped encrypted
-        envelope. Never return provider tokens to the app or log request secrets.
+        envelope. Never return refresh tokens to the app; short-lived access tokens are issued only by the dedicated broker endpoint to the native provider adapter.
       parameters:
         - $ref: '#/components/parameters/Provider'
       requestBody:
@@ -436,6 +436,39 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /provider-accounts/{accountId}/access-token:
+    post:
+      tags: [Provider Accounts]
+      operationId: issueProviderAccessToken
+      summary: Obtain a short-lived provider access token for native operations
+      description: |
+        The credential broker refreshes from the server-side vault and returns a
+        short-lived access token only to the authenticated device/native provider
+        adapter when direct provider API access requires it. Refresh tokens are
+        never returned. The native adapter must keep the access token in memory
+        only and never expose it to Flutter widgets, logs, analytics or disk.
+        Requested scopes must be a subset of the account's actually granted scopes.
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderAccessTokenRequest'
+      responses:
+        '200':
+          description: Short-lived access token issued to the native provider adapter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccessTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /provider-accounts/{accountId}/refresh-status:
     post:
       tags: [Provider Accounts]
@@ -1037,6 +1070,7 @@ components:
         redirectUri:
           type: string
           format: uri
+          description: Must exactly match a redirect URI registered and allowlisted for this provider; clients cannot choose arbitrary callback URLs.
         callbackMode:
           type: string
           enum: [backend_https, native_app]
@@ -1132,6 +1166,35 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/ProviderAccount'
+    ProviderAccessTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+          description: Must be a subset of the provider account's actual granted scopes.
+    ProviderAccessTokenResponse:
+      type: object
+      required: [accessToken, tokenType, expiresAt, grantedScopes]
+      properties:
+        accessToken:
+          type: string
+          description: Sensitive short-lived bearer token. Deliver only to the native provider adapter; never persist, log or expose to UI.
+        tokenType:
+          type: string
+          const: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+        grantedScopes:
+          type: array
+          items:
+            type: string
     ProviderAccountStatus:
       type: object
       required: [accountId, status, checkedAt]
