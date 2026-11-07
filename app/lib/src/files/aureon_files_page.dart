@@ -484,6 +484,10 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
           SnackBar(content: Text(error.message ?? error.code)),
         );
       }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
     }
   }
 
@@ -498,7 +502,7 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
         FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Delete permanently')),
       ],
     ));
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
     try {
       if (entry.isSystemTrash) {
         await widget.files.deleteSystemTrashEntry(root: widget.root, entryId: entry.id);
