@@ -5,7 +5,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 ## Scope
 
 - Android library module: compileSdk 36 for the current prototype, minSdk 26. Move to API 37 when the stable SDK package is published and validated.
-- Room 2.8.5 stores durable transfer checkpoints.
+- Room 2.8.5 stores durable transfer checkpoints. Kotlin is pinned to 2.3.10 because this Room compiler version does not yet parse Kotlin 2.4 metadata.
 - WorkManager 2.12.0 transfer constraints require connected network, battery not low and storage not low.
 - Pigeon 29.1.1 interface contract is checked in under pigeon/.
 - Tests close and reopen the Room database to verify persisted checkpoint state.
