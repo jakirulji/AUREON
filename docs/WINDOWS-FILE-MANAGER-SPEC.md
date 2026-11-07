@@ -127,3 +127,24 @@ After shared contracts are frozen, Windows UI/native prototyping can proceed alo
 - Installer/update/signing provider and release channel.
 - Preview handler scope and supported formats.
 - Default layout, theme and keyboard customization policy.
+
+## 11. Unified cross-account folders
+
+AUREON must support a single logical folder/view that contains files originating from multiple connected cloud accounts and providers. This is a first-class AUREON organization feature, not account pooling and not a provider-side folder unless the provider explicitly supports that operation.
+
+- AUREON virtual folders/collections may reference items from Google Drive Account A, Google Drive Account B, OneDrive and other connected accounts simultaneously.
+- Each item retains its own immutable provider account ID, provider item ID, provider-native parent ID, permissions, quota ownership and canonical location. Never merge provider identities or pretend that a virtual folder is a real folder on one provider.
+- The same cloud object may appear in multiple AUREON virtual folders without duplicating its bytes or creating duplicate provider objects. Favorites, tags and saved views are references/metadata, not copies.
+- The UI must clearly identify the source account/provider for every item and show whether the item is online-only, cached, pinned, unavailable or authentication-required.
+- Dragging an item into an AUREON virtual folder changes only AUREON organization metadata. Dragging/copying into an actual provider folder or another account is a distinct provider operation, with explicit Copy vs Move confirmation, capability checks, quota checks, collision handling and post-transfer verification.
+- Cross-provider Move must be implemented as verified copy to destination followed by a separately authorized source deletion only after destination verification and recovery checks. If source deletion is unsupported or fails, retain both copies and report the outcome; never imply atomic move across providers.
+- AUREON virtual folders must be available consistently on Android and Windows through the shared organization model and sync. They must be included in the independent AUREON metadata backup and restored by stable provider account subject + provider item ID.
+- Do not use multi-account folders to pool capacity or bypass provider quotas.
+
+### Acceptance criteria
+
+- Create one AUREON virtual folder and add files from at least two separate Google Drive accounts and one other provider.
+- Verify all entries remain linked to their original provider objects and display the correct source account.
+- Verify virtual organization does not move, copy, rename or mutate provider objects.
+- Verify the same logical virtual folder and its contents restore on a clean second device from the independent metadata backup.
+- Verify cross-account copy and move are separate, explicit operations with destination verification and no unsafe source deletion.
