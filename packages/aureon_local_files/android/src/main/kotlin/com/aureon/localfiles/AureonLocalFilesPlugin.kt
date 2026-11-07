@@ -430,10 +430,11 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             while (cursor.moveToNext()) {
                 val rootId = cursor.getString(rootIdCol)
                 val documentId = cursor.getString(documentIdCol)
-                if (rootId.isNullOrBlank() || documentId.isNullOrBlank()) continue
-                val rootDocument = DocumentsContract.buildDocumentUri(authority, documentId)
-                if (documentId == selectedId || DocumentsContract.isChildDocument(resolver, rootDocument, selected)) {
-                    return rootId
+                if (!rootId.isNullOrBlank() && !documentId.isNullOrBlank()) {
+                    val rootDocument = DocumentsContract.buildDocumentUri(authority, documentId)
+                    if (documentId == selectedId || DocumentsContract.isChildDocument(resolver, rootDocument, selected)) {
+                        return rootId
+                    }
                 }
             }
         }
