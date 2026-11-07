@@ -1,0 +1,32 @@
+name: AUREON Windows Native Filesystem Spike
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "windows-spike/**"
+      - "shared/contract-fixtures/**"
+      - ".github/workflows/aureon-windows-spike.yml"
+  pull_request:
+    paths:
+      - "windows-spike/**"
+      - "shared/contract-fixtures/**"
+      - ".github/workflows/aureon-windows-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-filesystem:
+    name: Build and test Windows filesystem adapter
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure CMake
+        run: cmake -S windows-spike -B windows-spike/build -A x64
+      - name: Build native adapter
+        run: cmake --build windows-spike/build --config Release --parallel
+      - name: Run native filesystem tests
+        run: ctest --test-dir windows-spike/build -C Release --output-on-failure

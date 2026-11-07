@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "android-spike/**"
+      - "shared/**"
       - ".github/workflows/aureon-android-spike.yml"
   pull_request:
     paths:

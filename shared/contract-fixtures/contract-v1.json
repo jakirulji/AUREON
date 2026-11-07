@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "fileIdentity": {
+    "fileId": "file-fixture-001",
+    "versionId": "version-fixture-001",
+    "providerAccountId": "drive-account-001",
+    "providerItemId": "provider-item-001",
+    "providerParentId": "provider-folder-001",
+    "providerVersion": "rev-7",
+    "canonicalLocationId": "location-001",
+    "contentFingerprintSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "providerCapabilities": {
+    "resumableUpload": true,
+    "resumableDownload": true,
+    "rangeDownload": true,
+    "remoteChecksum": false,
+    "readBackVerification": true,
+    "hierarchyListing": true,
+    "changeCursor": true,
+    "placeholderHydration": false,
+    "offlinePinning": false,
+    "maximumObjectBytes": 1073741824,
+    "minimumChunkBytes": 262144,
+    "maximumChunkBytes": 8388608
+  },
+  "transferCheckpoint": {
+    "operationId": "operation-fixture-001",
+    "fileId": "file-fixture-001",
+    "versionId": "version-fixture-001",
+    "providerAccountId": "drive-account-001",
+    "state": "waitingForAuth",
+    "acknowledgedBytes": 524288,
+    "totalBytes": 1048576,
+    "error": "authRequired"
+  },
+  "cleanupEvidence": {
+    "remoteObjectCommitted": true,
+    "remoteVerified": true,
+    "canonicalLocationPersisted": true,
+    "keyRecoveryMetadataReady": true,
+    "userOptedIn": false,
+    "osDeletionPermissionGranted": true,
+    "eligible": false
+  }
+}

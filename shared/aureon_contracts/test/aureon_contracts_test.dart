@@ -75,3 +75,71 @@ void main() {
     expect(checkpoint.toJson()['totalBytes'], isNull);
   });
 }
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:aureon_contracts/aureon_contracts.dart';
+import 'package:test/test.dart';
+
+void main() {
+  test('shared cross-platform fixture matches Dart contract serialization', () {
+    final fixture = jsonDecode(
+      File('../contract-fixtures/contract-v1.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
+
+    expect(fixture['schemaVersion'], 1);
+
+    final identity = FileIdentity(
+      fileId: 'file-fixture-001',
+      versionId: 'version-fixture-001',
+      providerAccountId: 'drive-account-001',
+      providerItemId: 'provider-item-001',
+      providerParentId: 'provider-folder-001',
+      providerVersion: 'rev-7',
+      canonicalLocationId: 'location-001',
+      contentFingerprintSha256: 'a' * 64,
+    );
+    expect(identity.toJson(), fixture['fileIdentity']);
+
+    final capability = ProviderCapabilities(
+      resumableUpload: true,
+      resumableDownload: true,
+      rangeDownload: true,
+      remoteChecksum: false,
+      readBackVerification: true,
+      hierarchyListing: true,
+      changeCursor: true,
+      placeholderHydration: false,
+      offlinePinning: false,
+      maximumObjectBytes: 1073741824,
+      minimumChunkBytes: 262144,
+      maximumChunkBytes: 8388608,
+    );
+    expect(capability.toJson(), fixture['providerCapabilities']);
+
+    final checkpoint = TransferCheckpoint(
+      operationId: 'operation-fixture-001',
+      fileId: 'file-fixture-001',
+      versionId: 'version-fixture-001',
+      providerAccountId: 'drive-account-001',
+      state: TransferState.waitingForAuth,
+      acknowledgedBytes: 524288,
+      totalBytes: 1048576,
+      error: TransferError.authRequired,
+    );
+    expect(checkpoint.toJson(), fixture['transferCheckpoint']);
+
+    final cleanup = fixture['cleanupEvidence'] as Map<String, dynamic>;
+    final evidence = CleanupEvidence(
+      remoteObjectCommitted: cleanup['remoteObjectCommitted'] as bool,
+      remoteVerified: cleanup['remoteVerified'] as bool,
+      canonicalLocationPersisted: cleanup['canonicalLocationPersisted'] as bool,
+      keyRecoveryMetadataReady: cleanup['keyRecoveryMetadataReady'] as bool,
+      userOptedIn: cleanup['userOptedIn'] as bool,
+      osDeletionPermissionGranted: cleanup['osDeletionPermissionGranted'] as bool,
+    );
+    expect(evidence.eligible, cleanup['eligible']);
+    expect(evidence.eligible, isFalse);
+  });
+}
