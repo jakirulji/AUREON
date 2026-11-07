@@ -122,6 +122,118 @@ class AureonMetadataStore {
     return updated;
   }
 
+  Future<AureonMetadataSnapshot> toggleFavorite(String folderId, String stableKey) async {
+    final current = await load();
+    var foundFolder = false;
+    var foundFile = false;
+    final roots = _mapFolders(current.rootFolders, (siblings, folder) {
+      if (folder.id != folderId) return folder;
+      foundFolder = true;
+      final files = folder.files.map((entry) {
+        if (entry.reference.stableKey != stableKey) return entry;
+        foundFile = true;
+        return AureonMetadataFileEntry(
+          reference: entry.reference, order: entry.order, tags: entry.tags,
+          favorite: !entry.favorite, customLabel: entry.customLabel,
+          pendingProviderReconciliation: entry.pendingProviderReconciliation,
+        );
+      }).toList();
+      return _copyFolder(folder, files: files);
+    });
+    if (!foundFolder || !foundFile) throw StateError('AUREON file reference not found.');
+    final updated = _next(current, roots);
+    await save(updated);
+    return updated;
+  }
+
+  Future<AureonMetadataSnapshot> addTagToFile(String folderId, String stableKey, String tag) async {
+    final clean = tag.trim();
+    if (clean.isEmpty) throw ArgumentError('Tag cannot be empty.');
+    final current = await load();
+    var foundFolder = false;
+    var foundFile = false;
+    final roots = _mapFolders(current.rootFolders, (siblings, folder) {
+      if (folder.id != folderId) return folder;
+      foundFolder = true;
+      final files = folder.files.map((entry) {
+        if (entry.reference.stableKey != stableKey) return entry;
+        foundFile = true;
+        return AureonMetadataFileEntry(
+          reference: entry.reference, order: entry.order,
+          tags: {...entry.tags, clean}.toList(), favorite: entry.favorite,
+          customLabel: entry.customLabel,
+          pendingProviderReconciliation: entry.pendingProviderReconciliation,
+        );
+      }).toList();
+      return _copyFolder(folder, files: files);
+    });
+    if (!foundFolder || !foundFile) throw StateError('AUREON file reference not found.');
+    final updated = AureonMetadataSnapshot(
+      snapshotId: 'metadata-${DateTime.now().microsecondsSinceEpoch}',
+      generation: current.generation + 1,
+      createdAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+      rootFolders: roots, virtualFolders: current.virtualFolders,
+      savedViews: current.savedViews,
+      globalTags: {...current.globalTags, clean}.toList(),
+      preferences: current.preferences,
+    );
+    await save(updated);
+    return updated;
+  }
+
+  Future<AureonMetadataSnapshot> reorderFile(String folderId, String stableKey, int newIndex) async {
+    final current = await load();
+    var foundFolder = false;
+    var foundFile = false;
+    List<AureonMetadataFolder> reorder(List<AureonMetadataFolder> folders) =>
+      folders.map((folder) {
+        if (folder.id == folderId) {
+          foundFolder = true;
+          final files = [...folder.files];
+          final index = files.indexWhere((entry) => entry.reference.stableKey == stableKey);
+          if (index < 0) return folder;
+          foundFile = true;
+          final item = files.removeAt(index);
+          final target = newIndex.clamp(0, files.length);
+          files.insert(target, item);
+          return _copyFolder(folder, files: files.asMap().entries.map((entry) =>
+            AureonMetadataFileEntry(
+              reference: entry.value.reference, order: entry.key,
+              tags: entry.value.tags, favorite: entry.value.favorite,
+              customLabel: entry.value.customLabel,
+              pendingProviderReconciliation: entry.value.pendingProviderReconciliation,
+            )).toList());
+        }
+        return _copyFolder(folder, folders: reorder(folder.folders));
+      }).toList();
+    final roots = reorder(current.rootFolders);
+    if (!foundFolder || !foundFile) throw StateError('AUREON file reference not found.');
+    final updated = _next(current, roots);
+    await save(updated);
+    return updated;
+  }
+
+  Future<AureonMetadataSnapshot> reorderFolder(String folderId, int newIndex) async {
+    final current = await load();
+    var found = false;
+    List<AureonMetadataFolder> reorder(List<AureonMetadataFolder> folders) {
+      final list = [...folders];
+      final index = list.indexWhere((folder) => folder.id == folderId);
+      if (index >= 0) {
+        found = true;
+        final item = list.removeAt(index);
+        list.insert(newIndex.clamp(0, list.length), item);
+        return list.asMap().entries.map((entry) => _copyFolder(entry.value, order: entry.key)).toList();
+      }
+      return list.map((folder) => _copyFolder(folder, folders: reorder(folder.folders))).toList();
+    }
+    final roots = reorder(current.rootFolders);
+    if (!found) throw StateError('Folder not found.');
+    final updated = _next(current, roots);
+    await save(updated);
+    return updated;
+  }
+
   Future<AureonMetadataSnapshot> moveFolder(String folderId, {String? newParentId}) async {
     final current = await load();
     final moving = _findFolder(current.rootFolders, folderId);
