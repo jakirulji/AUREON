@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "packages/aureon_local_files/**"
       - ".github/workflows/aureon-app-preview.yml"
   pull_request:
     paths:
@@ -32,6 +33,9 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Prepare local-files plugin package
+        shell: bash
+        run: mkdir -p "$RUNNER_TEMP/packages" && cp -R packages/aureon_local_files "$RUNNER_TEMP/packages/aureon_local_files"
       - name: Generate Android host project
         shell: bash
         run: |
@@ -40,6 +44,11 @@ jobs:
           rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test"
           cp -R app/lib "$RUNNER_TEMP/aureon-android/lib"
           cp -R app/test "$RUNNER_TEMP/aureon-android/test"
+      - name: Test native plugin Dart contract
+        working-directory: packages/aureon_local_files
+        run: |
+          flutter pub get
+          flutter test
       - name: Analyze, test and compile
         working-directory: ${{ runner.temp }}/aureon-android
         run: |
@@ -59,6 +68,11 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Prepare local-files plugin package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/packages" | Out-Null
+          Copy-Item packages/aureon_local_files "$env:RUNNER_TEMP/packages/aureon_local_files" -Recurse
       - name: Generate Windows host project
         shell: pwsh
         run: |
@@ -69,6 +83,12 @@ jobs:
           if (Test-Path "$env:RUNNER_TEMP/aureon-windows/test") { Remove-Item "$env:RUNNER_TEMP/aureon-windows/test" -Recurse -Force }
           Copy-Item app/lib "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse
           Copy-Item app/test "$env:RUNNER_TEMP/aureon-windows/test" -Recurse
+      - name: Test native plugin Dart contract
+        shell: pwsh
+        working-directory: packages/aureon_local_files
+        run: |
+          flutter pub get
+          flutter test
       - name: Analyze, test and compile
         shell: pwsh
         working-directory: ${{ runner.temp }}/aureon-windows

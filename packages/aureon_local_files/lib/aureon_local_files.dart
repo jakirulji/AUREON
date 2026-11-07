@@ -4,18 +4,21 @@ class AureonLocalRoot {
   const AureonLocalRoot({
     required this.rootId,
     required this.displayName,
+    required this.rootDocumentId,
   });
 
   final String rootId;
   final String displayName;
+  final String rootDocumentId;
 
   factory AureonLocalRoot.fromMap(Map<Object?, Object?> map) {
     final id = map['rootId'];
     final name = map['displayName'];
-    if (id is! String || id.isEmpty || name is! String || name.isEmpty) {
+    final documentId = map['rootDocumentId'];
+    if (id is! String || id.isEmpty || name is! String || name.isEmpty || documentId is! String || documentId.isEmpty) {
       throw const FormatException('Native folder picker returned an invalid root.');
     }
-    return AureonLocalRoot(rootId: id, displayName: name);
+    return AureonLocalRoot(rootId: id, displayName: name, rootDocumentId: documentId);
   }
 }
 

@@ -80,7 +80,8 @@ void PickRoot(std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   if (uninitialize) CoUninitialize();
   result->Success(EncodableValue(EncodableMap{
       {EncodableValue("rootId"), EncodableValue(utf8_path)},
-      {EncodableValue("displayName"), EncodableValue(Utf8(std::filesystem::path(wide_path).filename().wstring()))}
+      {EncodableValue("displayName"), EncodableValue(Utf8(std::filesystem::path(wide_path).filename().wstring()).empty() ? utf8_path : Utf8(std::filesystem::path(wide_path).filename().wstring()))},
+      {EncodableValue("rootDocumentId"), EncodableValue(utf8_path)}
   }));
 }
 
@@ -92,8 +93,17 @@ void ListChildren(const EncodableMap* args,
     result->Error("invalid_arguments", "rootId and parentId are required.");
     return;
   }
-  const auto path = std::filesystem::u8path(*parent);
   std::error_code ec;
+  const auto canonical_root = std::filesystem::weakly_canonical(std::filesystem::u8path(*root), ec);
+  if (ec) { result->Error("invalid_root", "The selected root is no longer accessible."); return; }
+  const auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(*parent), ec);
+  if (ec) { result->Error("not_a_directory", "The selected path is not accessible."); return; }
+  const auto relative = path.lexically_relative(canonical_root);
+  if (relative.empty() || relative.is_absolute() ||
+      (!relative.empty() && *relative.begin() == std::filesystem::path(".."))) {
+    result->Error("outside_root", "The requested folder is outside the selected AUREON root.");
+    return;
+  }
   if (!std::filesystem::is_directory(path, ec) || ec) {
     result->Error("not_a_directory", "The selected path is not an accessible directory.");
     return;
@@ -138,12 +148,7 @@ void ListChildren(const EncodableMap* args,
 }
 }  // namespace
 
-AureonLocalFilesPlugin::AureonLocalFilesPlugin() {
-  channel_ = std::make_unique<flutter::MethodChannel<EncodableValue>>(
-      flutter::PluginRegistrarManager::GetInstance()
-          ->GetRegistrar<flutter::PluginRegistrarWindows>(nullptr)->messenger(),
-      "aureon/local_files", &flutter::StandardMethodCodec::GetInstance());
-}
+AureonLocalFilesPlugin::AureonLocalFilesPlugin() = default;
 
 AureonLocalFilesPlugin::~AureonLocalFilesPlugin() = default;
 

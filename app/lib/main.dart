@@ -1,3 +1,4 @@
+import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:flutter/material.dart';
 
 void main() => runApp(const AureonApp());
@@ -73,7 +74,9 @@ class _AureonHomeState extends State<AureonHome> {
     ]),
   );
 
-  Widget _content(bool wide) => SingleChildScrollView(
+  Widget _content(bool wide) => selected == 1
+      ? const AureonFilesPage()
+      : SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(wide ? 34 : 20, 22, wide ? 34 : 20, 28),
     child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1180),

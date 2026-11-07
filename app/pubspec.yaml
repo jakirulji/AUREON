@@ -7,6 +7,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  aureon_local_files:
+    path: ../packages/aureon_local_files
 dev_dependencies:
   flutter_test:
     sdk: flutter
