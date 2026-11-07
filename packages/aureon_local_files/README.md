@@ -9,7 +9,7 @@ Supported operations:
 - Copy regular files within the selected root, refusing existing destination names.
 - Move files or folders one level to the parent folder using the platform's native move operation; destination collisions are rejected and each move requires user confirmation.
 - Windows can move selected files/folders to the system Recycle Bin through IFileOperation with FOFX_RECYCLEONDELETE; source/root validation and explicit UI confirmation are required.
-- Android moves supported SAF documents into a hidden `.AUREON Trash` folder inside the user-selected root using `DocumentsContract.moveDocument`; it never substitutes a copy/delete sequence. The Files screen hides this reserved folder and exposes a Trash view with Restore and separately confirmed permanent deletion. Original parent metadata is stored locally by AUREON.
+- Android first attempts provider-native Trash on Android 17+ when the selected document advertises `FLAG_SUPPORTS_TRASH`; the Trash view queries provider Trash and supports native restore. If unavailable, AUREON moves the document into a reserved hidden `.AUREON Trash (AUREON)` folder inside the selected root using `DocumentsContract.moveDocument`. Managed-Trash restore metadata is stored locally by AUREON. The UI offers Restore and separately confirmed permanent deletion; no automatic emptying is performed.
 - Verify file copies with SHA-256 before finalizing. Android streams to a temporary SAF document and reads it back; Windows hashes source before/after and the temporary destination using BCrypt.
 - Reject out-of-root Windows paths, symbolic links for copy, and invalid leaf names.
 - Surface unsupported SAF provider operations instead of silently falling back.
