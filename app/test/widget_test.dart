@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:aureon/main.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
@@ -226,7 +227,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move to Trash / Recycle Bin'));
     await tester.pumpAndSettle();
-    expect(find.text('Move "notes.txt" to AUREON Trash? You can restore it later. The original file will not be permanently deleted.'), findsOneWidget);
+    final confirmation = Platform.isWindows
+        ? 'Move "notes.txt" to the Windows Recycle Bin?'
+        : 'Move "notes.txt" to AUREON Trash? You can restore it later. The original file will not be permanently deleted.';
+    expect(find.text(confirmation), findsOneWidget);
     expect(calls.where((call) => call.method == 'moveToTrash'), isEmpty);
     await tester.tap(find.text('Move to Trash').last);
     await tester.pumpAndSettle();
