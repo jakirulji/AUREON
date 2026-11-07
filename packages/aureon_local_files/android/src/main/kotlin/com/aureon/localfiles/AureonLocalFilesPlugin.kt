@@ -418,6 +418,28 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     }
 
  
+    private fun resolveProviderRootId(resolver: ContentResolver, tree: Uri): String? {
+        val authority = tree.authority ?: return null
+        val selectedId = DocumentsContract.getTreeDocumentId(tree)
+        val selected = DocumentsContract.buildDocumentUriUsingTree(tree, selectedId)
+        val roots = DocumentsContract.buildRootsUri(authority)
+        resolver.query(roots, arrayOf(DocumentsContract.Root.COLUMN_ROOT_ID,
+            DocumentsContract.Root.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
+            val rootIdCol = cursor.getColumnIndexOrThrow(DocumentsContract.Root.COLUMN_ROOT_ID)
+            val documentIdCol = cursor.getColumnIndexOrThrow(DocumentsContract.Root.COLUMN_DOCUMENT_ID)
+            while (cursor.moveToNext()) {
+                val rootId = cursor.getString(rootIdCol)
+                val documentId = cursor.getString(documentIdCol)
+                if (rootId.isNullOrBlank() || documentId.isNullOrBlank()) continue
+                val rootDocument = DocumentsContract.buildDocumentUri(authority, documentId)
+                if (documentId == selectedId || DocumentsContract.isChildDocument(resolver, rootDocument, selected)) {
+                    return rootId
+                }
+            }
+        }
+        return null
+    }
+
     private fun listSystemTrash(call: MethodCall, result: MethodChannel.Result) {
         val root = call.argument<String>("rootId")
         if (root.isNullOrBlank()) { result.error("invalid_arguments", "rootId is required.", null); return }
@@ -426,8 +448,10 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
         try {
             val tree = Uri.parse(root)
+            val providerRootId = resolveProviderRootId(resolver, tree)
+                ?: throw UnsupportedOperationException("The provider root for this selected folder could not be resolved.")
             val method = DocumentsContract::class.java.getMethod("buildTrashDocumentsUri", String::class.java, String::class.java)
-            val trashUri = method.invoke(null, tree.authority ?: "", DocumentsContract.getRootId(tree)) as Uri
+            val trashUri = method.invoke(null, tree.authority ?: "", providerRootId) as Uri
             val rows = mutableListOf<Map<String, Any?>>()
             resolver.query(trashUri, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME,
                 Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE), null, null, null)?.use { cursor ->
@@ -486,8 +510,10 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             val resolver = activityBinding?.activity?.contentResolver
                 ?: throw IllegalStateException("The Android activity is unavailable.")
             val tree = Uri.parse(root)
+            val providerRootId = resolveProviderRootId(resolver, tree)
+                ?: throw UnsupportedOperationException("The provider root for this selected folder could not be resolved.")
             val method = DocumentsContract::class.java.getMethod("buildTrashDocumentsUri", String::class.java, String::class.java)
-            val trashUri = method.invoke(null, tree.authority ?: "", DocumentsContract.getRootId(tree)) as Uri
+            val trashUri = method.invoke(null, tree.authority ?: "", providerRootId) as Uri
             var found = false
             resolver.query(trashUri, arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
