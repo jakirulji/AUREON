@@ -56,6 +56,7 @@ jobs:
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f docs/migrations/V001__initial_schema.sql
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f docs/migrations/V002__vault-and-provider-inventory.sql
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f docs/migrations/V003__provider-trash-sync.sql
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f docs/migrations/V004__trash-provider-outcome-reference.sql
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f tests/database/V001_schema_smoke.sql
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f tests/database/V002_vault_inventory_smoke.sql
           psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f tests/database/V003_provider_trash_smoke.sql
