@@ -46,7 +46,6 @@ class AureonMetadataStore {
 
   final AureonMetadataKeyStore _keyStore;
   final Directory? _rootDirectory;
-  static const storageKey = 'aureon.metadata.snapshot.v1';
 
   Future<AureonMetadataSnapshot> load() async {
     final directory = await _directory();
@@ -470,31 +469,4 @@ class AureonMetadataStore {
     return bytes;
   }
 
-  Future<void> save(AureonMetadataSnapshot snapshot) async {
-    final directory = await _directory();
-    final key = await _getLocalKey();
-    final nonce = _randomBytes(12);
-    final aad = utf8.encode('$_aadPrefix${snapshot.generation}');
-    final box = await _cipher.encrypt(
-      utf8.encode(jsonEncode(snapshot.toJson())),
-      secretKey: SecretKey(key),
-      nonce: nonce,
-      aad: aad,
-    );
-    final envelope = utf8.encode(jsonEncode({
-      'format': _format,
-      'formatVersion': 1,
-      'generation': snapshot.generation,
-      'nonce': base64Url.encode(nonce),
-      'cipherText': base64Url.encode(box.cipherText),
-      'mac': base64Url.encode(box.mac.bytes),
-    }));
-    if (envelope.length > _maxCatalogBytes) throw StateError('AUREON local metadata catalog exceeds the supported size.');
-    final slot = snapshot.generation % 2;
-    final target = File('${directory.path}${Platform.pathSeparator}catalog-$slot.aureon');
-    final temporary = File('${target.path}.tmp');
-    await temporary.writeAsBytes(envelope, flush: true);
-    if (await target.exists()) await target.delete();
-    await temporary.rename(target.path);
-  }
 }
