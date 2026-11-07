@@ -106,6 +106,21 @@ void main() {
     await files.deleteTrashEntry(root: root, entryId: 'trash-item', trashFolderId: 'trash-folder');
   });
 
+  test('provider-native Trash list, restore and permanent delete use scoped root', () async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'listSystemTrash') return <Map<String, Object?>>[];
+      return true;
+    });
+    const root = AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc');
+    expect(await files.listSystemTrash(root: root), isEmpty);
+    await files.restoreSystemTrashEntry(root: root, entryId: 'system-trash-item');
+    await files.deleteSystemTrashEntry(root: root, entryId: 'system-trash-item');
+    expect(calls.map((call) => call.method), ['listSystemTrash', 'restoreSystemTrashEntry', 'deleteSystemTrashEntry']);
+    expect(calls.every((call) => (call.arguments as Map)['rootId'] == 'root-uri'), isTrue);
+  });
+
   test('rename and create folder send scoped identities', () async {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
