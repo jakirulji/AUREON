@@ -1,12 +1,31 @@
+import 'dart:io';
+
+import 'package:aureon/src/backup/aureon_metadata_store.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folder_store.dart';
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeKeyStore implements AureonMetadataKeyStore {
+  String? value;
+  @override
+  Future<String?> readKey() async => value;
+  @override
+  Future<void> writeKey(String next) async { value = next; }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  late Directory root;
+  late AureonVirtualFolderStore store;
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('aureon-virtual-folder-test-');
+    store = AureonVirtualFolderStore(
+      metadataStore: AureonMetadataStore(rootDirectory: root, keyStore: _FakeKeyStore()),
+    );
+  });
+  tearDown(() async {
+    if (await root.exists()) await root.delete(recursive: true);
+  });
 
   ProviderFileReference file(String account, String item, String label) => ProviderFileReference(
     provider: ProviderKind.googleDrive,
@@ -18,7 +37,6 @@ void main() {
   );
 
   test('one virtual folder can reference files from multiple accounts', () async {
-    final store = AureonVirtualFolderStore();
     final folder = await store.create('Projects');
     await store.addItem(folder.id, file('drive-account-a', 'file-a', 'Personal'));
     await store.addItem(folder.id, file('drive-account-b', 'file-b', 'Work'));
