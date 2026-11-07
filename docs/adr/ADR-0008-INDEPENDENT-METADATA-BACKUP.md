@@ -52,10 +52,13 @@ Do not include OAuth passwords/tokens, access/refresh credentials, Manual Recove
 ## Implemented in current client branch
 
 - Versioned nested metadata snapshot model and JSON validation.
+- Nested AUREON folder organizer operations: create, rename, delete, move, file-reference add/remove, favorites, tags and explicit folder/file ordering.
+- Device-local catalog is AES-256-GCM encrypted with a random device key held in platform secure storage; a two-slot catalog keeps a previous generation available after an interrupted write. Android app backup is disabled for device-bound secure-storage material.
 - Portable `.aureon-meta` authenticated encryption/decryption using Argon2id + AES-256-GCM.
 - Stable-ID conflict-aware merge planner and provider-inventory reconciliation input.
 - Settings UI to export and import the encrypted archive through native file picker.
 - Current virtual-folder memberships are included in the snapshot and restored to local catalog.
+- Restore conflict details are exposed in the UI; imported provider references remain pending until provider re-index.
 - Automated tests cover nested hierarchy/order round-trip, wrong passphrase rejection, merge behavior and provider object non-resurrection.
 
 ## Explicitly not yet implemented
