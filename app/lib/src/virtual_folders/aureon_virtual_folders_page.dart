@@ -2,6 +2,7 @@ import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:flutter/material.dart';
 
 import 'aureon_virtual_folder_store.dart';
+import '../backup/aureon_folder_organizer_page.dart';
 
 class AureonVirtualFoldersPage extends StatefulWidget {
   const AureonVirtualFoldersPage({super.key});
@@ -167,6 +168,12 @@ class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
       Row(children: [
         const Expanded(child: Text('Virtual folders', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
         IconButton(tooltip: 'Refresh', onPressed: _loading ? null : _refresh, icon: const Icon(Icons.refresh)),
+        OutlinedButton.icon(
+          onPressed: _loading ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AureonFolderOrganizerPage())),
+          icon: const Icon(Icons.account_tree_outlined),
+          label: const Text('Folder organizer'),
+        ),
+        const SizedBox(width: 8),
         FilledButton.icon(onPressed: _loading ? null : _createFolder, icon: const Icon(Icons.create_new_folder_outlined), label: const Text('New folder')),
       ]),
       const SizedBox(height: 6),
