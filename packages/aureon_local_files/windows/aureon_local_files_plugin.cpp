@@ -119,8 +119,8 @@ void OpenFile(const EncodableMap* args,
 
 bool IsWithinRoot(const std::filesystem::path& root, const std::filesystem::path& candidate) {
   const auto relative = candidate.lexically_relative(root);
-  return !relative.empty() && !relative.is_absolute() &&
-      (*relative.begin() != std::filesystem::path("..") || relative.empty());
+  return relative.empty() || (!relative.is_absolute() &&
+      *relative.begin() != std::filesystem::path(".."));
 }
 bool ValidLeafName(const std::string& name) {
   return !name.empty() && name != "." && name != ".." &&
@@ -136,9 +136,16 @@ void RenameEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult
   std::error_code ec;
   const auto base = std::filesystem::canonical(PathFromUtf8(*root), ec);
   if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
-  const auto source = std::filesystem::canonical(PathFromUtf8(*entry), ec);
-  if (ec || !IsWithinRoot(base, source) || source == base) { result->Error("outside_root", "The requested item is not a child of the selected root."); return; }
-  const auto target = source.parent_path() / PathFromUtf8(*name);
+  const auto source = std::filesystem::absolute(PathFromUtf8(*entry), ec).lexically_normal();
+  if (ec || source == base || source.parent_path().empty()) { result->Error("invalid_target", "The selected root itself cannot be renamed."); return; }
+  const auto parent = std::filesystem::canonical(source.parent_path(), ec);
+  if (ec || !IsWithinRoot(base, parent)) { result->Error("outside_root", "The requested item is not inside the selected root."); return; }
+  const auto status = std::filesystem::symlink_status(source, ec);
+  if (ec || std::filesystem::is_symlink(status) ||
+      (!std::filesystem::is_regular_file(status) && !std::filesystem::is_directory(status))) {
+    result->Error("unsupported_item", "Symbolic links and unsupported filesystem items cannot be renamed here."); return;
+  }
+  const auto target = parent / PathFromUtf8(*name);
   if (std::filesystem::exists(target, ec) || ec) { result->Error("conflict", "An item with that name already exists. Nothing was overwritten."); return; }
   std::filesystem::rename(source, target, ec);
   if (ec) { result->Error("rename_failed", "The item could not be renamed."); return; }
@@ -161,6 +168,7 @@ void CreateFolder(const EncodableMap* args, std::unique_ptr<flutter::MethodResul
   const auto value = target.u8string();
   result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
 }
+
 
 void ListChildren(const EncodableMap* args,
                   std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {

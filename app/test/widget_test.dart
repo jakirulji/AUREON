@@ -117,6 +117,30 @@ void main() {
     expect(find.text('alpha.txt'), findsNothing);
   });
 
+  testWidgets('Files page creates a folder using the selected parent', (tester) async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'pickRoot') {
+        return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
+      }
+      if (call.method == 'listChildren') return <Map<String, Object?>>[];
+      if (call.method == 'createFolder') return 'new-folder-id';
+      return null;
+    });
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
+    await tester.tap(find.byType(OutlinedButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New folder'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Work');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    final create = calls.firstWhere((call) => call.method == 'createFolder');
+    expect(create.arguments, {'rootId': 'root', 'parentId': 'root-doc', 'name': 'Work'});
+  });
+
   testWidgets('AUREON dashboard still renders', (tester) async {
     await tester.pumpWidget(const AureonApp());
     expect(find.text('AUREON'), findsOneWidget);
