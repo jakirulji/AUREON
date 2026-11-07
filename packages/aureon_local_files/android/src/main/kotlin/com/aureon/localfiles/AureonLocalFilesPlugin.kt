@@ -325,7 +325,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 } ?: throw IllegalStateException("The source parent cannot be listed.")
                 if (!sourceIsInParent) throw SecurityException("The selected item is not inside the supplied parent folder.")
                 // Prefer provider-native Android 17 Trash when the document explicitly advertises support.
-                if (android.os.Build.VERSION.SDK_INT >= 37 && (flags and 0x00010000) != 0) {
+                if (android.os.Build.VERSION.SDK_INT >= 37 && (flags and 0x00010000) != 0 && resolveProviderRootId(resolver, tree) != null) {
                     try {
                         val method = DocumentsContract::class.java.getMethod(
                             "trashDocument", ContentResolver::class.java, Uri::class.java)
