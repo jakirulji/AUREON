@@ -18,6 +18,22 @@ class ApplicationTest {
     }
 
     @Test
+    fun readinessEndpointFailsClosedWithoutDatabase() = testApplication {
+        application { module() }
+
+        val response = client.get("/health/ready")
+        assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+    }
+
+    @Test
+    fun readinessEndpointUsesInjectedProbe() = testApplication {
+        application { module(readinessProbe = ReadinessProbe { true }) }
+
+        val response = client.get("/health/ready")
+        assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    @Test
     fun protectedEndpointRejectsMissingCredentials() = testApplication {
         application { module() }
 
