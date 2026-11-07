@@ -122,9 +122,13 @@ class _AureonOperationHistoryPageState extends State<AureonOperationHistoryPage>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final records = await AureonOperationHistory.load();
-    if (mounted) setState(() { _records = records; _loading = false; });
+    if (mounted) setState(() => _loading = true);
+    try {
+      final records = await AureonOperationHistory.load();
+      if (mounted) setState(() { _records = records; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _records = []; _loading = false; });
+    }
   }
 
   Future<void> _clear() async {
