@@ -201,9 +201,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
         );
       }
     } on PlatformException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message ?? error.code)),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? error.code)),
+        );
+      }
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
     }
@@ -457,10 +459,12 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
     final folderId = _trashFolderId;
     if (folderId == null) return;
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     final raw = prefs.getString(_metaKey(entry.id));
     if (raw == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Restore information is missing. The item remains in Trash.')));
+        content: Text('Restore information is missing. The item remains in Trash.'),
+      ));
       return;
     }
     try {
@@ -469,11 +473,17 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
         sourceParentId: folderId, targetParentId: meta['originalParentId'] as String);
       await prefs.remove(_metaKey(entry.id));
       await _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Restored "${entry.name}" to its original folder.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Restored "${entry.name}" to its original folder.')),
+        );
+      }
     } on PlatformException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message ?? error.code)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? error.code)),
+        );
+      }
     }
   }
 
@@ -495,8 +505,11 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
       await prefs.remove(_metaKey(entry.id));
       await _load();
     } on PlatformException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message ?? error.code)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? error.code)),
+        );
+      }
     }
   }
 
@@ -515,7 +528,7 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
             leading: Icon(entry.isDirectory ? Icons.folder_delete_outlined : Icons.delete_outline),
             title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text(entry.sizeBytes == null ? 'In AUREON Trash' : '${(entry.sizeBytes! / 1024).toStringAsFixed(1)} KB'),
-            trailing: Wrap(mainAxisSize: MainAxisSize.min, spacing: 4, children: [
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton(tooltip: 'Restore', onPressed: () => _restore(entry), icon: const Icon(Icons.restore)),
               IconButton(tooltip: 'Delete permanently', onPressed: () => _deletePermanently(entry), icon: const Icon(Icons.delete_forever_outlined)),
             ]),
