@@ -11,7 +11,7 @@ class OAuthSecurity(private val secureRandom: SecureRandom = SecureRandom()) {
 
     fun pkceS256Challenge(verifier: String): String {
         require(verifier.length in 43..128) { "PKCE verifier length is invalid" }
-        require(verifier.all { it.isLetterOrDigit() || it in "-._~" }) {
+        require(verifier.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it in "-._~" }) {
             "PKCE verifier contains invalid characters"
         }
         val digest = MessageDigest.getInstance("SHA-256")
