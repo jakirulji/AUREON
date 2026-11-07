@@ -515,7 +515,6 @@ paths:
                 $ref: '#/components/schemas/FilePage'
         '401':
           $ref: '#/components/responses/Unauthorized'
-  /files:
     post:
       tags: [Files]
       operationId: createFileRecord
