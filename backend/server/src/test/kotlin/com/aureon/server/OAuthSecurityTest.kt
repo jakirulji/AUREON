@@ -29,6 +29,14 @@ class OAuthSecurityTest {
     }
 
     @Test
+    fun pkceRejectsNonAsciiVerifierCharacters() {
+        val invalidVerifier = "a".repeat(42) + "é"
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            security.pkceS256Challenge(invalidVerifier)
+        }
+    }
+
+    @Test
     fun stateHashIsBoundToExactValue() {
         val state = security.newState()
         val storedHash = security.hashState(state)
