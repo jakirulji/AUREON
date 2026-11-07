@@ -259,6 +259,14 @@ Decisions required before implementation:
 - Strict client-side E2E encryption is the target.
 - Root support is optional/experimental; rootless Android is primary.
 
+### 2026-11-07 — A0 vault and legacy inventory engineering alignment
+- Aligned Android OAuth with the user-consented backend credential-vault target for cross-device provider restoration.
+- Added explicit consent, KMS/HSM envelope encryption, credential-broker isolation, refresh rotation/lease and access-token delivery boundaries.
+- Added V002 PostgreSQL draft for OAuth transactions, provider inventory cursors, real parent hierarchy, provider items and provider-native albums.
+- Added metadata-first inventory API contracts and virtual category views; provider originals remain untouched.
+- Clarified that Google Photos albums are not Drive folders and are represented only where provider APIs expose them.
+- Added PostgreSQL 16 CI migration/smoke-test steps; execution result remains unverified.
+
 ## 16. Transfer Engine and Performance Architecture
 
 ### 16.1 Architectural decision
