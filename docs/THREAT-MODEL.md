@@ -7,8 +7,8 @@
 ## 1. Security objectives
 
 1. AUREON backend operators and database readers cannot decrypt E2E file content.
-2. Provider refresh credentials are stored only as KMS-wrapped encrypted envelopes after explicit user consent.
-3. Only the isolated credential-broker workload may request KMS decrypt operations for provider refresh credentials.
+2. In the zero-cost-first mode, provider refresh credentials are stored only as client-encrypted envelopes; the backend cannot decrypt them.
+3. The vault recovery key remains user-held and is never transmitted to the backend. A future separately consented KMS-backed mode requires a new threat review.
 4. Provider access tokens are short-lived, least-scope and delivered only to the authenticated native provider adapter when direct provider API access requires them.
 5. One compromised provider account does not expose other provider accounts or Master Account sessions.
 6. Local originals and the only verified remote copy are never silently deleted.
@@ -118,3 +118,14 @@ This isolated broker is a deliberately small security boundary; the rest of the 
 - Google restricted Drive scopes may require verification and security assessment; AUREON launch eligibility is not guaranteed.
 - Android OEM battery policies can delay background work; uninterrupted transfer cannot be guaranteed.
 - No architecture document substitutes for penetration testing, cryptographic review, privacy/legal review or incident-response readiness.
+
+
+## 9. Zero-cost-first provider credential vault
+
+The accepted current design is [ADR-0005](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md): the client encrypts provider refresh credentials with AES-256-GCM, per-account data keys and a user-held random recovery key. The backend stores ciphertext only and has no decrypt capability.
+
+- A database dump or API-process compromise must not reveal provider refresh tokens.
+- New-device restore requires the user to enter the recovery key once; loss of that key requires provider relinking.
+- Android Keystore and Windows OS-protected storage protect the locally unlocked vault.
+- Do not add a shared server-side environment master key as a substitute for managed KMS.
+- The previous isolated KMS credential-broker design is deferred until a paid, owner-approved managed KMS/HSM deployment and independent review exist.
