@@ -117,18 +117,18 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   }
 
   Future<String?> _nameDialog(String title, String label, {String initial = ''}) async {
-    final controller = TextEditingController(text: initial);
-    final value = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+    var draft = initial;
+    return showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text(title),
-      content: TextField(controller: controller, autofocus: true, decoration: InputDecoration(labelText: label),
-        onSubmitted: (value) => Navigator.of(context).pop(value)),
+      content: TextField(autofocus: true, controller: null,
+        decoration: InputDecoration(labelText: label), onChanged: (value) => draft = value,
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Save')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(draft), child: const Text('Save')),
       ],
     ));
-    controller.dispose();
-    return value;
   }
 
   Future<void> _openFile(AureonLocalEntry entry) async {
