@@ -53,6 +53,17 @@ Users may connect multiple supported cloud accounts. The interface should provid
 
 Design a provider abstraction for legitimate automatic placement/failover where allowed.
 
+## 3A. Cross-device provider authorization and existing-account import
+
+- User links each cloud account once. On a new device, AUREON Master Account sign-in restores the linked-provider inventory and automatically attempts provider reconnection using a user-consented encrypted backend credential vault.
+- This vault is the target architecture for the requested seamless experience; it is not implemented yet and must pass dedicated threat-model review, managed KMS envelope-encryption design, least-privilege access controls, audit/rotation, provider-terms review and independent security testing.
+- MFA is not requested on every AUREON login. If a provider requires fresh authentication, only that account pauses and the user completes the provider's official challenge. User may manually enter a verification code or authenticator code. AUREON never reads Gmail to harvest OTPs, stores authenticator seeds, collects provider passwords or bypasses MFA.
+- Provider credentials remain separate from E2E file-content keys and recovery secrets.
+- Existing Google Drive files must be indexed, not only files created by AUREON. Preserve full folder hierarchy and parent IDs; provide additional derived category views without moving or renaming provider files. Full-drive inventory requires the appropriate Google restricted scopes and verification; drive.file alone is insufficient.
+- Google Photos is distinct from Drive: represent albums as albums, not folders. Under the API rules effective March 31, 2025, Picker API supports user-mediated selection of existing library media while Library API focuses on app-created content. Do not promise unrestricted background enumeration of an existing Photos library.
+- Initial cloud indexing is metadata-first, paginated, resumable and non-destructive. Do not download every item by default; never move, rename or delete existing cloud originals during indexing.
+- Detailed requirements: [Cross-Device Cloud Restore and Existing-Content Import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md).
+
 ## 4. One canonical cloud copy
 
 Default behavior: **one canonical cloud copy per file**. Do not create duplicate cloud copies across every connected account by default.
