@@ -379,10 +379,36 @@ class AureonMetadataRestorePlanner {
         colorArgb: saved.colorArgb ?? existing?.colorArgb,
       ));
     }
-    result.addAll(currentById.values.map((folder) => folder));
+    result.addAll(currentById.values.map((folder) => _reconcileFolder(folder, liveProviderFiles)));
     result.sort((a, b) => a.order.compareTo(b.order));
     return result;
   }
+
+  AureonMetadataFolder _reconcileFolder(AureonMetadataFolder folder, Map<String, ProviderFileReference>? liveProviderFiles) {
+    final files = <AureonMetadataFileEntry>[];
+    for (final entry in folder.files) {
+      final live = liveProviderFiles?[entry.reference.stableKey];
+      if (liveProviderFiles != null && live == null) continue;
+      files.add(AureonMetadataFileEntry(
+        reference: _withReconciliation(live ?? entry.reference, live != null),
+        order: entry.order, tags: entry.tags, favorite: entry.favorite,
+        customLabel: entry.customLabel, pendingProviderReconciliation: live == null,
+      ));
+    }
+    return AureonMetadataFolder(
+      id: folder.id, name: folder.name, order: folder.order,
+      folders: folder.folders.map((child) => _reconcileFolder(child, liveProviderFiles)).toList(),
+      files: files, tags: folder.tags, colorArgb: folder.colorArgb,
+    );
+  }
+
+  ProviderFileReference _withReconciliation(ProviderFileReference item, bool reconciled) => ProviderFileReference(
+    provider: item.provider, providerAccountId: item.providerAccountId,
+    accountLabel: item.accountLabel, providerItemId: item.providerItemId,
+    name: item.name, providerParentId: item.providerParentId,
+    mimeType: item.mimeType, sizeBytes: item.sizeBytes, webUrl: item.webUrl,
+    isReconciled: reconciled,
+  );
 
   List<AureonMetadataFileEntry> _mergeFileEntries(
     List<AureonMetadataFileEntry> current,
@@ -405,7 +431,7 @@ class AureonMetadataRestorePlanner {
         conflicts.add('File placement changed: ${saved.reference.name}.');
       }
       result.add(AureonMetadataFileEntry(
-        reference: liveReference ?? saved.reference,
+        reference: _withReconciliation(liveReference ?? saved.reference, liveReference != null),
         order: saved.order,
         tags: {...?existing?.tags, ...saved.tags}.toList(),
         favorite: saved.favorite || (existing?.favorite ?? false),
@@ -457,7 +483,13 @@ class AureonMetadataRestorePlanner {
         )).toList(),
       ));
     }
-    result.addAll(currentById.values);
+    result.addAll(currentById.values.map((folder) => AureonVirtualFolder(
+      id: folder.id, name: folder.name, createdAtEpochMs: folder.createdAtEpochMs,
+      items: folder.items.where((item) => liveProviderFiles == null || liveProviderFiles.containsKey(item.stableKey)).map((item) {
+        final live = liveProviderFiles?[item.stableKey];
+        return _withReconciliation(live ?? item, live != null);
+      }).toList(),
+    )));
     return result;
   }
 
@@ -478,7 +510,7 @@ class AureonMetadataRestorePlanner {
 
   int _countPending(List<AureonMetadataFolder> folders) =>
       folders.fold<int>(0, (sum, folder) =>
-        sum + folder.files.length + _countPending(folder.folders));
+        sum + folder.files.where((file) => file.pendingProviderReconciliation).length + _countPending(folder.folders));
 }
 
 void _validateUniqueFolderIds(List<AureonMetadataFolder> roots) {
