@@ -1,27 +1,106 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
 
 import 'package:aureon_contracts/aureon_contracts.dart';
-
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cryptography/cryptography.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'aureon_metadata_backup.dart';
 
+abstract interface class AureonMetadataKeyStore {
+  Future<String?> readKey();
+  Future<void> writeKey(String value);
+}
+
+class PlatformAureonMetadataKeyStore implements AureonMetadataKeyStore {
+  PlatformAureonMetadataKeyStore({FlutterSecureStorage? storage})
+      : _storage = storage ?? const FlutterSecureStorage();
+
+  static const _keyName = 'aureon.metadata.local-encryption-key.v1';
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> readKey() => _storage.read(key: _keyName);
+
+  @override
+  Future<void> writeKey(String value) => _storage.write(key: _keyName, value: value);
+}
+
+/// Device-local metadata catalog. The catalog file is AES-GCM encrypted and
+/// its random key is kept in Android/Windows platform secure storage.
+/// Portable .aureon-meta archives use a separate passphrase-derived key.
 class AureonMetadataStore {
+  AureonMetadataStore({
+    AureonMetadataKeyStore? keyStore,
+    Directory? rootDirectory,
+  })  : _keyStore = keyStore ?? PlatformAureonMetadataKeyStore(),
+        _rootDirectory = rootDirectory;
+
+  static const _format = 'AUREON-LOCAL-METADATA-CATALOG';
+  static const _aadPrefix = 'AUREON|LOCAL-METADATA|v1|';
+  static const _maxCatalogBytes = 128 * 1024 * 1024;
+  static final _cipher = AesGcm.with256bits();
+  static final _random = Random.secure();
+
+  final AureonMetadataKeyStore _keyStore;
+  final Directory? _rootDirectory;
   static const storageKey = 'aureon.metadata.snapshot.v1';
 
   Future<AureonMetadataSnapshot> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(storageKey);
-    if (raw == null) {
+    final directory = await _directory();
+    final candidates = <AureonMetadataSnapshot>[];
+    var foundAny = false;
+    for (var slot = 0; slot < 2; slot++) {
+      final file = File('${directory.path}${Platform.pathSeparator}catalog-$slot.aureon');
+      if (!await file.exists()) continue;
+      foundAny = true;
+      try {
+        final bytes = await file.readAsBytes();
+        candidates.add(await _decryptCatalog(bytes));
+      } catch (_) {
+        // Keep searching the previous slot. If no valid slot remains, fail closed.
+      }
+    }
+    if (candidates.isEmpty) {
+      if (foundAny) throw StateError('AUREON metadata catalog is corrupted or its local secure key is unavailable. Restore an exported metadata backup.');
       return AureonMetadataSnapshot(
         snapshotId: 'local-empty',
         generation: 0,
         createdAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
       );
     }
-    final decoded = jsonDecode(raw);
-    if (decoded is! Map) throw const FormatException('Stored metadata snapshot is invalid.');
-    return AureonMetadataSnapshot.fromJson(decoded.cast<String, Object?>());
+    candidates.sort((a, b) => b.generation.compareTo(a.generation));
+    return candidates.first;
+  }
+
+  Future<void> save(AureonMetadataSnapshot snapshot) async {
+    final directory = await _directory();
+    final key = await _getLocalKey();
+    final nonce = _randomBytes(12);
+    final aad = utf8.encode('$_aadPrefix${snapshot.generation}');
+    final box = await _cipher.encrypt(
+      utf8.encode(jsonEncode(snapshot.toJson())),
+      secretKey: SecretKey(key),
+      nonce: nonce,
+      aad: aad,
+    );
+    final envelope = utf8.encode(jsonEncode({
+      'format': _format,
+      'formatVersion': 1,
+      'generation': snapshot.generation,
+      'nonce': base64Url.encode(nonce),
+      'cipherText': base64Url.encode(box.cipherText),
+      'mac': base64Url.encode(box.mac.bytes),
+    }));
+    if (envelope.length > _maxCatalogBytes) throw StateError('AUREON local metadata catalog exceeds the supported size.');
+    final slot = snapshot.generation % 2;
+    final target = File('${directory.path}${Platform.pathSeparator}catalog-$slot.aureon');
+    final temporary = File('${target.path}.tmp');
+    await temporary.writeAsBytes(envelope, flush: true);
+    if (await target.exists()) await target.delete();
+    await temporary.rename(target.path);
   }
 
   Future<AureonMetadataSnapshot> createFolder(String name, {String? parentId}) async {
@@ -29,9 +108,7 @@ class AureonMetadataStore {
     if (clean.isEmpty) throw ArgumentError('Folder name is required.');
     final current = await load();
     final id = _newId();
-    final folder = AureonMetadataFolder(
-      id: id, name: clean, order: 0,
-    );
+    final folder = AureonMetadataFolder(id: id, name: clean, order: 0);
     final roots = _insertFolder(current.rootFolders, folder, parentId);
     final updated = _next(current, roots);
     await save(updated);
@@ -194,7 +271,7 @@ class AureonMetadataStore {
           if (index < 0) return folder;
           foundFile = true;
           final item = files.removeAt(index);
-          final target = newIndex.clamp(0, files.length);
+          final target = newIndex.clamp(0, files.length).toInt();
           files.insert(target, item);
           return _copyFolder(folder, files: files.asMap().entries.map((entry) =>
             AureonMetadataFileEntry(
@@ -222,7 +299,7 @@ class AureonMetadataStore {
       if (index >= 0) {
         found = true;
         final item = list.removeAt(index);
-        list.insert(newIndex.clamp(0, list.length), item);
+        list.insert(newIndex.clamp(0, list.length).toInt(), item);
         return list.asMap().entries.map((entry) => _copyFolder(entry.value, order: entry.key)).toList();
       }
       return list.map((folder) => _copyFolder(folder, folders: reorder(folder.folders))).toList();
@@ -331,16 +408,93 @@ class AureonMetadataStore {
     tags: folder.tags, colorArgb: folder.colorArgb,
   );
 
+  Future<Directory> _directory() async {
+    final root = _rootDirectory ?? await getApplicationSupportDirectory();
+    final directory = Directory('${root.path}${Platform.pathSeparator}AUREON${Platform.pathSeparator}metadata');
+    await directory.create(recursive: true);
+    return directory;
+  }
+
+  Future<List<int>> _getLocalKey() async {
+    final stored = await _keyStore.readKey();
+    if (stored != null) {
+      final key = base64Url.decode(base64Url.normalize(stored));
+      if (key.length != 32) throw StateError('AUREON local metadata key has an invalid length.');
+      return key;
+    }
+    final key = _randomBytes(32);
+    await _keyStore.writeKey(base64Url.encode(key));
+    final confirmed = await _keyStore.readKey();
+    if (confirmed == null || base64Url.decode(base64Url.normalize(confirmed)).length != 32) {
+      throw StateError('Could not safely initialize AUREON local metadata key.');
+    }
+    return key;
+  }
+
+  Future<AureonMetadataSnapshot> _decryptCatalog(List<int> bytes) async {
+    if (bytes.isEmpty || bytes.length > _maxCatalogBytes) {
+      throw const FormatException('Local metadata catalog size is invalid.');
+    }
+    final value = jsonDecode(utf8.decode(bytes));
+    if (value is! Map) throw const FormatException('Invalid local metadata catalog envelope.');
+    final envelope = value.cast<String, Object?>();
+    if (envelope['format'] != _format || envelope['formatVersion'] != 1 ||
+        envelope['generation'] is! int) {
+      throw const FormatException('Unsupported local metadata catalog format.');
+    }
+    final generation = envelope['generation'] as int;
+    final nonce = _decode(_requiredString(envelope, 'nonce'), 12);
+    final cipherText = _decode(_requiredString(envelope, 'cipherText'));
+    final mac = _decode(_requiredString(envelope, 'mac'), 16);
+    final clear = await _cipher.decrypt(
+      SecretBox(cipherText, nonce: nonce, mac: Mac(mac)),
+      secretKey: SecretKey(await _getLocalKey()),
+      aad: utf8.encode('$_aadPrefix$generation'),
+    );
+    final payload = jsonDecode(utf8.decode(clear));
+    if (payload is! Map) throw const FormatException('Invalid local metadata payload.');
+    final snapshot = AureonMetadataSnapshot.fromJson(payload.cast<String, Object?>());
+    if (snapshot.generation != generation) throw const FormatException('Local metadata generation mismatch.');
+    return snapshot;
+  }
+
   String _newId() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    final bytes = _randomBytes(16);
     return 'folder-${base64Url.encode(bytes).replaceAll('=', '')}';
   }
 
+  List<int> _randomBytes(int count) => List<int>.generate(count, (_) => _random.nextInt(256));
+  List<int> _decode(String value, int length) {
+    final bytes = base64Url.decode(base64Url.normalize(value));
+    if (bytes.length != length) throw const FormatException('Invalid local metadata field length.');
+    return bytes;
+  }
+
   Future<void> save(AureonMetadataSnapshot snapshot) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!await prefs.setString(storageKey, jsonEncode(snapshot.toJson()))) {
-      throw StateError('Could not persist AUREON metadata snapshot.');
-    }
+    final directory = await _directory();
+    final key = await _getLocalKey();
+    final nonce = _randomBytes(12);
+    final aad = utf8.encode('$_aadPrefix${snapshot.generation}');
+    final box = await _cipher.encrypt(
+      utf8.encode(jsonEncode(snapshot.toJson())),
+      secretKey: SecretKey(key),
+      nonce: nonce,
+      aad: aad,
+    );
+    final envelope = utf8.encode(jsonEncode({
+      'format': _format,
+      'formatVersion': 1,
+      'generation': snapshot.generation,
+      'nonce': base64Url.encode(nonce),
+      'cipherText': base64Url.encode(box.cipherText),
+      'mac': base64Url.encode(box.mac.bytes),
+    }));
+    if (envelope.length > _maxCatalogBytes) throw StateError('AUREON local metadata catalog exceeds the supported size.');
+    final slot = snapshot.generation % 2;
+    final target = File('${directory.path}${Platform.pathSeparator}catalog-$slot.aureon');
+    final temporary = File('${target.path}.tmp');
+    await temporary.writeAsBytes(envelope, flush: true);
+    if (await target.exists()) await target.delete();
+    await temporary.rename(target.path);
   }
 }
