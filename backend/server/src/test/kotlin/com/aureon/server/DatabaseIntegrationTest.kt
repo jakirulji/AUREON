@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 
 class DatabaseIntegrationTest {
     @Test
-    fun postgres18ConnectionSeesV001AndV002SchemaWhenConfigured() {
+    fun postgres18ConnectionSeesV001ThroughV003SchemaWhenConfigured() {
         val jdbcUrl = System.getenv("AUREON_TEST_DATABASE_URL")
         assumeTrue(!jdbcUrl.isNullOrBlank(), "PostgreSQL integration is enabled in GitHub Actions")
         val username = System.getenv("AUREON_TEST_DATABASE_USER") ?: "aureon"
@@ -35,7 +35,7 @@ class DatabaseIntegrationTest {
                         1,
                         connection.createArrayOf(
                             "text",
-                            arrayOf("provider_oauth_transactions", "provider_inventory_cursors", "provider_items")
+                            arrayOf("provider_oauth_transactions", "provider_inventory_cursors", "provider_items", "trash_items")
                         )
                     )
                     statement.executeQuery().use { result ->
@@ -44,7 +44,7 @@ class DatabaseIntegrationTest {
                     }
                 }
             }
-            assertEquals(3, tables, "V002 inventory tables must exist after migration")
+            assertEquals(4, tables, "V002 inventory and V003 Trash tables must exist after migration")
         }
     }
 }
