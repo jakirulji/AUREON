@@ -5,7 +5,7 @@
 
 ## Decision
 
-Use **Room as the authoritative Android local persistence layer**, owned by Kotlin. Flutter is the presentation layer and accesses local domain operations through a typed Pigeon platform interface. Do not let Flutter UI and Kotlin background workers maintain separate writable databases for the same transfer/catalog state.
+Use **Room 2.8.5 as the authoritative Android local persistence layer**, owned by Kotlin. Use **WorkManager 2.12.0** for durable deferrable work and **Pigeon 29.1.1** for the typed Flutter-to-Kotlin boundary. These are the current stable candidates as of this A0 review; pin and test them in the Android prototype before production. Do not let Flutter UI and Kotlin background workers maintain separate writable databases for the same transfer/catalog state.
 
 ## Responsibilities
 
@@ -47,6 +47,17 @@ Use **Room as the authoritative Android local persistence layer**, owned by Kotl
 - More native Kotlin work and a typed bridge to maintain.
 - Pigeon API compatibility and schema migration tests become A0/A1 requirements.
 
+## Proposed Android dependency baseline
+
+- Android Gradle Plugin 9.5.0 with Gradle 9.9.0 or later compatible patch.
+- Kotlin 2.4.21 and JDK 21 for the app build toolchain.
+- compileSdk/targetSdk 37; minSdk 26.
+- Room 2.8.5 with KSP (or the then-supported Room compiler integration) and exported schema JSON committed for migration review.
+- WorkManager 2.12.0; use unique work names and explicit constraints/backoff.
+- Pigeon 29.1.1; generated Dart/Kotlin bindings are build artifacts from a checked-in interface definition, not hand-maintained string channels.
+
+These versions are candidate pins, not yet validated in an Android build. Re-check current stable SDK and Play policy before release.
+
 ## Validation spike
 
 Before A0 exit, demonstrate:
@@ -57,3 +68,10 @@ Before A0 exit, demonstrate:
 5. Flutter-to-Kotlin Pigeon calls and typed state updates.
 6. Keystore-backed local wrapping-key creation and fail-closed behavior on key invalidation.
 7. No source deletion when upload verification or authorization is incomplete.
+
+## References
+
+- [AndroidX Room release notes](https://developer.android.com/jetpack/androidx/releases/room) — Room 2.8.5 stable.
+- [AndroidX WorkManager release notes](https://developer.android.com/jetpack/androidx/releases/work) — WorkManager 2.12.0 stable.
+- [Flutter Pigeon package](https://pub.dev/packages/pigeon) — typed platform API generation; current stable 29.1.1.
+- [Android Gradle Plugin 9.5.0 release notes](https://developer.android.com/build/releases/agp-9-5-0-release-notes) — API 37 support and Gradle compatibility.
