@@ -11,6 +11,8 @@ on:
   pull_request:
     paths:
       - "app/**"
+      - "packages/aureon_local_files/**"
+      - "shared/aureon_contracts/**"
       - ".github/workflows/aureon-app-preview.yml"
   workflow_dispatch:
 
@@ -34,10 +36,12 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Prepare local-files plugin package
+      - name: Prepare local Dart packages
         shell: bash
-        run: mkdir -p "$RUNNER_TEMP/packages" && cp -R packages/aureon_local_files "$RUNNER_TEMP/packages/aureon_local_files"
-          cp -R shared/aureon_contracts "$RUNNER_TEMP/packages/aureon_contracts"
+        run: |
+          mkdir -p "$RUNNER_TEMP/packages" "$RUNNER_TEMP/shared"
+          cp -R packages/aureon_local_files "$RUNNER_TEMP/packages/aureon_local_files"
+          cp -R shared/aureon_contracts "$RUNNER_TEMP/shared/aureon_contracts"
       - name: Generate Android host project
         shell: bash
         run: |
@@ -70,12 +74,13 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Prepare local-files plugin package
+      - name: Prepare local Dart packages
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/packages" | Out-Null
           Copy-Item packages/aureon_local_files "$env:RUNNER_TEMP/packages/aureon_local_files" -Recurse
-          Copy-Item shared/aureon_contracts "$env:RUNNER_TEMP/packages/aureon_contracts" -Recurse
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/shared" | Out-Null
+          Copy-Item shared/aureon_contracts "$env:RUNNER_TEMP/shared/aureon_contracts" -Recurse
       - name: Generate Windows host project
         shell: pwsh
         run: |
