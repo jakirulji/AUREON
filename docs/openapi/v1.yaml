@@ -865,6 +865,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Authenticated caller is not permitted to perform this operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
     NotFound:
       description: Resource not found or not visible to this account.
       content:
