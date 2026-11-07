@@ -175,8 +175,10 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Move to AUREON Trash?'),
-        content: Text('Move "${entry.name}" to AUREON Trash? You can restore it later. The original file will not be permanently deleted.'),
+        title: Text(Platform.isWindows ? 'Move to Recycle Bin?' : 'Move to AUREON Trash?'),
+        content: Text(Platform.isWindows
+          ? 'Move "${entry.name}" to the Windows Recycle Bin?'
+          : 'Move "${entry.name}" to AUREON Trash? You can restore it later. The original file will not be permanently deleted.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Move to Trash')),
