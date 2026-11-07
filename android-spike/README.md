@@ -9,15 +9,16 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 - WorkManager 2.12.0 transfer constraints require connected network, battery not low and storage not low.
 - Pigeon 29.1.1 interface contract is checked in under pigeon/; CI generates matching Dart and Kotlin APIs from the same pinned package version and analyzes/compiles both sides.
 - Generated Dart API is written to `pigeon/lib/src/aureon_storage_api.g.dart`; generated Kotlin API is written into the Android storage module under `com.aureon.storage.generated`.
-- The generated Kotlin API compiles against Flutter’s Android embedding (`flutter.jar`); the prototype still has no registered runtime handler or Flutter application shell.
-- Tests close and reopen the Room database to verify persisted checkpoint state.
+- `AureonStorageHostApiImpl` implements the generated Kotlin host contract and connects transfer lookup/pause/resume calls to the Room repository. The generated Kotlin API compiles against Flutter’s Android embedding (`flutter.jar`).
+- Runtime handler registration (`AureonStorageHostApi.setUp`) and a Flutter application shell are not present yet; the host implementation is currently validated through native unit tests.
+- Tests close and reopen the Room database, verify persisted checkpoint state, and exercise Pigeon host API metadata mapping plus pause/resume state transitions.
 - Source cleanup can only be offered after remote verification, explicit user opt-in and a granted OS permission.
 
 ## Security and lifecycle boundaries
 
 - Source URI and provider upload-session references are represented as encrypted-envelope byte arrays in the schema; the byte arrays in this spike are test fixtures, not production ciphertext.
 - No method deletes a local source file. This prototype only computes whether a cleanup offer is eligible.
-- No actual provider transfer, Android Keystore wrapping, Pigeon code generation, WorkManager scheduling, SAF picker or Flutter UI is implemented yet.
+- No actual provider transfer, Android Keystore wrapping, production WorkManager scheduling, SAF picker or Flutter UI is implemented yet. Pigeon generation is exercised in CI; the generated source files are created during the build.
 - A database close/reopen test is not a full Android process-death/reboot/OEM test.
 
 ## Build
