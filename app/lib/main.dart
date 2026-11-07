@@ -110,10 +110,10 @@ class _AureonHomeState extends State<AureonHome> {
         const Text('Storage overview', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
         LayoutBuilder(builder: (context, box) {
-          final count = box.maxWidth > 700 ? 3 : 1;
+          final count = box.maxWidth > 1000 ? 3 : box.maxWidth > 520 ? 2 : 1;
           return GridView.count(
             crossAxisCount: count, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: count == 1 ? 3.1 : 2.5,
+            crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: count == 1 ? 3.1 : count == 2 ? 2.8 : 2.5,
             children: const [
               _StorageCard(icon: Icons.phone_android, name: 'This device', detail: 'Local storage • Not connected', color: Color(0xFF64E6C2)),
               _StorageCard(icon: Icons.cloud_queue, name: 'Cloud accounts', detail: 'No accounts connected', color: Color(0xFF83A9FF)),
