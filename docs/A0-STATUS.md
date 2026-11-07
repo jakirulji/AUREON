@@ -1,7 +1,7 @@
 # AUREON A0 — Readiness and Exit-Gate Tracker
 
 **Last updated:** 2026-11-07  
-**Overall status:** <strong>IN PROGRESS</strong> — OpenAPI, PostgreSQL 18, Ktor/JDBC integration, OAuth PKCE primitives and KMS/refresh-lease model tests are green; production security approval, Android prototype and owner-controlled deployment/provider decisions remain open.
+**Overall status:** <strong>IN PROGRESS</strong> — OpenAPI, PostgreSQL 18, Ktor/JDBC integration, OAuth PKCE primitives, PostgreSQL refresh-lease transactions and outbox tests are green; production security approval, Android prototype and owner-controlled deployment/provider decisions remain open.
 
 This file is the operational A0 checklist. A document existing in GitHub is not the same as a decision being verified or code being implemented.
 
@@ -12,11 +12,6 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - [A0 Threat Model](./THREAT-MODEL.md) — STRIDE register, security invariants, separate credential-broker workload requirement and required test evidence.
 - [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory and policy framework; public policy/legal review remains open.
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and offline recovery-code recommendation; owner approval pending.
-- [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
-- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — managed KMS/HSM boundary; vendor and region intentionally undecided.
-- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; starts only after A0 exit review.
-
-- [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and recovery-code recommendation; owner approval pending.
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — managed KMS/HSM boundary; vendor and region intentionally undecided.
 - [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; starts only after A0 exit review.
