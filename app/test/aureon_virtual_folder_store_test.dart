@@ -52,7 +52,6 @@ void main() {
   });
 
   test('membership add is idempotent and remove only changes AUREON metadata', () async {
-    final store = AureonVirtualFolderStore();
     final folder = await store.create('Archive');
     final reference = file('drive-a', 'item-1', 'Drive A');
     await store.addItem(folder.id, reference);
@@ -67,7 +66,6 @@ void main() {
   });
 
   test('same provider item in different accounts is not conflated', () async {
-    final store = AureonVirtualFolderStore();
     final folder = await store.create('Mixed');
     await store.addItem(folder.id, file('account-a', 'same-item-id', 'A'));
     await store.addItem(folder.id, file('account-b', 'same-item-id', 'B'));
@@ -75,7 +73,6 @@ void main() {
   });
 
   test('duplicate folder names are rejected case-insensitively', () async {
-    final store = AureonVirtualFolderStore();
     await store.create('Projects');
     await expectLater(store.create('projects'), throwsStateError);
   });
