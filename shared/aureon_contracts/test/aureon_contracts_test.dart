@@ -4,7 +4,38 @@ import 'dart:io';
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:test/test.dart';
 
-void main() {
+void main() {\n
+  group('TransferStateMachine', () {
+    test('enforces the forward transfer lifecycle', () {
+      expect(TransferStateMachine.canTransition(TransferState.queued, TransferState.preparing), isTrue);
+      expect(TransferStateMachine.canTransition(TransferState.preparing, TransferState.transferring), isTrue);
+      expect(TransferStateMachine.canTransition(TransferState.transferring, TransferState.finalizing), isTrue);
+      expect(TransferStateMachine.canTransition(TransferState.finalizing, TransferState.verifying), isTrue);
+    });
+
+    test('verified requires remote verification evidence', () {
+      expect(TransferStateMachine.canTransition(TransferState.verifying, TransferState.verified), isFalse);
+      expect(TransferStateMachine.canTransition(
+        TransferState.verifying, TransferState.verified, remoteVerified: true,
+      ), isTrue);
+    });
+
+    test('prevents skipping verification and reopening terminal states', () {
+      expect(TransferStateMachine.canTransition(
+        TransferState.transferring, TransferState.verified, remoteVerified: true,
+      ), isFalse);
+      expect(TransferStateMachine.canTransition(TransferState.verified, TransferState.queued), isFalse);
+      expect(TransferStateMachine.canTransition(TransferState.cancelled, TransferState.queued), isFalse);
+    });
+
+    test('allows auth-blocked work to resume', () {
+      expect(TransferStateMachine.canTransition(
+        TransferState.waitingForAuth, TransferState.queued,
+      ), isTrue);
+    });
+  });
+
+
   group('CleanupEvidence', () {
     test('default-safe evidence never permits cleanup without opt-in', () {
       const evidence = CleanupEvidence(

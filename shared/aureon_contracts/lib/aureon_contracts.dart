@@ -181,3 +181,66 @@ class TransferCheckpoint {
         'error': error?.name,
       };
 }
+
+
+/// Validates durable transfer state transitions shared by platform adapters.
+class TransferStateMachine {
+  TransferStateMachine._();
+
+  static const Map<TransferState, Set<TransferState>> _allowed = {
+    TransferState.queued: {
+      TransferState.preparing, TransferState.paused,
+      TransferState.waitingForNetwork, TransferState.waitingForAuth,
+      TransferState.waitingForQuota, TransferState.cancelled,
+    },
+    TransferState.preparing: {
+      TransferState.transferring, TransferState.paused,
+      TransferState.waitingForNetwork, TransferState.waitingForAuth,
+      TransferState.waitingForQuota, TransferState.retryWait,
+      TransferState.failed, TransferState.cancelled,
+    },
+    TransferState.transferring: {
+      TransferState.finalizing, TransferState.paused,
+      TransferState.waitingForNetwork, TransferState.waitingForAuth,
+      TransferState.waitingForQuota, TransferState.retryWait,
+      TransferState.conflict, TransferState.failed, TransferState.cancelled,
+    },
+    TransferState.finalizing: {
+      TransferState.verifying, TransferState.waitingForNetwork,
+      TransferState.waitingForAuth, TransferState.retryWait,
+      TransferState.conflict, TransferState.failed, TransferState.cancelled,
+    },
+    TransferState.verifying: {
+      TransferState.verified, TransferState.waitingForNetwork,
+      TransferState.waitingForAuth, TransferState.retryWait,
+      TransferState.conflict, TransferState.failed, TransferState.cancelled,
+    },
+    TransferState.paused: {TransferState.queued, TransferState.cancelled},
+    TransferState.waitingForNetwork: {
+      TransferState.queued, TransferState.paused, TransferState.cancelled,
+    },
+    TransferState.waitingForAuth: {
+      TransferState.queued, TransferState.paused, TransferState.cancelled,
+    },
+    TransferState.waitingForQuota: {
+      TransferState.queued, TransferState.paused, TransferState.cancelled,
+    },
+    TransferState.retryWait: {
+      TransferState.queued, TransferState.paused, TransferState.cancelled,
+    },
+    TransferState.conflict: {TransferState.queued, TransferState.cancelled},
+    TransferState.failed: {TransferState.queued, TransferState.cancelled},
+    TransferState.verified: {},
+    TransferState.cancelled: {},
+  };
+
+  /// A transfer can enter verified only with affirmative remote evidence.
+  static bool canTransition(
+    TransferState from,
+    TransferState to, {
+    bool remoteVerified = false,
+  }) {
+    if (to == TransferState.verified && !remoteVerified) return false;
+    return _allowed[from]?.contains(to) ?? false;
+  }
+}

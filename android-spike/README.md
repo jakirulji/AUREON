@@ -10,7 +10,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 - Pigeon 29.1.1 interface contract is checked in under pigeon/; CI generates matching Dart and Kotlin APIs from the same pinned package version and analyzes/compiles both sides.
 - Generated Dart API is written to `pigeon/lib/src/aureon_storage_api.g.dart`; generated Kotlin API is written into the Android storage module under `com.aureon.storage.generated`.
 - `AureonStorageHostApiImpl` implements the generated Kotlin host contract and connects transfer lookup/pause/resume calls to the Room repository. The generated Kotlin API compiles against Flutter’s Android embedding (`flutter.jar`).
-- Runtime handler registration (`AureonStorageHostApi.setUp`) and a Flutter application shell are not present yet; the host implementation is currently validated through native unit tests.
+- AureonStoragePlugin registers and unregisters the generated Pigeon handler per FlutterEngine. Plugin lifecycle and host implementation are compile/unit-test validated; a live FlutterEngine-to-Dart round trip and Flutter application shell are still open.
 - Tests close and reopen the Room database, verify persisted checkpoint state, and exercise Pigeon host API metadata mapping plus pause/resume state transitions.
 - Source cleanup can only be offered after remote verification, explicit user opt-in and a granted OS permission.
 
