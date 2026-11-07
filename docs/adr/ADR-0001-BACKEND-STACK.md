@@ -1,6 +1,6 @@
 # ADR-0001 — Backend Technology and Runtime
 
-**Status:** Recommended for A0 validation; production lock pending the architecture spike  
+**Status:** Provisional recommendation; basic Ktor scaffold passed CI, full architecture spike remains open  
 **Date:** 2026-11-07  
 **Decision owner:** AUREON project  
 **Scope:** Android-first AUREON control-plane backend; Windows client remains a later phase
@@ -78,6 +78,12 @@ Build a disposable proof-of-concept, not the production app, that demonstrates:
 - A clean disposable environment can reproduce the test suite.
 
 If any critical gate fails, revise the stack decision before A1 production implementation.
+
+## Current spike evidence
+
+- Backend scaffold CI run #42370407442: JDK 21 setup, Gradle 9.9.0 setup, Ktor compile, four HTTP/authentication tests and backend build all passed.
+- Extended fake-KMS and refresh-lease tests are in the repository; their latest GitHub Actions result must be observed before calling those tests green.
+- No PostgreSQL connection, Flyway migration runner, production authentication, real KMS SDK, OAuth provider, outbox worker or container image has been implemented in the spike.
 
 ## Consequences
 
