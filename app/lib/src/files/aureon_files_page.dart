@@ -469,6 +469,24 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
   String get _rootKey => base64Url.encode(utf8.encode(widget.root.rootId)).replaceAll('=', '');
   String _metaKey(String id) => 'aureon.trash.meta.$_rootKey.$id';
 
+  void _recordHistory({
+    required String kind,
+    required String itemName,
+    required String sourceLocation,
+    String? destinationLocation,
+    required bool succeeded,
+    String? errorCode,
+  }) {
+    unawaited(AureonOperationHistory.record(
+      kind: kind,
+      itemName: itemName,
+      sourceLocation: sourceLocation,
+      destinationLocation: destinationLocation,
+      succeeded: succeeded,
+      errorCode: errorCode,
+    ));
+  }
+
   @override
   void initState() {
     super.initState();
