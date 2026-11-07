@@ -238,8 +238,8 @@ void main() {
   testWidgets('AUREON Trash restores an item to its recorded parent', (tester) async {
     const root = AureonLocalRoot(rootId: 'root-trash-test', displayName: 'Home', rootDocumentId: 'root-doc');
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('aureon.trash.folder.${root.rootId.hashCode}', 'trash-root');
-    await prefs.setString('aureon.trash.meta.${root.rootId.hashCode}.trashed-1',
+    await prefs.setString('aureon.trash.folder.${base64Url.encode(utf8.encode(root.rootId)).replaceAll('=', '')}', 'trash-root');
+    await prefs.setString('aureon.trash.meta.${base64Url.encode(utf8.encode(root.rootId)).replaceAll('=', '')}.trashed-1',
       jsonEncode({'originalParentId': 'original-parent', 'originalName': 'notes.txt', 'trashedAt': 1700000000000}));
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
