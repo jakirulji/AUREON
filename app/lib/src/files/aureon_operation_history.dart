@@ -55,7 +55,7 @@ class AureonOperationHistory {
     required bool succeeded,
     String? errorCode,
   }) {
-    _writeQueue = _writeQueue.then((_) async {
+    final operation = _writeQueue.then((_) async {
       final preferences = await SharedPreferences.getInstance();
       final rows = _decode(preferences.getString(storageKey));
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -72,10 +72,14 @@ class AureonOperationHistory {
       if (rows.length > maxRecords) rows.removeRange(maxRecords, rows.length);
       await preferences.setString(storageKey, jsonEncode(rows.map((row) => row.toJson()).toList()));
     });
+    _writeQueue = operation.catchError((Object _) {});
     return _writeQueue;
   }
 
+  static Future<void> flush() => _writeQueue;
+
   static Future<List<AureonOperationRecord>> load() async {
+    await _writeQueue;
     final preferences = await SharedPreferences.getInstance();
     return _decode(preferences.getString(storageKey));
   }
