@@ -173,6 +173,10 @@ void main() {
       'parentId': 'root-doc', 'targetName': 'notes-copy.txt',
     });
     expect(find.text('Copy completed and SHA-256 verified. Original preserved.'), findsOneWidget);
+    await tester.tap(find.byTooltip('Operation history'));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy • notes.txt'), findsOneWidget);
+    expect(find.textContaining('Success'), findsOneWidget);
   });
 
   testWidgets('Files page moves an item to its parent only after confirmation', (tester) async {
