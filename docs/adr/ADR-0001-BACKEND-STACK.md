@@ -82,7 +82,7 @@ If any critical gate fails, revise the stack decision before A1 production imple
 ## Current spike evidence
 
 - Backend scaffold CI run #42370407442: JDK 21 setup, Gradle 9.9.0 setup, Ktor compile, four HTTP/authentication tests and backend build all passed.
-- Extended fake-KMS and refresh-lease tests are in the repository; their latest GitHub Actions result must be observed before calling those tests green.
+- Extended fake-KMS and refresh-lease tests passed in GitHub Actions run #42370500985.
 - No PostgreSQL connection, Flyway migration runner, production authentication, real KMS SDK, OAuth provider, outbox worker or container image has been implemented in the spike.
 
 ## Consequences
