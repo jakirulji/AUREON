@@ -282,6 +282,8 @@ class AureonRecoveryKeyService {
     if (rawKeys is! List || rawKeys.length != keyCount) {
       throw const FormatException('Recovery key file must contain exactly five keys.');
     }
+    final generation = _requiredInt(header, 'generation');
+    if (generation < 1) throw const FormatException('Recovery key generation must be positive.');
     final keys = rawKeys.map((entry) {
       if (entry is! Map) throw const FormatException('Invalid manual recovery key.');
       final item = entry.cast<String, Object?>();
@@ -296,7 +298,7 @@ class AureonRecoveryKeyService {
     }
     return ManualRecoveryKeySet(
       vaultId: vaultId,
-      generation: _requiredInt(header, 'generation'),
+      generation: generation,
       createdAtEpochMs: _requiredInt(payload, 'createdAtEpochMs'),
       keys: keys,
     );
@@ -376,7 +378,7 @@ class AureonRecoveryKeyService {
   }
 
   void _validateKeySet(ManualRecoveryKeySet set) {
-    if (set.keys.length != keyCount ||
+    if (set.vaultId.trim().isEmpty || set.generation < 1 || set.keys.length != keyCount ||
         set.keys.map((key) => key.id).toSet().length != keyCount ||
         set.keys.map((key) => key.value).toSet().length != keyCount ||
         set.keys.any((key) => _unhex(key.value).length != keyBytes)) {
