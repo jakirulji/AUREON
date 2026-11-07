@@ -98,7 +98,7 @@ erDiagram
 - The database stores only a versioned authenticated-encryption envelope, algorithm identifier, KMS key reference/version, granted scopes, timestamps and concurrency metadata.
 - Envelope payload includes the wrapped data key, nonce, ciphertext and authentication tag according to a versioned format. The database never stores KMS key material or plaintext access/refresh tokens.
 - KMS key references are identifiers, not secrets. Access is granted only to a dedicated credential-broker workload identity.
-- Access tokens are memory-only unless a provider-specific reviewed exception exists. Refresh token rotation is an atomic compare-and-swap on credential version.
+- Refresh tokens remain exclusively in the backend vault. A short-lived access token may be issued over TLS to the authenticated native provider adapter for direct provider API operations; it is memory-only, never logged or persisted, and never exposed to Flutter UI. Refresh-token rotation is an atomic compare-and-swap on credential version.
 - A refresh lease prevents concurrent use of rotating credentials. A stale lease holder cannot overwrite a newer version.
 - OAuth state is stored as a hash. Any server-held PKCE verifier is encrypted, short-lived and deleted after transaction consumption/expiry. Raw authorization codes are never persisted.
 - Every decrypt/refresh/rotate/revoke operation emits a redacted audit event. Outbox and audit payloads never contain secrets.
