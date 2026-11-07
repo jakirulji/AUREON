@@ -37,8 +37,8 @@ BEGIN
     UPDATE trash_items SET status='restored', restored_at=now(), updated_by_device_id=d1,
       updated_at=now(), row_version=row_version+1 WHERE id=trash1 AND user_id=u1;
     IF (SELECT status FROM trash_items WHERE id=trash1) <> 'restored' THEN RAISE EXCEPTION 'Restore state not persisted'; END IF;
-    INSERT INTO trash_items(user_id, provider_account_id, provider_item_id, trash_mode, operation_id, created_by_device_id, updated_by_device_id)
-      VALUES (u1, p1, 'cloud-item-1', 'provider_folder', '00000000-0000-4000-8000-000000000034', d1, d1);
+    INSERT INTO trash_items(user_id, provider_account_id, provider_item_id, trash_mode, trash_container_provider_item_id, operation_id, created_by_device_id, updated_by_device_id)
+      VALUES (u1, p1, 'cloud-item-1', 'provider_folder', 'trash-container-1', '00000000-0000-4000-8000-000000000034', d1, d1);
     IF (SELECT count(*) FROM information_schema.columns WHERE table_name='trash_items'
       AND column_name IN ('local_path','saf_uri','file_bytes')) <> 0 THEN
       RAISE EXCEPTION 'Local-only path/content column unexpectedly exists';
