@@ -110,3 +110,10 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - Backend API and adapter are code prototypes only. They are not yet wired to the production session authenticator, credential broker, deployed backend or live provider OAuth. Provider operation receipt references are currently accepted by the API contract but not yet durably stored by the V003 schema/repository.
 - Android/Windows app-side cross-device sync is not yet wired. Existing SAF/Win32 local Trash remains device-local. The client needs the real Master Account session, provider account inventory and authenticated API base URL before it can safely sync provider-backed Trash.
 - Backend CI run #42401277217: Ktor tests passed and backend build passed; final job teardown/status was still in progress at last check. Adapter change run #42401338611 was still running. No APK/EXE artifacts were created.
+
+
+### Cloud Trash sync client progress
+
+- Added `app/lib/src/files/aureon_trash_sync_client.dart`: HTTPS-only authenticated transport contract, concrete Dart `HttpClient` adapter, provider-backed Trash list/create/restore/purge requests, provider-outcome-reference requirement, and HTTP 409 stale-state conflict mapping.
+- Added Dart tests for authenticated listing, provider receipt requirement, HTTPS enforcement and no-session fail-closed behavior.
+- This client is not yet wired into the Trash page because the app does not yet have a production Master Account session/token provider or deployed API base URL. It does not sync device-local SAF/Win32 Trash.
