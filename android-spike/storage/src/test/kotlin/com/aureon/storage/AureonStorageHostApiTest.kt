@@ -3,10 +3,6 @@ package com.aureon.storage
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -38,7 +34,6 @@ class AureonStorageHostApiTest {
         ).build()
         api = AureonStorageHostApiImpl(
             repository = TransferCheckpointRepository(database.transferJobDao()),
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
             nowEpochMs = { 9000L }
         )
     }
@@ -52,10 +47,8 @@ class AureonStorageHostApiTest {
     @Test
     fun hostApiReturnsOnlyTransferSnapshotMetadata() = runBlocking {
         database.transferJobDao().upsert(testJob())
-        val result = CompletableDeferred<Result<com.aureon.storage.generated.TransferSnapshot?>>()
 
-        api.getTransfer("operation-host-api") { result.complete(it) }
-        val snapshot = result.await().getOrThrow()
+        val snapshot = api.getTransfer("operation-host-api")
 
         assertEquals("operation-host-api", snapshot?.operationId)
         assertEquals("uploading", snapshot?.status)
@@ -66,23 +59,17 @@ class AureonStorageHostApiTest {
 
     @Test
     fun hostApiReturnsNullForUnknownTransfer() = runBlocking {
-        val result = CompletableDeferred<Result<com.aureon.storage.generated.TransferSnapshot?>>()
-        api.getTransfer("missing-operation") { result.complete(it) }
-        assertNull(result.await().getOrThrow())
+        assertNull(api.getTransfer("missing-operation"))
     }
 
     @Test
     fun pauseAndResumeCommandsPersistStateTransitions() = runBlocking {
         database.transferJobDao().upsert(testJob())
 
-        val pauseResult = CompletableDeferred<Result<Unit>>()
-        api.pauseTransfer("operation-host-api") { pauseResult.complete(it) }
-        pauseResult.await().getOrThrow()
+        api.pauseTransfer("operation-host-api")
         assertEquals("paused", database.transferJobDao().getById("operation-host-api")?.status)
 
-        val resumeResult = CompletableDeferred<Result<Unit>>()
-        api.resumeTransfer("operation-host-api") { resumeResult.complete(it) }
-        resumeResult.await().getOrThrow()
+        api.resumeTransfer("operation-host-api")
         assertEquals("queued", database.transferJobDao().getById("operation-host-api")?.status)
     }
 
@@ -91,9 +78,9 @@ class AureonStorageHostApiTest {
         database.transferJobDao().upsert(
             testJob().copy(status = "verified", remoteVerified = true, verifiedAtEpochMs = 8000L)
         )
-        val result = CompletableDeferred<Result<Unit>>()
-        api.pauseTransfer("operation-host-api") { result.complete(it) }
-        assertTrue(result.await().isFailure)
+
+        assertTrue(runCatching { api.pauseTransfer("operation-host-api") }.isFailure)
+        assertTrue(runCatching { api.resumeTransfer("operation-host-api") }.isFailure)
     }
 
     private fun testJob() = TransferJobEntity(
