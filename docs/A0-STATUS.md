@@ -8,6 +8,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 ## 1. Work completed in the repository
 
 - [A0 Threat Model](./THREAT-MODEL.md) — STRIDE register, security invariants, separate credential-broker workload requirement and required test evidence.
+- [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory and policy framework; public policy/legal review remains open.
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and offline recovery-code recommendation; owner approval pending.
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — managed KMS/HSM boundary; vendor and region intentionally undecided.
@@ -46,7 +47,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | Android platform | Provisional ADR | Minimum API 26 / target API 37 recommended; release-time SDK policy and OEM matrix still require validation |
 | Local data layer | Recommended ADR | Room owned by Kotlin + Pigeon typed Flutter boundary; Room/WorkManager/process-death prototype remains |
 | Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
-| Privacy and legal | Open | Data visibility, restricted-scope disclosures, jurisdiction, retention, account deletion and privacy notice require review |
+| Privacy and legal | Baseline drafted; approval open | Data inventory, consent, retention and subprocessor framework documented; jurisdiction, actual retention, public privacy policy and legal review remain |
 | A1 backlog | Drafted | [First vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) created; start only after A0 exit review |
 
 ## 3. Immediate execution order
