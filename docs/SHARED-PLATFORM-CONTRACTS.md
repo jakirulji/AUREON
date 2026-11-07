@@ -135,3 +135,25 @@ A contract change requires:
 - File identity, account capability, error mapping and cleanup eligibility fixtures are shared.
 - Encryption interoperability test vectors are approved before real encrypted transfer is enabled.
 - Each platform adapter has its own native integration tests and cannot weaken shared safety invariants.
+
+## 10. Cross-account AUREON virtual folders
+
+AUREON organization folders are logical containers that may reference files from multiple provider accounts and providers. They are distinct from provider-native folders.
+
+- Define a stable AUREON virtual-folder ID and membership relation between that folder and logical file/provider-item references.
+- Membership is metadata only: adding/removing an item from an AUREON virtual folder must not mutate the provider object, its native parent, or its bytes.
+- Every referenced file retains its own provider account ID, provider item ID, provider-native parent ID, permissions, quota owner and canonical location.
+- One provider object may be referenced by multiple AUREON virtual folders without duplicating content.
+- Cross-account/provider Copy and Move are separate explicit transfer workflows, never inferred from virtual-folder membership changes.
+- Cross-provider Move means verified destination copy followed by separately authorized source deletion; if deletion cannot be safely completed, retain both copies and report a partial outcome.
+- Virtual-folder metadata is part of the independent encrypted AUREON organization backup and must reconcile by stable provider account subject + provider item ID.
+- Android and Windows must use the same folder/membership contract and shared test fixtures.
+
+### Shared model acceptance tests
+
+1. One virtual folder contains items from multiple provider accounts and providers.
+2. Adding/removing membership does not call provider mutation APIs.
+3. Provider-native parent relationships remain unchanged.
+4. Duplicate membership is idempotent; one file may belong to multiple virtual folders.
+5. Cross-device restore reproduces folder membership without duplicating provider objects.
+6. Explicit cross-provider copy/move obeys quota, permission, verification and no-auto-delete invariants.
