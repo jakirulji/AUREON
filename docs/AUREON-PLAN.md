@@ -380,6 +380,7 @@ Performance targets must be measured on representative devices and networks; do 
 
 ## 17. Engineering documents
 
+- [A0 Status and Exit-Gate Tracker](./A0-STATUS.md) — evidence-based readiness matrix; distinguishes authored documents from validated tests and implemented code.
 - [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) — system boundaries, backend structure, data model, API contract, OAuth/security decisions, transfer contract, validation gates and A0 exit criteria.
 - [Server Data Model](./DATA-MODEL.md) — PostgreSQL entities, ownership constraints, credential-vault invariants and metadata-first provider inventory.
 - [V001 PostgreSQL baseline](./migrations/V001__initial_schema.sql) and [V002 vault/inventory migration](./migrations/V002__vault-and-provider-inventory.sql) — additive schema evolution; V002 must run after V001.
