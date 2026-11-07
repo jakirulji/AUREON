@@ -125,7 +125,7 @@ void ListChildren(const EncodableMap* args,
     return;
   }
   std::error_code ec;
-  const auto canonical_root = std::filesystem::weakly_canonical(std::filesystem::u8path(*root), ec);
+  const auto canonical_root = std::filesystem::weakly_canonical(PathFromUtf8(*root), ec);
   if (ec) { result->Error("invalid_root", "The selected root is no longer accessible."); return; }
   const auto path = std::filesystem::weakly_canonical(PathFromUtf8(*parent), ec);
   if (ec) { result->Error("not_a_directory", "The selected path is not accessible."); return; }
