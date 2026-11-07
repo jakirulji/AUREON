@@ -211,10 +211,22 @@ paths:
         - $ref: '#/components/parameters/Provider'
         - name: code
           in: query
-          required: true
+          required: false
           schema:
             type: string
-          description: Provider authorization code; never log or persist.
+          description: Provider authorization code on success; never log or persist.
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Provider error code on denial/failure; sanitize before surfacing to the user.
+        - name: error_description
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Untrusted provider error detail; never display raw without sanitization or log with secrets.
         - name: state
           in: query
           required: true
