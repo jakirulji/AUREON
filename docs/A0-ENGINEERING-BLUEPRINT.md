@@ -234,7 +234,7 @@ Two legitimate models exist. The product requirement for seamless cross-device p
 
 ## 6. Database design
 
-Use PostgreSQL for server-side relational metadata. Use migrations from the first schema version. Never rely on application code alone for uniqueness or referential integrity.
+Use PostgreSQL 16 for server-side relational metadata. The provisional backend recommendation is Kotlin/JVM + Ktor 3.6.x as a modular monolith; see [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md). This remains provisional until the architecture spike proves auth, PostgreSQL migrations, credential-broker boundaries, refresh concurrency and outbox behavior. Use ordered migrations from the first schema version; never rely on application code alone for uniqueness or referential integrity.
 
 **Engineering drafts:** [Relational data model and ER diagram](./DATA-MODEL.md) · [V001 initial schema](./migrations/V001__initial_schema.sql) · [V002 vault and provider inventory](./migrations/V002__vault-and-provider-inventory.sql). V001 is the baseline; V002 is additive and must run after V001. CI is configured to apply both to PostgreSQL 16 and run separate smoke tests. The workflow result must be observed before either migration is called validated; no live production database is provisioned.
 
@@ -543,6 +543,7 @@ A0 is complete only when:
 - Transfer Coordinator state machine and idempotency behavior are testable.
 - Android minimum API and supported test devices are chosen.
 - Hosting/cost/security decisions are documented.
+- Backend stack recommendation has passed its architecture spike or has a reviewed alternative ADR.
 - A1 backlog is split into small, verifiable issues.
 
 Until these are met, A0 is **in progress**. This document is the first blueprint draft, not a declaration that all A0 decisions are closed.
