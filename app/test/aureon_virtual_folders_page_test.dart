@@ -5,12 +5,14 @@ import 'package:aureon/src/virtual_folders/aureon_virtual_folder_store.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory root;
   late AureonVirtualFolderStore store;
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     root = await Directory.systemTemp.createTemp('aureon-virtual-page-test-');
     store = AureonVirtualFolderStore(
       metadataStore: AureonMetadataStore(rootDirectory: root, keyStore: _FakeKeyStore()),
