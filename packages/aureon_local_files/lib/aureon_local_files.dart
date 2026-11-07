@@ -112,6 +112,10 @@ class AureonLocalFiles {
     final value = await _channel.invokeMethod<Object?>('moveToTrash', <String, Object?>{
       'rootId': root.rootId, 'entryId': entryId, 'parentId': parentId,
     });
+    if (value == true) {
+      return AureonTrashMoveResult(id: entryId, name: '', trashFolderId: '__windows__',
+        originalParentId: parentId, trashedAt: DateTime.now().millisecondsSinceEpoch, mode: 'windows');
+    }
     if (value is! Map) throw const FormatException('Native Trash returned an invalid response.');
     final id = value['id'];
     final name = value['name'];
