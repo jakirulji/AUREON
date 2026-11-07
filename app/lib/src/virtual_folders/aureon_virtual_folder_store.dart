@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:aureon_contracts/aureon_contracts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../backup/aureon_metadata_backup.dart';
 import '../backup/aureon_metadata_store.dart';
@@ -13,9 +14,24 @@ class AureonVirtualFolderStore {
       : _metadataStore = metadataStore ?? AureonMetadataStore();
 
   final AureonMetadataStore _metadataStore;
+  static const _legacyStorageKey = 'aureon.virtual_folders.v1';
 
-  Future<List<AureonVirtualFolder>> load() async =>
-      (await _metadataStore.load()).virtualFolders;
+  Future<List<AureonVirtualFolder>> load() async {
+    final current = await _metadataStore.load();
+    if (current.virtualFolders.isNotEmpty) return current.virtualFolders;
+    final prefs = await SharedPreferences.getInstance();
+    final legacy = prefs.getString(_legacyStorageKey);
+    if (legacy == null || legacy.isEmpty) return current.virtualFolders;
+    final decoded = jsonDecode(legacy);
+    if (decoded is! List) throw const FormatException('Legacy virtual-folder catalog is invalid.');
+    final migrated = decoded.map((value) {
+      if (value is! Map) throw const FormatException('Legacy virtual-folder entry is invalid.');
+      return AureonVirtualFolder.fromJson(value.cast<String, Object?>());
+    }).toList();
+    await save(migrated);
+    await prefs.remove(_legacyStorageKey);
+    return migrated;
+  }
 
   Future<void> save(List<AureonVirtualFolder> folders) async {
     final current = await _metadataStore.load();
@@ -30,6 +46,8 @@ class AureonVirtualFolderStore {
       preferences: current.preferences,
     );
     await _metadataStore.save(updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_legacyStorageKey);
   }
 
   Future<AureonVirtualFolder> create(String name) async {
