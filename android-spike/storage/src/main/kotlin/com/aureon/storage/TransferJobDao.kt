@@ -16,6 +16,30 @@ interface TransferJobDao {
     @Query(
         """
         UPDATE transfer_jobs
+        SET status = 'paused',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status IN ('queued', 'uploading')
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun pause(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'queued',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status = 'paused'
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun resume(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
         SET acknowledgedBytes = :acknowledgedBytes,
             updatedAtEpochMs = :updatedAtEpochMs
         WHERE operationId = :operationId

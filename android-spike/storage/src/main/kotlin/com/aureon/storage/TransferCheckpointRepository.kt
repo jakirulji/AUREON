@@ -8,6 +8,25 @@ class TransferCheckpointRepository(private val dao: TransferJobDao) {
         dao.upsert(job)
     }
 
+    suspend fun getTransfer(operationId: String): TransferJobEntity? {
+        require(operationId.isNotBlank())
+        return dao.getById(operationId)
+    }
+
+    suspend fun pause(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.pause(operationId, nowEpochMs) == 1) {
+            "Transfer cannot be paused from its current state"
+        }
+    }
+
+    suspend fun resume(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.resume(operationId, nowEpochMs) == 1) {
+            "Only a paused, unverified transfer can be resumed"
+        }
+    }
+
     suspend fun acknowledge(operationId: String, bytes: Long, nowEpochMs: Long) {
         require(bytes >= 0)
         check(dao.updateAcknowledgedBytes(operationId, bytes, nowEpochMs) == 1) {
