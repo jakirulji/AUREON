@@ -371,7 +371,11 @@ Performance targets must be measured on representative devices and networks; do 
 
 ## 17. Engineering documents
 
-- [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) — system boundaries, proposed backend structure, data model, API draft, OAuth/security decisions, transfer contract, testing strategy and A0 exit criteria.
+- [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) — system boundaries, backend structure, data model, API contract, OAuth/security decisions, transfer contract, validation gates and A0 exit criteria.
+- [Server Data Model](./DATA-MODEL.md) — PostgreSQL entities, ownership constraints, credential-vault invariants and metadata-first provider inventory.
+- [V001 PostgreSQL baseline](./migrations/V001__initial_schema.sql) and [V002 vault/inventory migration](./migrations/V002__vault-and-provider-inventory.sql) — additive schema evolution; V002 must run after V001.
+- [Android Native OAuth and Credential Lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) — provider callback patterns, user-consented credential vault, cross-device restoration and refresh safety.
+- [OpenAPI v1 contract](./openapi/v1.yaml) — identity, provider authorization, inventory, file catalog, sync and transfer control-plane endpoints.
 
 ## 18. Plan maintenance
 
