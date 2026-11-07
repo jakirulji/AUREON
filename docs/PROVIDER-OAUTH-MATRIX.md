@@ -18,7 +18,7 @@ This document translates AUREON's initial provider scope strategy into a least-p
 
 | Provider | Intended access model | Proposed minimum starting scopes | Important limitation / review |
 |---|---|---|---|
-| Google Drive | OAuth user-delegated | `drive.file`; add `drive.metadata.readonly` only if required and approved | `drive.file` is per-file access: app-created, opened by the app, or explicitly shared/selected. It does not provide unrestricted inventory of a user's entire existing Drive. `drive`, `drive.readonly`, and metadata-wide scopes are restricted; broader access can trigger Google verification and, where restricted-scope data is stored/transmitted server-side, a security assessment. |
+| Google Drive | OAuth user-delegated | **Narrow mode:** `drive.file`. **Full existing-library read mode:** `drive.readonly` plus `drive.file` for app-created content. **Full file-manager mode:** `drive` only if editing arbitrary existing Drive items is an approved launch requirement. | `drive.file` is per-file access and does not enumerate the entire existing Drive. `drive.readonly` permits reading/downloading all Drive files but not general write access; pairing it with `drive.file` keeps writes limited to files the app creates/opens/selects. `drive` permits read/write across all files and is restricted. Restricted-scope verification is required; server storage/transmission of restricted data may require an independent security assessment. Final mode must be proven against exact API endpoints and Google review eligibility before production. |
 | OneDrive personal/work | Microsoft Graph delegated | `Files.ReadWrite` for full user file operations; add `offline_access`, `openid`, `profile`, `email` only as required by the chosen identity/token flow | `Files.ReadWrite` is the least-privileged permission for upload/replace endpoints and covers read/create/update/delete of the signed-in user's files. Avoid `Files.ReadWrite.All` and application permissions for the consumer baseline. Deletion is still technically possible with the granted permission; AUREON must block automatic delete in its own policy layer. |
 | Dropbox | Scoped OAuth, Full Dropbox only if full-account browsing is a core requirement | `files.metadata.read`, `files.content.read`, `files.content.write`; `account_info.read` for account identity if required | App Folder access is narrower but confines AUREON to its app folder. Full Dropbox access is needed for whole-account file management. Dropbox's `files.content.write` supports write operations including delete endpoints; app logic must still prohibit automatic deletion. Avoid sharing scopes unless sharing features are explicitly introduced. |
 
@@ -26,7 +26,14 @@ This document translates AUREON's initial provider scope strategy into a least-p
 
 ### Google Drive
 
-**Preferred product strategy:** start with `drive.file` and a user-mediated per-file selection flow for selected-file workflows. On web, evaluate Google Picker. On native Android, do not assume an Android Storage Access Framework (SAF) URI grant is equivalent to granting Drive API `drive.file` access; prove the exact selection-to-Drive-API behavior in a native integration spike before promising it. This is the narrower permission path and aligns with per-file consent.
+**AUREON requirement:** the user expects existing Drive folders and files to be indexed, with real hierarchy retained. `drive.file` alone cannot meet that requirement.
+
+**Recommended evaluation order:**
+1. Test `drive.readonly` + `drive.file` as a read-all / write-app-files combination. This may support complete existing-library browsing and downloads while limiting writes to AUREON-managed/selected files.
+2. If users must edit, move or upload into arbitrary pre-existing folders, evaluate the broader `drive` scope. Do not request it silently; it needs a clear consent explanation and Google's restricted-scope review/assessment path.
+3. Keep a per-file `drive.file`-only mode as the privacy-minimal alternative, but label it accurately as selected-file access rather than full Drive browsing.
+
+On web, evaluate Google Picker. On native Android, do not assume a SAF URI grant is equivalent to Drive API `drive.file` access; prove the exact selection-to-API behavior before promising it.
 
 **Critical product trade-off:** a conventional unified browser that silently indexes every existing file and folder in a user's Drive cannot be delivered with `drive.file` alone. If full-drive browsing, global search, or automatic migration of arbitrary existing files is non-negotiable, the product must evaluate the required restricted scopes (likely `drive` or a combination of read/metadata scopes), Google's verification process, qualification requirements, and security assessment obligations before committing to that feature.
 
@@ -45,6 +52,14 @@ Choose the Dropbox app access type based on the promised product behavior:
 - **Full Dropbox:** needed for a general file manager over the user's existing Dropbox content.
 
 For a full file browser, start with metadata read + content read + content write. Do not request `sharing.read` or `sharing.write` until link/share management is a shipped feature.
+
+## Recommended first-provider OAuth flow
+
+- First provider: Google Drive, because the user's initial requirement includes indexing existing Drive content and preserving folder hierarchy.
+- Callback mode: backend HTTPS callback is the recommended target for cross-device refresh-token custody. The AUREON app opens the system browser; the backend creates the one-time state and PKCE verifier, stores only protected transaction material, and exchanges the returned code using a server-registered OAuth client. The exact Google OAuth client type, redirect URI, PKCE support and secret storage must be proven in a provider integration spike.
+- The backend redirect URI must be an exact pre-registered HTTPS URI. Never accept a client-selected callback host.
+- Do not embed a Google OAuth client secret in the APK or repository. Store server-side OAuth client credentials in a managed secret manager.
+- Start with the least privilege that meets the selected mode; request additional scopes only with a clear incremental consent screen.
 
 ## Cross-provider authorization lifecycle
 
@@ -69,11 +84,12 @@ Provider scopes may technically permit destructive operations. AUREON's product 
 
 ## Decisions still open before provider implementation
 
-1. Whether AUREON's Google Drive baseline accepts the restricted-scope verification/security-assessment cost to support whole-drive browsing, or launches with Picker-based per-file access.
+1. Whether AUREON launches with full existing-library read access (`drive.readonly` + `drive.file`) or full edit access (`drive`), including restricted-scope verification and any required security-assessment cost.
 2. Whether Dropbox's first release promises App Folder-only or Full Dropbox.
 3. Whether OneDrive personal and work/school accounts are both in the first provider release.
 4. Native OAuth redirect strategy and exact supported account types for each provider.
 5. Backend credential vault is the required target for user-consented cross-device provider restoration; production approval depends on threat-model review, KMS design, provider-terms review and independent security testing.
+6. Google Drive backend HTTPS callback is the recommended OAuth mode; exact client registration, redirect URI and PKCE implementation require a provider spike.
 6. Provider app registration ownership, consent-screen branding, verification submissions and production redirect domains.
 
 ## Official references
