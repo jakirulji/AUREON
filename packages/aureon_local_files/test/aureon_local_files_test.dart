@@ -46,7 +46,16 @@ void main() {
     expect(entries.last.sizeBytes, 120);
   });
 
-  test('malformed native entry is rejected', () async {
+  test('openFile sends the selected root and file identity', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'openFile');
+      expect(call.arguments, {'rootId': 'root-uri', 'fileId': 'child-document'});
+      return true;
+    });
+    await files.openFile(root: const AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc'), fileId: 'child-document');
+  });
+
+  test('malformed native entry is rejected',
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async => [
       {'id': 'x', 'name': 'broken'},

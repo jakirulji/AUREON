@@ -4,6 +4,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include <windows.h>
+#include <shellapi.h>
 #include <shobjidl.h>
 #include <wrl/client.h>
 
@@ -88,6 +89,26 @@ void PickRoot(std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
       {EncodableValue("displayName"), EncodableValue(Utf8(std::filesystem::path(wide_path).filename().wstring()).empty() ? utf8_path : Utf8(std::filesystem::path(wide_path).filename().wstring()))},
       {EncodableValue("rootDocumentId"), EncodableValue(utf8_path)}
   }));
+}
+
+void OpenFile(const EncodableMap* args,
+              std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  const auto* root = GetString(args, "rootId");
+  const auto* file = GetString(args, "fileId");
+  if (!root || !file || root->empty() || file->empty()) { result->Error("invalid_arguments", "rootId and fileId are required."); return; }
+  std::error_code ec;
+  const auto canonical_root = std::filesystem::weakly_canonical(std::filesystem::u8path(*root), ec);
+  if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
+  const auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(*file), ec);
+  if (ec) { result->Error("not_found", "The selected file is unavailable."); return; }
+  const auto relative = path.lexically_relative(canonical_root);
+  if (relative.empty() || relative.is_absolute() || (!relative.empty() && *relative.begin() == std::filesystem::path(".."))) {
+    result->Error("outside_root", "The requested file is outside the selected AUREON root."); return;
+  }
+  if (!std::filesystem::is_regular_file(path, ec) || ec) { result->Error("not_a_file", "The selected item is not an accessible file."); return; }
+  const auto opened = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+  if (opened <= 32) { result->Error("open_failed", "Windows could not open this file."); return; }
+  result->Success(EncodableValue(true));
 }
 
 void ListChildren(const EncodableMap* args,
@@ -190,6 +211,11 @@ void AureonLocalFilesPlugin::HandleMethodCall(
   if (call.method_name() == "listChildren") {
     const auto* args = std::get_if<EncodableMap>(call.arguments());
     ListChildren(args, std::move(result));
+    return;
+  }
+  if (call.method_name() == "openFile") {
+    const auto* args = std::get_if<EncodableMap>(call.arguments());
+    OpenFile(args, std::move(result));
     return;
   }
   result->NotImplemented();

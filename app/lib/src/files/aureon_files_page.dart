@@ -90,6 +90,18 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     } catch (error) { _fail(error.toString()); }
   }
 
+  Future<void> _openFile(AureonLocalEntry entry) async {
+    final root = _root;
+    if (root == null || entry.isDirectory) return;
+    try {
+      await _files.openFile(root: root, fileId: entry.id);
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'Unable to open this file.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   Future<void> _open(AureonLocalEntry entry) async {
     if (!entry.isDirectory) return;
     setState(() { _levels.add(_Folder(entry.name, entry.id)); _entries = []; _searchController.clear(); });
@@ -205,8 +217,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   leading: Icon(e.isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined),
                   title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  trailing: e.isDirectory ? const Icon(Icons.chevron_right) : null,
-                  onTap: e.isDirectory ? () => _open(e) : null,
+                  trailing: Icon(e.isDirectory ? Icons.chevron_right : Icons.open_in_new, size: 18),
+                  onTap: e.isDirectory ? () => _open(e) : () => _openFile(e),
                 ));
               })),
       ],

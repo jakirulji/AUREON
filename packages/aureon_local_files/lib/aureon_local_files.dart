@@ -77,6 +77,10 @@ class AureonLocalFiles {
     return AureonLocalRoot.fromMap(value);
   }
 
+  Future<void> openFile({required AureonLocalRoot root, required String fileId}) async {
+    await _channel.invokeMethod<void>('openFile', <String, Object?>{'rootId': root.rootId, 'fileId': fileId});
+  }
+
   Future<List<AureonLocalEntry>> listChildren({
     required AureonLocalRoot root,
     required String parentId,

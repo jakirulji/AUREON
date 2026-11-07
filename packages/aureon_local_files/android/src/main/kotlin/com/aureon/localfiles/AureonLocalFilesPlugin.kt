@@ -49,6 +49,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         when (call.method) {
             "pickRoot" -> pickRoot(result)
             "listChildren" -> listChildren(call, result)
+            "openFile" -> openFile(call, result)
             else -> result.notImplemented()
         }
     }
@@ -110,6 +111,32 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         )
         return resolver.query(documentUri, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }
+
+    private fun openFile(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val fileId = call.argument<String>("fileId")
+        if (root.isNullOrBlank() || fileId.isNullOrBlank()) {
+            result.error("invalid_arguments", "rootId and fileId are required.", null); return
+        }
+        val activity = activityBinding?.activity
+        if (activity == null) { result.error("no_activity", "An active screen is required.", null); return }
+        try {
+            val uri = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(root), fileId)
+            val mime = activity.contentResolver.getType(uri) ?: "application/octet-stream"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(intent)
+            result.success(true)
+        } catch (error: android.content.ActivityNotFoundException) {
+            result.error("no_viewer", "No installed app can open this file type.", null)
+        } catch (error: SecurityException) {
+            result.error("permission_denied", "File access was revoked. Re-select its folder.", null)
+        } catch (error: Exception) {
+            result.error("open_failed", error.message ?: "Unable to open this file.", null)
+        }
     }
 
     private fun listChildren(call: MethodCall, result: MethodChannel.Result) {

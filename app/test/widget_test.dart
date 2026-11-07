@@ -36,6 +36,7 @@ void main() {
           {'id': 'file-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 42},
         ];
       }
+      if (call.method == 'openFile') return true;
       return null;
     });
 
@@ -46,6 +47,8 @@ void main() {
     expect(find.text('Documents'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
     expect(find.text('notes.txt'), findsOneWidget);
+    await tester.tap(find.text('notes.txt'));
+    await tester.pumpAndSettle();
 
     final preferences = await SharedPreferences.getInstance();
     final saved = jsonDecode(preferences.getString('aureon.saved_local_root')!);
