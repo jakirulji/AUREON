@@ -142,6 +142,38 @@ void main() {
     expect(create.arguments, {'rootId': 'root', 'parentId': 'root-doc', 'name': 'Work'});
   });
 
+  testWidgets('Files page copies a file into the current folder', (tester) async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'pickRoot') {
+        return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
+      }
+      if (call.method == 'listChildren') {
+        return [{'id': 'file-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}];
+      }
+      if (call.method == 'copyFile') return 'copy-1';
+      return null;
+    });
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
+    await tester.tap(find.byType(OutlinedButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'notes-copy.txt');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    final copy = calls.firstWhere((call) => call.method == 'copyFile');
+    expect(copy.arguments, {
+      'rootId': 'root', 'sourceId': 'file-1',
+      'parentId': 'root-doc', 'targetName': 'notes-copy.txt',
+    });
+    expect(find.text('Copy completed and SHA-256 verified. Original preserved.'), findsOneWidget);
+  });
+
   testWidgets('AUREON dashboard still renders', (tester) async {
     await tester.pumpWidget(const AureonApp());
     expect(find.text('AUREON'), findsOneWidget);
