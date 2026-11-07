@@ -72,3 +72,38 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.Unauthorized, response.status)
     }
 }
+
+
+    @Test
+    fun authenticatedProviderTrashRouteUsesUserScopedRepository() = testApplication {
+        val expectedUser = java.util.UUID.fromString("00000000-0000-4000-8000-000000000099")
+        var requestedUser: java.util.UUID? = null
+        val repository = object : TrashRepository {
+            override fun list(userId: java.util.UUID, limit: Int, before: java.time.Instant?): List<TrashItemResponse> {
+                requestedUser = userId
+                return emptyList()
+            }
+            override fun record(userId: java.util.UUID, request: TrashCreateRequest): TrashItemResponse =
+                error("not used in list test")
+            override fun transition(
+                userId: java.util.UUID,
+                trashItemId: java.util.UUID,
+                request: TrashTransitionRequest,
+                targetStatus: String
+            ): TrashItemResponse? = error("not used in list test")
+        }
+        application {
+            module(
+                sessionAuthenticator = SessionAuthenticator { token ->
+                    if (token == "valid-session") AuthenticatedSession(expectedUser.toString()) else null
+                },
+                trashRepository = repository
+            )
+        }
+
+        val response = client.get("/v1/trash/items") {
+            header(HttpHeaders.Authorization, "Bearer valid-session")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(expectedUser, requestedUser)
+    }
