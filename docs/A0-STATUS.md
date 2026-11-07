@@ -100,3 +100,13 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - OpenAPI defines provider-backed Trash list/record/restore/purge metadata operations and includes trash_item in the sync change taxonomy. Clients must perform provider actions first and report only confirmed outcomes.
 - Local SAF/Win32 items are deliberately excluded: device-specific tree URIs and filesystem paths cannot be restored safely on another device. Their Trash remains local until a provider-backed file model exists.
 - Important boundary: the current Ktor runtime still exposes only health and authenticated /v1/me; these new Trash routes are contract/database groundwork, not yet a live service or app-connected sync. Master Account session issuance, provider adapter execution and route/repository integration remain prerequisites.
+
+
+## Provider Trash sync implementation update (2026-11-07)
+
+- Added authenticated Ktor route handlers for listing provider-backed Trash records, recording provider-confirmed Trash operations, and version-checked restore/permanent-delete metadata transitions. Repository methods are tenant-scoped and use operation IDs for idempotent create requests.
+- Added a PostgreSQL repository implementation for the V003 `trash_items` table. It depends on V003 being applied; the current backend workflow still needs to include V003 and its smoke test before this repository is integration-tested against CI PostgreSQL.
+- Added a Google Drive v3 native Trash adapter using the provider `trashed` flag, restore and guarded permanent delete. It accepts a short-lived access token from a future credential-broker integration and does not store or log it.
+- Backend API and adapter are code prototypes only. They are not yet wired to the production session authenticator, credential broker, deployed backend or live provider OAuth. Provider operation receipt references are currently accepted by the API contract but not yet durably stored by the V003 schema/repository.
+- Android/Windows app-side cross-device sync is not yet wired. Existing SAF/Win32 local Trash remains device-local. The client needs the real Master Account session, provider account inventory and authenticated API base URL before it can safely sync provider-backed Trash.
+- Backend CI run #42401277217: Ktor tests passed and backend build passed; final job teardown/status was still in progress at last check. Adapter change run #42401338611 was still running. No APK/EXE artifacts were created.
