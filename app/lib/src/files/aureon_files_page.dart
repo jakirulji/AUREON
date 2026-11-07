@@ -116,11 +116,17 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       await _files.copyFile(root: root, sourceId: entry.id,
         parentId: _levels.last.id, targetName: name.trim());
       await _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copy completed and SHA-256 verified. Original preserved.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Copy completed and SHA-256 verified. Original preserved.')),
+        );
+      }
     } on PlatformException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message ?? error.code)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? error.code)),
+        );
+      }
     }
   }
 
