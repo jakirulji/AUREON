@@ -91,3 +91,22 @@ Do not enable production credential recovery or destructive Trash/restore/purge 
 - Do not use multiple provider accounts to pool quotas or bypass provider limits.
 - Do not automatically delete local originals or remote objects.
 - CI must never upload interim APK/EXE artifacts; final packages are produced once the agreed feature scope is complete.
+
+
+## 9. Independent dual-recovery procedure
+
+The provider credential vault must have two independent recovery paths:
+
+1. **Manual recovery:** user-held random 256-bit Manual Recovery Key decrypts the local encrypted vault snapshot/portable Recovery Bundle. The key is never transmitted to Cloudflare. This must work while Worker and D1 endpoints are unreachable.
+2. **Cloudflare recovery:** Worker Secret-derived key unwraps a separate envelope after Firebase identity and recovery policy checks. This is the alternate route if the Manual Recovery Key is lost.
+
+A portable Recovery Bundle must be exportable and storable outside Cloudflare. It contains encrypted vault data, wrapped DEK envelopes and non-secret version/identity metadata only; never plaintext credentials, DEK, Manual Recovery Key or Worker Secret. Display bundle timestamp/freshness and reconcile stale token/account state before accepting it as current.
+
+The Manual Recovery Key alone cannot reconstruct unavailable ciphertext. If the bundle is stored only in D1, it is not an independent Cloudflare-outage backup. Cache encrypted vault snapshots on authorized devices and provide explicit export/import.
+
+Test matrix before production:
+- Cloudflare Worker/D1 blocked + manual key + current bundle => vault opens on clean device.
+- Manual key unavailable + Cloudflare healthy => verified Cloudflare recovery works.
+- Worker Secret lost + manual key + current bundle => manual recovery works.
+- Both paths or all ciphertext copies lost => provider relinking required; no false recovery promise.
+- Stale bundle import never silently overwrites newer server/device state.
