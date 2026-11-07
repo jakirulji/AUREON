@@ -1,25 +1,26 @@
 # AUREON Windows Native Filesystem Spike
 
-This is the first Windows-native foundation, not a complete file manager and not a Cloud Files API provider.
+This is an A0 native foundation, not a complete file manager and not a Cloud Files API provider.
 
 ## Included
 
 - C++20 filesystem enumeration using wide-character paths.
-- Directory-first deterministic ordering.
-- File size and last-write metadata where available.
+- Directory-first deterministic ordering and file metadata.
 - Explicit hidden-entry and directory-symlink options.
-- Permission-denied entries are skipped without aborting the entire listing.
-- Temporary-directory tests for nested folders, file sizes and hidden entries.
+- Safe same-volume rename and move operations that refuse destination overwrite.
+- Regular-file copy through a temporary sibling followed by rename; source is preserved and existing destinations are not overwritten.
+- Move rejects symlink sources and moving a directory into itself.
+- Cross-volume move does not silently fall back to copy-and-delete; it fails safely.
+- Temporary-directory tests cover enumeration, rename, move, copy, overwrite rejection and traversal-name rejection.
 
 ## Deliberately not included yet
 
-- File mutation, rename, move, delete or recycle-bin operations.
-- ACL/security descriptor editing.
-- Reparse-point traversal by default.
+- Delete/recycle-bin integration (must use the Windows shell's undo-capable operation path, never raw permanent deletion for normal UI actions).
+- ACL/security descriptor editing and full Windows error-code mapping.
 - Cloud Files API sync-root registration, hydration or dehydration.
 - Shell extensions, Explorer replacement or default-app hijacking.
 
-The next Windows increment should add safe metadata/property operations and path/error mapping, then a disposable-user-profile Cloud Files API integration harness. Keep Windows Explorer available.
+Keep Windows Explorer available. The next native increment should add an undo-capable recycle-bin adapter and a disposable-user-profile Cloud Files API integration harness.
 
 ## Build
 

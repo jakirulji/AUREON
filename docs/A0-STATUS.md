@@ -36,7 +36,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - Dart `TransferStateMachine` validates transfer lifecycle transitions and requires positive remote-verification evidence before entering `verified`; tests cover normal progression, auth recovery and terminal states.
 - Android workflow **Run #38** (run ID `42376380553`) completed successfully. Pigeon generation and Dart analysis, shared contract tests, Room persistence tests, generated Kotlin bridge compilation and Android storage module assembly all passed. [View Run #38](https://github.com/jakirulji/AUREON/actions/runs/42376380553).
 - Run #37 was the preceding failed attempt caused by test-source syntax; Run #38 tested the corrected commit. This does not prove live FlutterEngine-to-Dart communication or device runtime behavior.
-- Windows C++20 directory enumeration passed CMake/CTest CI run #42375617817. No Cloud Files API registration or file mutation is implemented.
+- Windows C++20 directory enumeration passed CMake/CTest CI run #42375617817. A subsequent native increment now adds no-overwrite rename/move, regular-file copy with temporary promotion, source-preserving copy semantics and path-traversal checks; CI validation is pending. Delete/recycle-bin and Cloud Files API integration remain open.
 
 ## 2. Remaining A0 gates
 
@@ -62,7 +62,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 2. Preserve the validated V001/V002 baseline; future schema changes must use new ordered migrations and regression tests.
 3. Extend the backend OAuth exchange path with provider-specific validation and callback transaction binding; keep credentials out of logs and UI.
 4. Complete Android FlutterEngine↔Dart round-trip integration, process-death recovery and SAF tests.
-5. Add Windows safe native file operations and a disposable-user-profile Cloud Files API integration harness.
+5. Validate the Windows safe native file operations in CI, then add undo-capable recycle-bin support and a disposable-user-profile Cloud Files API integration harness.
 6. Resolve Master Account auth/recovery, OAuth scopes/callback, KMS/hosting/cost, privacy/legal and E2E recovery decisions with the owner.
 7. Obtain independent security review of the credential broker, credential vault and E2E key recovery; then conduct the A0 exit review. Do not start A1 before this review.
 
