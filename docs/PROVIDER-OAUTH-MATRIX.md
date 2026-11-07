@@ -73,7 +73,7 @@ Provider scopes may technically permit destructive operations. AUREON's product 
 2. Whether Dropbox's first release promises App Folder-only or Full Dropbox.
 3. Whether OneDrive personal and work/school accounts are both in the first provider release.
 4. Native OAuth redirect strategy and exact supported account types for each provider.
-5. Whether tokens remain device-held or a backend credential vault is ever offered.
+5. Backend credential vault is the required target for user-consented cross-device provider restoration; production approval depends on threat-model review, KMS design, provider-terms review and independent security testing.
 6. Provider app registration ownership, consent-screen branding, verification submissions and production redirect domains.
 
 ## Official references
