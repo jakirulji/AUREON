@@ -34,8 +34,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 - Shared JSON fixture `shared/contract-fixtures/contract-v1.json` is consumed by Dart and Android Kotlin tests; Windows C++ uses the same repository baseline and its own native filesystem suite. This is parity scaffolding, not a generated cross-language SDK.
 - Dart `TransferStateMachine` validates transfer lifecycle transitions and requires positive remote-verification evidence before entering `verified`; tests cover normal progression, auth recovery and terminal states.
-- Android workflow **Run #38** (run ID `42376380553`) completed successfully. Pigeon generation and Dart analysis, shared contract tests, Room persistence tests, generated Kotlin bridge compilation and Android storage module assembly all passed. [View Run #38](https://github.com/jakirulji/AUREON/actions/runs/42376380553).
-- Run #37 was the preceding failed attempt caused by test-source syntax; Run #38 tested the corrected commit. This does not prove live FlutterEngine-to-Dart communication or device runtime behavior.
+- Android storage workflow **Run #41** (run ID `42378046823`) completed successfully. Shared Dart contract tests, Pigeon generation/analyze, Room persistence/recovery tests, Kotlin bridge compilation, Android module assembly and WorkManager unique scheduling/synthetic Worker tests passed. [View Run #41](https://github.com/jakirulji/AUREON/actions/runs/42378046823). This still does not prove a live FlutterEngine-to-Dart round trip or real provider transfer.
+- A cross-platform Flutter UI preview was added under `app/`. It currently contains responsive navigation, storage overview and recent-file sample rows with an explicit preview-data warning. The new [App Preview Builds workflow](../.github/workflows/aureon-app-preview.yml) is building a debug APK and Windows release bundle and running Flutter analyze/widget tests. The first run is currently in progress; no APK/EXE artifact is considered available until both jobs and artifact uploads succeed.
 - Windows C++20 directory enumeration passed CMake/CTest CI run #42375617817. Safe no-overwrite rename/move/copy plus path-traversal checks passed Windows CI run #42377088269. CNG SHA-256 source-stability and destination-integrity verification passed Windows CI run #42377313897. A Shell IFileOperation recycle-bin adapter explicitly requests recycle-on-delete and passed its disposable-file integration test in Windows CI run #42377449840. A Cloud Files API sync-root register/unregister adapter and disposable-directory integration test passed Windows CI run #42377658677. Hydration callbacks, placeholder population, pinning and Explorer status integration remain open.
 
 ## 2. Remaining A0 gates
@@ -50,7 +50,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
 | E2E encryption | Open | Protocol proposal exists; recovery design approval, cross-platform test vectors and independent cryptographic review remain |
 | Android platform | Provisional ADR | Minimum API 26 / prototype target API 36; release-time SDK policy and OEM matrix still require validation |
-| Local data layer | Prototype in progress | Room checkpoint persistence, cleanup eligibility gate, WorkManager constraints scaffold, Pigeon bridge and FlutterEngine plugin lifecycle source exist. A read-only post-reopen recovery planner distinguishes queued work from in-flight uploads requiring provider-session reconciliation and auth-blocked jobs; Android CI Run #39 passed Room persistence/recovery tests, Pigeon generation/analyze, Kotlin bridge compile and module assembly. Live FlutterEngine↔Dart round-trip, actual provider reconciliation, process-death/reboot/OEM testing, provider-aware Worker execution, SAF and Keystore integration remain |
+| Local data layer | Prototype in progress | Room checkpoint persistence, cleanup eligibility gate, WorkManager constraints and unique scheduling, Pigeon bridge and FlutterEngine plugin lifecycle source exist. Android CI Run #41 passed Room persistence/recovery, Pigeon, Kotlin bridge and synthetic WorkManager scheduling/Worker tests. Live FlutterEngine↔Dart round-trip, provider-session reconciliation, real provider-aware Worker, process-death/reboot/OEM testing, SAF and Keystore integration remain |
 | Windows platform | Prototype in progress | C++20 directory enumeration passes Windows CI; safe rename/move/copy/recycle-bin operations, ACL/path error mapping, Cloud Files API sync-root/hydration tests and supported shell integration remain |
 | Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
 | Privacy and legal | Baseline drafted; approval open | Data inventory, consent, retention and subprocessor framework documented; jurisdiction, actual retention, public privacy policy and legal review remain |
@@ -60,11 +60,12 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 1. Keep OpenAPI and PostgreSQL 18 contract checks green on every relevant change.
 2. Preserve the validated V001/V002 baseline; future schema changes must use new ordered migrations and regression tests.
-3. Extend the backend OAuth exchange path with provider-specific validation and callback transaction binding; keep credentials out of logs and UI.
-4. Validate the Android post-reopen recovery planner, then complete FlutterEngine↔Dart round-trip integration, provider-session reconciliation, process-death/reboot tests and SAF tests.
-5. Implement Cloud Files API callback connection, placeholder population/hydration and Explorer status integration; registration alone is not a functioning cloud placeholder provider.
-6. Resolve Master Account auth/recovery, OAuth scopes/callback, KMS/hosting/cost, privacy/legal and E2E recovery decisions with the owner.
-7. Obtain independent security review of the credential broker, credential vault and E2E key recovery; then conduct the A0 exit review. Do not start A1 before this review.
+3. Finish and verify the first APK/Windows preview workflow; then install the APK on a real Android device and run a documented smoke-test checklist. The preview is UI-only and must not be used to manage real files.
+4. Wire the Flutter shell to the live platform adapters: Android FlutterEngine↔Dart round-trip, SAF browsing and Room-backed transfer view; Windows native filesystem adapter and Explorer-style real directory browsing.
+5. Extend the backend OAuth exchange path with provider-specific validation and callback transaction binding; keep credentials out of logs and UI.
+6. Implement Cloud Files API callback connection, placeholder population/hydration and Explorer status integration; registration alone is not a functioning cloud placeholder provider.
+7. Resolve Master Account auth/recovery, OAuth scopes/callback, KMS/hosting/cost, privacy/legal and E2E recovery decisions with the owner.
+8. Obtain independent security review of the credential broker, credential vault and E2E key recovery; then conduct the A0 exit review. Do not start A1 before this review.
 
 ## 4. Non-negotiable implementation safety
 
