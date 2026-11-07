@@ -1,11 +1,11 @@
 import 'package:pigeon/pigeon.dart';
 
 class TransferSnapshot {
-  String operationId = '';
-  String status = '';
-  int acknowledgedBytes = 0;
+  String? operationId;
+  String? status;
+  int? acknowledgedBytes;
   int? totalBytes;
-  bool remoteVerified = false;
+  bool? remoteVerified;
 }
 
 @HostApi()
