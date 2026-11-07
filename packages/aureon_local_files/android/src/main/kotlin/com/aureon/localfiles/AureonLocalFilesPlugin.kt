@@ -60,6 +60,9 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "moveEntry" -> moveEntry(call, result)
             "moveToTrash" -> moveToTrash(call, result)
             "deleteTrashEntry" -> deleteTrashEntry(call, result)
+            "listSystemTrash" -> listSystemTrash(call, result)
+            "restoreSystemTrashEntry" -> restoreSystemTrashEntry(call, result)
+            "deleteSystemTrashEntry" -> deleteSystemTrashEntry(call, result)
             "createFolder" -> createFolder(call, result)
             else -> result.notImplemented()
         }
@@ -302,9 +305,14 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 }
                 var name: String? = null
                 var mime: String? = null
-                resolver.query(source, arrayOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE),
+                var flags = 0
+                resolver.query(source, arrayOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_FLAGS),
                     null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) { name = cursor.getString(0); mime = cursor.getString(1) }
+                    if (cursor.moveToFirst()) {
+                        name = cursor.getString(0)
+                        mime = cursor.getString(1)
+                        flags = if (cursor.isNull(2)) 0 else cursor.getInt(2)
+                    }
                 } ?: throw IllegalStateException("The selected item cannot be inspected.")
                 val displayName = name ?: throw IllegalStateException("The selected item has no name.")
                 if (displayName == ".AUREON Trash (AUREON)") throw IllegalArgumentException("The Trash folder itself cannot be moved to Trash.")
@@ -315,6 +323,23 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                     while (cursor.moveToNext()) if (cursor.getString(idCol) == entryId) sourceIsInParent = true
                 } ?: throw IllegalStateException("The source parent cannot be listed.")
                 if (!sourceIsInParent) throw SecurityException("The selected item is not inside the supplied parent folder.")
+                // Prefer provider-native Android 17 Trash when the document explicitly advertises support.
+                if (android.os.Build.VERSION.SDK_INT >= 37 && (flags and 0x00010000) != 0) {
+                    try {
+                        val method = DocumentsContract::class.java.getMethod(
+                            "trashDocument", ContentResolver::class.java, Uri::class.java)
+                        val trashed = method.invoke(null, resolver, source) as? Uri
+                        if (trashed != null) {
+                            Handler(Looper.getMainLooper()).post {
+                                result.success(mapOf("id" to DocumentsContract.getDocumentId(trashed),
+                                    "name" to displayName, "trashFolderId" to "__system__",
+                                    "originalParentId" to parentId, "isDirectory" to (mime == Document.MIME_TYPE_DIR),
+                                    "trashedAt" to System.currentTimeMillis(), "mode" to "system"))
+                            }
+                            return@Thread
+                        }
+                    } catch (_: Exception) { }
+                }
                 val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootId)
                 var trashId: String? = null
                 resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE),
@@ -389,6 +414,92 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             result.success(true)
         } catch (error: Exception) {
             result.error("permanent_delete_failed", error.message ?: "Permanent deletion failed.", null)
+        }
+    }
+
+ 
+    private fun listSystemTrash(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        if (root.isNullOrBlank()) { result.error("invalid_arguments", "rootId is required.", null); return }
+        if (android.os.Build.VERSION.SDK_INT < 37) { result.success(emptyList<Map<String, Any?>>()); return }
+        val resolver = activityBinding?.activity?.contentResolver
+        if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
+        try {
+            val tree = Uri.parse(root)
+            val method = DocumentsContract::class.java.getMethod("buildTrashDocumentsUri", String::class.java, String::class.java)
+            val trashUri = method.invoke(null, tree.authority ?: "", DocumentsContract.getRootId(tree)) as Uri
+            val rows = mutableListOf<Map<String, Any?>>()
+            resolver.query(trashUri, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE), null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
+                val sizeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_SIZE)
+                while (cursor.moveToNext()) rows.add(mapOf(
+                    "id" to cursor.getString(idCol),
+                    "name" to (cursor.getString(nameCol) ?: "Unnamed"),
+                    "isDirectory" to (cursor.getString(mimeCol) == Document.MIME_TYPE_DIR),
+                    "sizeBytes" to if (cursor.isNull(sizeCol)) null else cursor.getLong(sizeCol),
+                    "isSystemTrash" to true))
+            }
+            result.success(rows)
+        } catch (_: Exception) {
+            // A provider without Android 17 Trash support returns an empty native Trash view.
+            result.success(emptyList<Map<String, Any?>>())
+        }
+    }
+
+    private fun restoreSystemTrashEntry(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val entryId = call.argument<String>("entryId")
+        if (root.isNullOrBlank() || entryId.isNullOrBlank()) {
+            result.error("invalid_arguments", "rootId and entryId are required.", null); return
+        }
+        if (android.os.Build.VERSION.SDK_INT < 37) {
+            result.error("unsupported", "Provider-native Trash restore requires Android 17 or later.", null); return
+        }
+        try {
+            val resolver = activityBinding?.activity?.contentResolver
+                ?: throw IllegalStateException("The Android activity is unavailable.")
+            val tree = Uri.parse(root)
+            val source = DocumentsContract.buildDocumentUri(tree.authority!!, entryId)
+            val method = DocumentsContract::class.java.getMethod("restoreDocumentFromTrash",
+                ContentResolver::class.java, Uri::class.java, Uri::class.java)
+            val restored = method.invoke(null, resolver, source, null) as? Uri
+                ?: throw UnsupportedOperationException("The provider could not restore this item.")
+            result.success(DocumentsContract.getDocumentId(restored))
+        } catch (error: Exception) {
+            result.error("restore_failed", error.message ?: "Provider-native restore failed.", null)
+        }
+    }
+
+    private fun deleteSystemTrashEntry(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val entryId = call.argument<String>("entryId")
+        if (root.isNullOrBlank() || entryId.isNullOrBlank()) {
+            result.error("invalid_arguments", "rootId and entryId are required.", null); return
+        }
+        if (android.os.Build.VERSION.SDK_INT < 37) {
+            result.error("unsupported", "Provider-native Trash deletion requires Android 17 or later.", null); return
+        }
+        try {
+            val resolver = activityBinding?.activity?.contentResolver
+                ?: throw IllegalStateException("The Android activity is unavailable.")
+            val tree = Uri.parse(root)
+            val method = DocumentsContract::class.java.getMethod("buildTrashDocumentsUri", String::class.java, String::class.java)
+            val trashUri = method.invoke(null, tree.authority ?: "", DocumentsContract.getRootId(tree)) as Uri
+            var found = false
+            resolver.query(trashUri, arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+                while (cursor.moveToNext()) if (cursor.getString(idCol) == entryId) found = true
+            } ?: throw IllegalStateException("Provider Trash cannot be listed.")
+            if (!found) throw SecurityException("The selected item is not in provider Trash.")
+            val item = DocumentsContract.buildDocumentUri(tree.authority!!, entryId)
+            if (!DocumentsContract.deleteDocument(resolver, item))
+                throw IllegalStateException("The provider did not confirm permanent deletion.")
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("permanent_delete_failed", error.message ?: "Provider Trash deletion failed.", null)
         }
     }
 
