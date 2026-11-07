@@ -16,7 +16,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       expect(call.method, 'pickRoot');
-      return {'rootId': 'content://tree/root', 'displayName': 'Documents'};
+      return {'rootId': 'content://tree/root', 'rootDocumentId': 'document-root', 'displayName': 'Documents'};
     });
     final root = await files.pickRoot();
     expect(root?.rootId, 'content://tree/root');
@@ -38,7 +38,7 @@ void main() {
       ];
     });
     final entries = await files.listChildren(
-      root: const AureonLocalRoot(rootId: 'content://tree/root', displayName: 'Docs'),
+      root: const AureonLocalRoot(rootId: 'content://tree/root', displayName: 'Docs', rootDocumentId: 'document-root'),
       parentId: 'document-root',
     );
     expect(entries, hasLength(2));
@@ -53,7 +53,7 @@ void main() {
     ]);
     expect(
       () => files.listChildren(
-        root: const AureonLocalRoot(rootId: 'root', displayName: 'Root'),
+        root: const AureonLocalRoot(rootId: 'root', displayName: 'Root', rootDocumentId: 'root'),
         parentId: 'root',
       ),
       throwsFormatException,
