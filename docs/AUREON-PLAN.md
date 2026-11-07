@@ -385,6 +385,7 @@ Performance targets must be measured on representative devices and networks; do 
 - [A0 Status and Exit-Gate Tracker](./A0-STATUS.md) — evidence-based readiness matrix; distinguishes authored documents from validated tests and implemented code.
 - [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) — system boundaries, backend structure, data model, API contract, OAuth/security decisions, transfer contract, validation gates and A0 exit criteria.
 - [A0 Threat Model](./THREAT-MODEL.md) — STRIDE threat register, security invariants, isolated credential-broker requirement and security test gates.
+- [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory, consent, retention, subprocessors and provider compliance requirements; legal approval remains open.
 - [Server Data Model](./DATA-MODEL.md) — PostgreSQL entities, ownership constraints, credential-vault invariants and metadata-first provider inventory.
 - [V001 PostgreSQL baseline](./migrations/V001__initial_schema.sql) and [V002 vault/inventory migration](./migrations/V002__vault-and-provider-inventory.sql) — additive schema evolution; V002 must run after V001.
 - [Android Native OAuth and Credential Lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) — provider callback patterns, user-consented credential vault, cross-device restoration and refresh safety.
