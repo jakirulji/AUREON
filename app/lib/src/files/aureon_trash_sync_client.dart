@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 abstract interface class AureonTrashHttpTransport {
   Future<Map<String, Object?>> send({
@@ -143,4 +144,45 @@ class AureonTrashSyncClient {
       body: body,
     );
   }
+}
+
+
+/// Production JSON transport backed by Dart's HttpClient.
+class AureonIoTrashHttpTransport implements AureonTrashHttpTransport {
+  AureonIoTrashHttpTransport({HttpClient? client}) : _client = client ?? HttpClient();
+  final HttpClient _client;
+
+  @override
+  Future<Map<String, Object?>> send({
+    required String method,
+    required Uri uri,
+    required String bearerToken,
+    Map<String, Object?>? body,
+  }) async {
+    final request = await _client.openUrl(method, uri);
+    request.headers
+      ..set(HttpHeaders.authorizationHeader, 'Bearer $bearerToken')
+      ..set(HttpHeaders.acceptHeader, 'application/json');
+    if (body != null) {
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode(body));
+    }
+    final response = await request.close();
+    final responseText = await response.transform(utf8.decoder).join();
+    final decoded = responseText.isEmpty
+        ? <String, Object?>{}
+        : Map<String, Object?>.from(jsonDecode(responseText) as Map);
+    if (response.statusCode == HttpStatus.conflict) {
+      throw AureonTrashSyncConflict(decoded['code'] as String? ?? 'CONFLICT');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw HttpException(
+        'AUREON Trash API request failed (' + response.statusCode.toString() + ').',
+        uri: uri,
+      );
+    }
+    return decoded;
+  }
+
+  void close() => _client.close(force: true);
 }
