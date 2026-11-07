@@ -51,7 +51,7 @@ Use **Room 2.8.5 as the authoritative Android local persistence layer**, owned b
 
 - Android Gradle Plugin 9.5.0 with Gradle 9.9.0 or later compatible patch.
 - Kotlin 2.4.21 and JDK 21 for the app build toolchain.
-- compileSdk/targetSdk 37; minSdk 26.
+- compileSdk/targetSdk 36 for the current prototype; minSdk 26. Raise to API 37 when its stable SDK package is published and validated.
 - Room 2.8.5 with KSP (or the then-supported Room compiler integration) and exported schema JSON committed for migration review.
 - WorkManager 2.12.0; use unique work names and explicit constraints/backoff.
 - Pigeon 29.1.1; generated Dart/Kotlin bindings are build artifacts from a checked-in interface definition, not hand-maintained string channels.
