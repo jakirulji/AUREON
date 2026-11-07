@@ -1,24 +1,65 @@
 # AUREON — zero-cost-first deployment and owner actions
 
-**Status:** No cloud resources have been purchased or provisioned. This document is an implementation plan, not evidence of a live deployment.  
-**Cost policy:** No paid service, billing upgrade, paid domain, paid storage or paid KMS may be enabled without explicit owner approval.
+**Status:** Architecture direction accepted; no cloud resources have been provisioned and no production service is deployed.  
+**Cost policy:** No paid plan, billing upgrade, custom domain, paid storage or other charge without explicit owner approval.
 
-## 1. Chosen zero-cost-first security model
+## 1. Selected no-card platform direction
 
-See [ADR-0005 — Zero-cost-first credential vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md).
+- **Identity:** Firebase Authentication Spark, Email/Password with email verification. SMS verification is excluded.
+- **API runtime:** Cloudflare Workers, using the free `workers.dev` hostname initially.
+- **Metadata database:** Cloudflare D1.
+- **Credential-vault recovery:** a Cloudflare Worker Secret-derived wrapping key, used only by the isolated credential-broker path.
+- **Domain:** no purchased custom domain required for initial development and staging.
+- **Files:** Android/Windows clients continue direct transfers to official provider APIs. File payloads do not transit Workers or D1.
 
-- Provider refresh credentials are encrypted on the client using a user-held random recovery key. The backend stores opaque ciphertext only and cannot decrypt it.
-- A new device restores encrypted provider inventory after Master Account login and asks for the recovery key once to unlock the vault.
-- Android Keystore and Windows OS-protected storage protect the locally unlocked vault key.
-- E2E file-content keys remain separate from provider OAuth credential keys.
-- No KMS, HSM or server-side plaintext credential vault is required for this phase.
-- If the recovery key is lost, affected cloud accounts must be linked again. There is no hidden server recovery bypass.
+This is a candidate personal-use zero-cost deployment, not a guarantee of permanent free operation, unlimited capacity or uninterrupted availability. Free quotas and product terms can change.
 
-This is the deliberate zero-cost trade-off. Do not describe this mode as a KMS-backed vault.
+## 2. Security boundary and recovery
 
-## 2. Transfer and network architecture
+Provider refresh credentials are encrypted using AES-256-GCM. A random per-vault DEK encrypts credential records; a key derived from the Worker Secret wraps the DEK. D1 stores only encrypted envelopes and non-secret metadata.
 
-**File bytes must not pass through AUREON's backend by default.**
+The Worker runtime can access its configured Secret. Therefore:
+- This is **not** HSM/KMS and must not be described as hardware-backed key isolation.
+- A compromised Worker deployment or Cloudflare account could potentially expose all credential vaults protected by the secret.
+- Restrict the decrypt path, validate Firebase identity and verified email, enforce ownership and scope checks, rate-limit, audit and fail closed.
+- Email verification is a recovery signal, not strong proof if the email account itself is compromised. Add passkey/trusted-device step-up where possible, a cooldown, notifications and lost-device/session revocation.
+- Keep E2E file-content keys client-controlled and cryptographically separate. Email recovery must never decrypt file content.
+- Keep an owner-controlled offline emergency copy of the Worker Secret under a separate secure procedure. Never place it in GitHub, chat, source code, D1 or CI logs. If the secret and its emergency copy are both lost, affected provider accounts may need relinking.
+- Version and rotate the secret carefully. Do not delete old key versions until all envelopes have been rewrapped and tested.
+
+## 3. Important backend migration
+
+The existing AUREON backend prototype is Ktor + PostgreSQL. It cannot be deployed unchanged as a Cloudflare Worker and D1 is not a drop-in PostgreSQL replacement.
+
+Required work before switching clients:
+1. Implement a TypeScript Cloudflare Worker API.
+2. Design D1 tables and migrations for users, devices/sessions, provider inventory, encrypted vault envelopes, recovery challenges, audit events and transfer/Trash metadata.
+3. Port and test session/authentication, ownership isolation, provider OAuth transaction handling, credential broker and provider Trash coordination.
+4. Preserve API contracts where practical; document deliberate differences.
+5. Add integration tests for Firebase JWT validation, cross-user isolation, secret unavailability, recovery abuse, cooldown, secret rotation, D1 restore and provider token refresh.
+6. Keep the existing Ktor/PostgreSQL prototype until the Worker implementation passes contract and security tests. Do not delete working code prematurely.
+
+## 4. Free-tier limitations and safe behavior
+
+- Workers and D1 have hard plan quotas and platform limits. On quota exhaustion, API/metadata/recovery operations may be throttled or paused.
+- Firebase Spark has email verification limits and abuse controls. No SMS is planned.
+- A free plan is not an SLA. Design local job persistence and retry so metadata outages do not lose transfer checkpoints or local originals.
+- Already authorized direct provider transfers should continue independently of AUREON's metadata API when technically possible.
+- Keep bounded request sizes, pagination, concurrency and per-user rate limits.
+- Do not relay file bytes through Workers; Worker request/body limits and CPU/runtime quotas make it unsuitable as a file-transfer engine.
+- No region failover or paid backup service is assumed in the free phase. D1 export/restore and Worker Secret emergency recovery must be tested.
+
+## 5. Owner actions — no secrets in chat
+
+1. Create/confirm an owner-controlled Firebase project on Spark; do not upgrade to Blaze.
+2. Create/confirm an owner-controlled Cloudflare account; protect it with MFA.
+3. Do not purchase a domain or enable paid services.
+4. Do not paste passwords, API keys, Firebase service-account private keys, Worker Secrets, OAuth client secrets, provider refresh tokens or recovery codes into chat or GitHub.
+5. When accounts are ready, report only that they are ready. We can then guide creation of the Firebase web app/auth settings and Cloudflare Worker/D1 resources.
+
+No cloud resources have been created by this repository change.
+
+## 6. Transfer and network architecture
 
 - Android/Windows native provider adapters upload/download directly to each provider's official API.
 - Use provider-native resumable sessions (Google Drive resumable upload, Microsoft Graph upload sessions, Dropbox upload sessions).
@@ -26,61 +67,25 @@ This is the deliberate zero-cost trade-off. Do not describe this mode as a KMS-b
 - Resume after process death, network switch, VPN switch, temporary DNS failure and provider throttling.
 - Use bounded retries with exponential backoff and jitter; honor Retry-After and reconcile ambiguous outcomes before retrying.
 - Keep local originals on every failure. No cleanup unless remote verification succeeds, explicit cleanup opt-in exists and OS permission is granted.
-- Never route file bytes through Cloud Run, Cloudflare Workers, Neon or an AUREON relay in the normal path.
+- Never route file bytes through Cloudflare Workers, D1 or an AUREON relay in the normal path.
+- AUREON cannot guarantee every ISP/VPN route or provider edge will always be reachable.
 
-AUREON cannot guarantee that every ISP, VPN endpoint or provider edge will always be reachable. It can avoid adding its own file-relay bottleneck and make transfers recoverable across network changes. Do not promise VPN bypass or geographic censorship circumvention.
+## 7. What is not production-ready
 
-## 3. Candidate free-tier services and honest limits
-
-| Component | Candidate | What it is suitable for | Hard limitation / policy |
-|---|---|---|---|
-| API runtime | Google Cloud Run | Low-volume Ktor metadata/session API staging | Free compute/request allowance is region/usage dependent; outbound internet data transfer can be billed. Singapore is Tier 2 pricing. Requires billing setup. No automatic deployment until owner provisions a project. |
-| Database | Neon Free PostgreSQL | Development/staging metadata and test data | 100 CU-hours/project/month, 1 GB/project, 5 GB public network transfer/project/month; compute suspends at quota. Never make direct uploads depend on it. |
-| Edge/DNS | Cloudflare Free, optional | DNS, basic edge protection and static assets if a domain is already owned | Does not make Ktor run on Workers. Do not proxy provider file bytes. D1 has hard free read/write limits and is not a drop-in PostgreSQL replacement. |
-| Secret Manager | None required for provider tokens in zero-cost mode | Keep only non-user operational secrets out of source control if a host is later approved | Never put user refresh tokens or vault recovery keys in GitHub Actions secrets or a shared deployment secret. |
-| KMS/HSM | Deferred | Optional future server-assisted vault mode | Not generally free. Do not create or depend on a KMS key in the zero-cost phase. |
-
-Free-tier limits are not service-level guarantees. Neon can suspend compute after quota exhaustion; Cloud Run networking, logs and other usage can incur charges. Budget alerts are not hard spending caps. Therefore this plan does not claim that a hosted backend can be guaranteed to cost exactly $0 under all traffic.
-
-## 4. Region and Bangladesh/VPN behavior
-
-- Benchmark API latency from Bangladesh to Cloud Run Singapore and Mumbai before selecting a region. Do not assume one is always faster across every ISP/VPN.
-- Keep API and database in the same nearby region where available to avoid cross-region database latency and transfer costs.
-- Provider file transfers connect directly to Google/Microsoft/Dropbox endpoints from the user's current network. Backend region does not carry file bytes.
-- Implement DNS/TLS error classification, connection timeouts, resumable upload/download, exponential backoff, Retry-After, and pause/resume after network changes.
-- A VPN can change the route and provider's perceived region; AUREON must not hard-code a VPN exit location or promise that a provider will accept every VPN endpoint.
-- No region, DNS provider or CDN can guarantee reachability from every Bangladesh ISP or VPN. Validate with the owner's actual ISP and VPNs before release.
-- Do not deploy multi-region failover in the free phase; it introduces additional cost and operational complexity.
-
-## 5. Deployment gate — no provisioning yet
-
-The repository currently has a Ktor/PostgreSQL runtime prototype and CI tests, not a hosted production service. A safe deployment still requires:
-1. A cloud account controlled by the owner and explicit approval for the provider/region.
-2. A spending cap and billing alerts, acknowledging that alerts are not hard caps.
-3. Neon account/project and a private PostgreSQL connection string supplied only through the host's secure secret facility.
-4. A Cloud Run project/service identity using GitHub OIDC Workload Identity Federation (no downloaded service-account JSON key).
-5. A public HTTPS API endpoint and OAuth callback design.
-6. Controlled V001–V004 migrations and backup/restore tests.
-7. Real staging tests from Bangladesh networks and at least one VPN route.
-8. Security review of Master Account sessions, provider OAuth, client-side vault recovery and account isolation.
-
-Do not provision resources or create billing charges until the owner completes those account-side actions and approves the exact region and spend ceiling. Do not request passwords, OTP seeds, recovery codes, provider refresh tokens or cloud private keys in chat.
-
-## 6. What is not production-ready
-
-- Master Account passkey registration/recovery and complete session issuance/rotation.
-- Android/Windows client-side credential vault implementation and cross-platform cryptographic test vectors.
+- Complete Master Account login/session lifecycle and Firebase integration.
+- Worker API and D1 schema/migrations; current Ktor/PostgreSQL code is not yet ported.
+- Worker Secret provisioning, broker isolation, recovery policy and key-rotation/restore drills.
+- Android/Windows credential-vault clients and cross-platform cryptographic test vectors.
 - Production provider OAuth app verification and full Drive scope approval.
 - Live direct provider transfer and VPN/ISP network matrix.
-- Hosted API/database deployment, automated backups and restore drill.
-- Server-side provider Trash coordinator and backend-confirmed provider receipts.
 - Independent cryptographic, privacy and penetration testing.
+- Production provider Trash coordinator and backend-confirmed provider receipts.
 
-Do not enable production destructive Trash/restore/purge actions until the backend executes provider mutations and verifies the result itself.
+Do not enable production credential recovery or destructive Trash/restore/purge actions until the relevant backend execution, ownership checks, receipts and security review are complete.
 
-## 7. Cost and data-safety guardrails
+## 8. Cost and data-safety guardrails
 
-- No paid plan upgrades, KMS/HSM creation, VPS, domain purchase or object-storage package without explicit owner approval.
+- No paid plan upgrades, paid domain, VPS, paid storage or other charge without explicit owner approval.
 - If a free API/database quota is exhausted, metadata sync or account inventory may pause; queue locally and resume later. Do not lose transfer checkpoints or local originals.
 - Drive upload/download must continue to use provider APIs directly when the provider account and local client remain authorized, independent of AUREON database quota.
 - Do not use multiple provider accounts to pool quotas or bypass provider limits.
