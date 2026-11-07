@@ -1,0 +1,12 @@
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+linter:
+  rules:
+    - avoid_print
+    - collection_methods_unrelated_type
+    - exhaustive_cases
+    - prefer_final_locals
+    - unawaited_futures

@@ -1,0 +1,8 @@
+name: aureon_contracts
+description: Platform-neutral AUREON file, provider and transfer contracts.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: ">=3.11.0 <4.0.0"
+dev_dependencies:
+  test: ^1.26.0
