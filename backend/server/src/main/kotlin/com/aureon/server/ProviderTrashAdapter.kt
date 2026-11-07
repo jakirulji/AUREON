@@ -34,12 +34,12 @@ class GoogleDriveTrashAdapter(
     override fun moveToTrash(accessToken: String, providerItemId: String): ProviderTrashReceipt {
         val before = getMetadata(accessToken, providerItemId)
         require(!before.trashed) { "Provider item is already trashed" }
-        val response = request(accessToken, "PATCH", "/files/\${encode(providerItemId)}?supportsAllDrives=true", """{"trashed":true}""")
+        val response = request(accessToken, "PATCH", "/files/${encode(providerItemId)}?supportsAllDrives=true", """{"trashed":true}""")
         return ProviderTrashReceipt(providerItemId, before.parents.firstOrNull(), "provider_native", null, response.reference)
     }
 
     override fun restore(accessToken: String, providerItemId: String): ProviderTrashReceipt {
-        val response = request(accessToken, "PATCH", "/files/\${encode(providerItemId)}?supportsAllDrives=true", """{"trashed":false}""")
+        val response = request(accessToken, "PATCH", "/files/${encode(providerItemId)}?supportsAllDrives=true", """{"trashed":false}""")
         val after = getMetadata(accessToken, providerItemId)
         require(!after.trashed) { "Provider did not confirm restore" }
         return ProviderTrashReceipt(providerItemId, after.parents.firstOrNull(), "provider_native", null, response.reference)
@@ -48,7 +48,7 @@ class GoogleDriveTrashAdapter(
     override fun permanentlyDelete(accessToken: String, providerItemId: String): ProviderTrashReceipt {
         val before = getMetadata(accessToken, providerItemId)
         require(before.trashed) { "Refusing permanent deletion of an item not in Trash" }
-        val response = request(accessToken, "DELETE", "/files/\${encode(providerItemId)}?supportsAllDrives=true", null)
+        val response = request(accessToken, "DELETE", "/files/${encode(providerItemId)}?supportsAllDrives=true", null)
         return ProviderTrashReceipt(providerItemId, before.parents.firstOrNull(), "provider_native", null, response.reference)
     }
 
@@ -56,7 +56,7 @@ class GoogleDriveTrashAdapter(
     private data class Outcome(val body: String, val reference: String)
 
     private fun getMetadata(token: String, itemId: String): Metadata {
-        val response = request(token, "GET", "/files/\${encode(itemId)}?fields=id,parents,trashed&supportsAllDrives=true", null)
+        val response = request(token, "GET", "/files/${encode(itemId)}?fields=id,parents,trashed&supportsAllDrives=true", null)
         val root = json.parseToJsonElement(response.body).jsonObject
         val parents = root["parents"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
         val trashed = root["trashed"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
