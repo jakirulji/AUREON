@@ -58,7 +58,7 @@ Build a disposable proof-of-concept, not the production app, that demonstrates:
 1. Ktor starts with health/readiness routes and structured redacted request logging.
 2. AUREON bearer session validation and device binding protect a sample route.
 3. PostgreSQL 16 connects through a bounded pool.
-4. A bounded HikariCP pool connects to PostgreSQL 18 after V001 and V002 are applied; production migration-runner selection (Flyway or equivalent) and repeat-startup behavior still require a dedicated test.
+4. A bounded HikariCP pool connects to PostgreSQL 18 after V001 and V002 are applied; the refresh-lease repository uses atomic conditional updates and the outbox uses SKIP LOCKED claims. Production migration-runner selection (Flyway or equivalent) and repeat-startup behavior still require a dedicated test.
 5. The V001 and V002 smoke tests pass against PostgreSQL 16.
 6. One OAuth start/callback transaction validates state, PKCE and one-time consumption without logging code/verifier.
 7. A fake KMS implementation exercises envelope encrypt/decrypt, consent gating, refresh lease and compare-and-swap rotation. Production KMS credentials are not used in the spike.
@@ -83,7 +83,7 @@ If any critical gate fails, revise the stack decision before A1 production imple
 
 - Backend scaffold CI run #42370407442: JDK 21 setup, Gradle 9.9.0 setup, Ktor compile, four HTTP/authentication tests and backend build all passed.
 - Extended fake-KMS and refresh-lease tests passed in GitHub Actions run #42370500985.
-- PostgreSQL 18 + HikariCP/JDBC integration, schema presence, OAuth PKCE/redirect tests, SQL migrations/smoke tests and backend build passed in run #42370744363.
+- PostgreSQL 18 + HikariCP/JDBC integration, transactional refresh-lease race test, outbox claim/retry tests, OAuth PKCE/redirect tests, SQL migrations/smoke tests and backend build passed in run #42371046029.
 - No PostgreSQL connection, Flyway migration runner, production authentication, real KMS SDK, OAuth provider, outbox worker or container image has been implemented in the spike.
 
 ## Consequences
