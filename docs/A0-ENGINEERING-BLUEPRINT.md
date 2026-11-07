@@ -234,6 +234,8 @@ Two legitimate models exist:
 
 Use PostgreSQL for server-side relational metadata. Use migrations from the first schema version. Never rely on application code alone for uniqueness or referential integrity.
 
+**Engineering drafts:** [Relational data model and ER diagram](./DATA-MODEL.md) · [Initial PostgreSQL migration](./migrations/V001__initial_schema.sql). These are proposed A0 artifacts and have not yet been applied to a live database or validated against a running PostgreSQL instance.
+
 ### 6.1 Core server tables
 
 | Table | Key fields / purpose |
