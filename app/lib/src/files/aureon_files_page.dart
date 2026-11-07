@@ -63,11 +63,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
         const SizedBox(height:12),FilledButton.icon(onPressed:_choose,icon:const Icon(Icons.folder_open),label:const Text('Choose folder'))])))
       else Expanded(child:_entries.isEmpty&&!_loading?const Center(child:Text('This folder is empty.')):
         ListView.separated(itemCount:_entries.length,separatorBuilder:(_,_)=>const Divider(height:1),
-          itemBuilder:(context,i){final e=_entries[i];return ListTile(
+          itemBuilder:(context,i){final e=_entries[i];return Material(color: Colors.transparent, child: ListTile(
             leading:Icon(e.isDirectory?Icons.folder_outlined:Icons.insert_drive_file_outlined),
             title:Text(e.name,maxLines:1,overflow:TextOverflow.ellipsis),
             subtitle:Text(e.isDirectory?'Folder':'File'),
             trailing:e.isDirectory?const Icon(Icons.chevron_right):Text(_size(e.sizeBytes)),
-            onTap:e.isDirectory?()=>_open(e):null);}))
+            onTap:e.isDirectory?()=>_open(e):null));}))
     ]));
 }
