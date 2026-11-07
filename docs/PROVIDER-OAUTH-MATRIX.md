@@ -26,7 +26,7 @@ This document translates AUREON's initial provider scope strategy into a least-p
 
 ### Google Drive
 
-**Preferred product strategy:** start with `drive.file` and a user-mediated Google Picker/file-selection flow for selected-file workflows. This is the narrower permission path and aligns with per-file consent.
+**Preferred product strategy:** start with `drive.file` and a user-mediated per-file selection flow for selected-file workflows. On web, evaluate Google Picker. On native Android, do not assume an Android Storage Access Framework (SAF) URI grant is equivalent to granting Drive API `drive.file` access; prove the exact selection-to-Drive-API behavior in a native integration spike before promising it. This is the narrower permission path and aligns with per-file consent.
 
 **Critical product trade-off:** a conventional unified browser that silently indexes every existing file and folder in a user's Drive cannot be delivered with `drive.file` alone. If full-drive browsing, global search, or automatic migration of arbitrary existing files is non-negotiable, the product must evaluate the required restricted scopes (likely `drive` or a combination of read/metadata scopes), Google's verification process, qualification requirements, and security assessment obligations before committing to that feature.
 
