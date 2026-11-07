@@ -285,7 +285,8 @@ void main() {
       ]),
     });
     await tester.pumpWidget(const MaterialApp(home: AureonOperationHistoryPage()));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Copy • notes.txt'), findsOneWidget);
     expect(find.textContaining('Success'), findsOneWidget);
     expect(find.textContaining('Documents / notes-copy.txt'), findsOneWidget);
