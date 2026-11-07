@@ -34,7 +34,7 @@ ALTER TABLE provider_credentials
     ADD CONSTRAINT ck_provider_credentials_refresh_lease
         CHECK ((refresh_lease_id IS NULL) = (refresh_lease_expires_at IS NULL)),
     ADD CONSTRAINT ck_provider_credentials_refreshing_lease
-        CHECK (credential_status <> 'refreshing' OR refresh_lease_id IS NOT NULL),
+        CHECK ((credential_status = 'refreshing') = (refresh_lease_id IS NOT NULL)),
     ADD CONSTRAINT ck_provider_credentials_active_consent
         CHECK (credential_status NOT IN ('active', 'refreshing') OR consented_at IS NOT NULL);
 
