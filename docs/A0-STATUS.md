@@ -1,7 +1,7 @@
 # AUREON A0 — Readiness and Exit-Gate Tracker
 
 **Last updated:** 2026-11-07  
-**Overall status:** <strong>IN PROGRESS</strong> — OpenAPI, PostgreSQL 18 and the initial Ktor/KMS/refresh-lease spike tests are green; production security approval, Android prototype and owner-controlled deployment/provider decisions remain open.
+**Overall status:** <strong>IN PROGRESS</strong> — OpenAPI, PostgreSQL 18, Ktor/JDBC integration, OAuth PKCE primitives and KMS/refresh-lease model tests are green; production security approval, Android prototype and owner-controlled deployment/provider decisions remain open.
 
 This file is the operational A0 checklist. A document existing in GitHub is not the same as a decision being verified or code being implemented.
 
@@ -23,7 +23,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 |---|---|---|
 | Product requirements | [AUREON Plan](./AUREON-PLAN.md) | Product scope and safety rules recorded |
 | Architecture | [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) | Modular-monolith target and trust boundaries documented |
-| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Ktor 3.6.1 / Kotlin 2.4.21 / JDK 21 scaffold, auth seam, fake-KMS fail-closed tests and refresh-lease CAS model tests passed in CI run #42370500985 |
+| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Ktor 3.6.1 / Kotlin 2.4.21 / JDK 21, HikariCP/JDBC to PostgreSQL 18, OAuth PKCE/redirect, auth, fake-KMS and refresh-lease model tests passed in CI run #42370744363 |
 | Data model | [DATA-MODEL](./DATA-MODEL.md) | V001/V002 entities and ownership invariants documented |
 | Database schema | [V001](./migrations/V001__initial_schema.sql), [V002](./migrations/V002__vault-and-provider-inventory.sql) | Additive SQL drafts committed |
 | Database tests | [V001 smoke](../tests/database/V001_schema_smoke.sql), [V002 smoke](../tests/database/V002_vault_inventory_smoke.sql) | Both smoke-test suites passed in GitHub Actions run #42370296201 on PostgreSQL 18 |
@@ -39,7 +39,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 |---|---|---|
 | OpenAPI formal validation | **Passed** | GitHub Actions run #42370296201, validator step succeeded |
 | PostgreSQL V001 + V002 | **Passed** | GitHub Actions run #42370296201: both migrations and both smoke tests succeeded on PostgreSQL 18 |
-| Ktor architecture spike | Partially validated | Liveness + deny-all auth seam and HTTP tests passed. Fake-KMS fail-closed/key-zeroization and in-memory refresh-lease race/stale-commit tests passed. Real PostgreSQL repository/transaction, OAuth exchange, outbox and container tests remain |
+| Ktor architecture spike | Partially validated | Ktor HTTP/auth, PKCE/state/redirect primitives, HikariCP/JDBC connection to PostgreSQL 18, KMS fail-closed/key-zeroization and in-memory refresh-lease concurrency tests passed in run #42370744363. Real provider code exchange, PostgreSQL transactional refresh-lease repository, production KMS adapter, outbox and container tests remain |
 | Master Account auth/recovery | Provisional ADR | Passkey-first + offline recovery codes recommended; password fallback and email recovery policy require owner approval |
 | KMS/HSM | Architecture specified; deployment open | Separate credential-broker workload identity and KMS-only decrypt boundary specified; vendor/region, production IAM, rotation/destruction and independent review remain |
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
@@ -54,7 +54,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 1. Observe and resolve the OpenAPI/PostgreSQL CI run. Do not mark validation complete without the actual run and job evidence.
 2. Review V001/V002 against PostgreSQL 18 behavior. If CI exposes an issue, add a new migration or amend V002 only while it remains unapplied; never rewrite V001.
-3. Extend the Ktor spike with real PostgreSQL repository/transaction tests, OAuth exchange tests, outbox processing and container build.
+3. Extend the Ktor spike with PostgreSQL transactional refresh-lease repository tests, provider OAuth code exchange, outbox processing and container build.
 4. Decide Master Account authentication/recovery, KMS deployment and first-provider OAuth scope/callback mode.
 5. Obtain independent security review of the isolated credential broker, credential vault and E2E key recovery.
 6. Complete the Android Room/Pigeon/WorkManager prototype, security reviews and operational decisions; then conduct the A0 exit review and start the [A1 vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md).
