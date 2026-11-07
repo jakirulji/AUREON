@@ -2,31 +2,34 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:aureon_contracts/aureon_contracts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Local durable metadata store. It never performs provider mutations.
-/// Cloud sync/backup adapters can implement the same serialized contract later.
+import '../backup/aureon_metadata_backup.dart';
+import '../backup/aureon_metadata_store.dart';
+
+/// Virtual-folder memberships share the encrypted local metadata catalog.
+/// Adding/removing a membership never calls a provider API or mutates originals.
 class AureonVirtualFolderStore {
-  static const storageKey = 'aureon.virtual_folders.v1';
+  AureonVirtualFolderStore({AureonMetadataStore? metadataStore})
+      : _metadataStore = metadataStore ?? AureonMetadataStore();
 
-  Future<List<AureonVirtualFolder>> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(storageKey);
-    if (raw == null || raw.isEmpty) return const [];
-    final decoded = jsonDecode(raw);
-    if (decoded is! List) throw const FormatException('Virtual folder catalog is invalid.');
-    return decoded.map((value) {
-      if (value is! Map) throw const FormatException('Virtual folder entry is invalid.');
-      return AureonVirtualFolder.fromJson(value.cast<String, Object?>());
-    }).toList();
-  }
+  final AureonMetadataStore _metadataStore;
+
+  Future<List<AureonVirtualFolder>> load() async =>
+      (await _metadataStore.load()).virtualFolders;
 
   Future<void> save(List<AureonVirtualFolder> folders) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode(folders.map((folder) => folder.toJson()).toList());
-    if (!await prefs.setString(storageKey, encoded)) {
-      throw StateError('Could not persist AUREON virtual folders.');
-    }
+    final current = await _metadataStore.load();
+    final updated = AureonMetadataSnapshot(
+      snapshotId: 'metadata-${DateTime.now().microsecondsSinceEpoch}',
+      generation: current.generation + 1,
+      createdAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+      rootFolders: current.rootFolders,
+      virtualFolders: folders,
+      savedViews: current.savedViews,
+      globalTags: current.globalTags,
+      preferences: current.preferences,
+    );
+    await _metadataStore.save(updated);
   }
 
   Future<AureonVirtualFolder> create(String name) async {
