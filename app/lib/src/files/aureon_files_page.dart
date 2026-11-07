@@ -187,7 +187,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       final moved = await _files.moveToTrash(root: root, entryId: entry.id, parentId: parent.id);
       final prefs = await SharedPreferences.getInstance();
-      final rootKey = root.rootId.hashCode;
+      final rootKey = base64Url.encode(utf8.encode(root.rootId)).replaceAll('=', '');
       await prefs.setString('aureon.trash.folder.$rootKey', moved.trashFolderId);
       await prefs.setString('aureon.trash.meta.$rootKey.${moved.id}', jsonEncode({
         'originalParentId': moved.originalParentId,
@@ -416,7 +416,7 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
   bool _loading = true;
   String? _error;
 
-  String get _rootKey => widget.root.rootId.hashCode.toString();
+  String get _rootKey => base64Url.encode(utf8.encode(widget.root.rootId)).replaceAll('=', '');
   String _metaKey(String id) => 'aureon.trash.meta.$_rootKey.$id';
 
   @override
