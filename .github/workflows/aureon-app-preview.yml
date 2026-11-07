@@ -73,7 +73,7 @@ jobs:
           flutter create --empty --platforms=windows --project-name aureon --org com.aureon "$env:RUNNER_TEMP/aureon-windows"
           Copy-Item app/pubspec.yaml "$env:RUNNER_TEMP/aureon-windows/pubspec.yaml" -Force
           Remove-Item "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse -Force
-          Remove-Item "$env:RUNNER_TEMP/aureon-windows/test" -Recurse -Force
+          if (Test-Path "$env:RUNNER_TEMP/aureon-windows/test") { Remove-Item "$env:RUNNER_TEMP/aureon-windows/test" -Recurse -Force }
           Copy-Item app/lib "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse
           Copy-Item app/test "$env:RUNNER_TEMP/aureon-windows/test" -Recurse
       - name: Test and build Windows release
