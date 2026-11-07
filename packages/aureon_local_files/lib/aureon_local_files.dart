@@ -24,7 +24,7 @@ class AureonLocalRoot {
 
 class AureonTrashMoveResult {
   const AureonTrashMoveResult({required this.id, required this.name, required this.trashFolderId,
-    required this.originalParentId, required this.trashedAt});
+    required this.originalParentId, required this.trashedAt, required this.mode});
   final String id;
   final String name;
   final String trashFolderId;
