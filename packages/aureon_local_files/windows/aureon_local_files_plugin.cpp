@@ -1,10 +1,14 @@
 #include "aureon_local_files/aureon_local_files_plugin.h"
 
+#include <flutter/encodable_value.h>
+#include <flutter/standard_method_codec.h>
+
 #include <windows.h>
 #include <shobjidl.h>
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <system_error>
