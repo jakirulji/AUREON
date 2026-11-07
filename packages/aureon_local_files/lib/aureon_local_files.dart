@@ -22,6 +22,16 @@ class AureonLocalRoot {
   }
 }
 
+class AureonTrashMoveResult {
+  const AureonTrashMoveResult({required this.id, required this.name, required this.trashFolderId,
+    required this.originalParentId, required this.trashedAt});
+  final String id;
+  final String name;
+  final String trashFolderId;
+  final String originalParentId;
+  final int trashedAt;
+}
+
 class AureonLocalEntry {
   const AureonLocalEntry({
     required this.id,
@@ -94,9 +104,27 @@ class AureonLocalFiles {
     return value;
   }
 
-  Future<void> moveToTrash({required AureonLocalRoot root, required String entryId, required String parentId}) async {
-    await _channel.invokeMethod<void>('moveToTrash', <String, Object?>{
+  Future<AureonTrashMoveResult> moveToTrash({required AureonLocalRoot root, required String entryId, required String parentId}) async {
+    final value = await _channel.invokeMethod<Object?>('moveToTrash', <String, Object?>{
       'rootId': root.rootId, 'entryId': entryId, 'parentId': parentId,
+    });
+    if (value is! Map) throw const FormatException('Native Trash returned an invalid response.');
+    final id = value['id'];
+    final name = value['name'];
+    final trashFolderId = value['trashFolderId'];
+    final originalParentId = value['originalParentId'];
+    final trashedAt = value['trashedAt'];
+    if (id is! String || name is! String || trashFolderId is! String ||
+        originalParentId is! String || trashedAt is! int) {
+      throw const FormatException('Native Trash returned incomplete restore information.');
+    }
+    return AureonTrashMoveResult(id: id, name: name, trashFolderId: trashFolderId,
+      originalParentId: originalParentId, trashedAt: trashedAt);
+  }
+
+  Future<void> deleteTrashEntry({required AureonLocalRoot root, required String entryId, required String trashFolderId}) async {
+    await _channel.invokeMethod<void>('deleteTrashEntry', <String, Object?>{
+      'rootId': root.rootId, 'entryId': entryId, 'trashFolderId': trashFolderId,
     });
   }
 
