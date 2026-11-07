@@ -358,7 +358,11 @@ Performance targets must be measured on representative devices and networks; do 
 - Added adaptive chunking/concurrency, bounded retries, background scheduling and provider-specific download behavior.
 - aria2 remains an optional download-engine evaluation candidate, subject to license, security, Android and performance review.
 
-## 17. Plan maintenance
+## 17. Engineering documents
+
+- [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) — system boundaries, proposed backend structure, data model, API draft, OAuth/security decisions, transfer contract, testing strategy and A0 exit criteria.
+
+## 18. Plan maintenance
 
 For each new idea:
 1. Add a dated Change Log entry.
