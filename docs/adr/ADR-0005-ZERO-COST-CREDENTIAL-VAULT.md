@@ -1,62 +1,82 @@
 # ADR-0005 — Zero-cost credential vault with server-assisted recovery
 
-**Status:** Accepted owner direction for the personal, zero-cost-first phase; implementation and security review pending  
+**Status:** Accepted owner direction; dual recovery clarified by ADR-0007; implementation and security review pending  
 **Date:** 2026-11-08
 
 ## Context
 
-The owner cannot use OCI signup because the available DBBL Nexus card is not an international Visa/Mastercard payment card. A no-payment-card onboarding path is required. The owner also wants to recover the provider credential vault on a new device after losing the user recovery key, using verified email as part of the recovery process.
+The owner requires a no-payment-card platform and wants cross-device restoration of linked cloud-provider credentials. The owner explicitly requires two independent recovery paths: a manually held recovery key that remains usable if Cloudflare is unavailable, and a Cloudflare-assisted recovery path if the manual key is lost.
 
-The previous client-only design protected provider refresh credentials from the backend, but made recovery impossible if every copy of the user recovery key was lost. The newly accepted direction deliberately trades some server-side confidentiality for recoverability.
+The earlier single Worker-Secret-wrapped design was too Cloudflare-dependent. A Worker outage alone should not prevent a user from opening a locally available or exported encrypted vault bundle with the manual key.
 
 ## Decision
 
-For the personal zero-cost-first deployment candidate:
-
-- Firebase Authentication Spark is the Master Account identity provider, using email/password and verified email. SMS is out of scope. No custom domain is required for the initial flow.
-- Cloudflare Workers is the API and narrowly scoped credential-vault recovery runtime.
-- Cloudflare D1 stores account metadata, provider inventory and encrypted credential-vault envelopes. It stores no plaintext provider refresh tokens or wrapping keys.
-- A Cloudflare Worker Secret holds a high-entropy credential-vault wrapping root key. This is **not KMS/HSM**, is not an independently isolated hardware key, and is accessible to the deployed Worker runtime. A Worker compromise or malicious deployment with access to the secret can expose all credential vaults protected by that key.
-- The Worker may unwrap a user's credential-vault data-encryption key only after authenticating the Firebase identity, checking verified email, enforcing the recovery policy and writing an audit event. The normal API surface must not expose a generic decrypt endpoint.
-- Email verification initiates recovery; it is not proof against compromise of the user's email account. Require recent reauthentication, notify existing trusted devices/email, impose a recovery cooldown, and use a passkey or trusted device as an additional factor when available. Any email-only fallback must be explicitly disclosed as a weaker recovery path and rate-limited.
-- Keep the existing random user recovery key as an optional offline emergency factor/backup where feasible, but losing it must not be the sole reason recovery fails under the approved server-assisted path.
-- E2E file-content keys remain in a separate client-controlled hierarchy. They are never wrapped by the Worker Secret, sent to Workers, stored in D1 in plaintext, or recoverable through email-only credential-vault recovery.
-- Provider refresh tokens remain encrypted at rest in D1. The Worker decrypts only inside the provider credential-broker path, refreshes provider credentials, and returns only a short-lived, least-scope access token to the authenticated native adapter when direct client-to-provider transfer requires it. Access tokens are memory-only and never logged.
+- Firebase Authentication Spark is the Master Account identity provider, using email/password and verified email. SMS is out of scope.
+- Cloudflare Workers is the API and server-assisted credential-vault recovery runtime; Cloudflare D1 stores metadata and encrypted vault envelopes.
+- Provider credential records use AES-256-GCM with a random per-vault DEK.
+- The same DEK is wrapped independently through two recovery paths:
+  1. **Manual path:** a user-held high-entropy random 256-bit Manual Recovery Key derives a manual KEK using HKDF-SHA-256 and a per-vault random salt. The client wraps the DEK and stores the manual wrapped-DEK envelope with the encrypted vault. The Manual Recovery Key is never uploaded, transmitted to Cloudflare, or stored by AUREON.
+  2. **Cloudflare path:** a distinct high-entropy Worker Secret-derived KEK wraps the same DEK into a separate server envelope. The Worker may unwrap only after authenticated recovery policy checks. This is not KMS/HSM and is not zero-knowledge.
+- The two KEK hierarchies are cryptographically independent. Never derive one from the other, store either raw key in D1, or use the Manual Recovery Key as a Worker Secret.
+- The client can decrypt the credential vault locally after manual-key recovery and use provider refresh tokens directly with official provider OAuth/token endpoints where provider policy and native client security permit. Do not require a live Worker decrypt call after a successful manual recovery.
+- The Cloudflare path can restore the vault when the Manual Recovery Key is lost, subject to verified Firebase identity, recent reauthentication, step-up factor where available, cooldown, notification, audit, device/session revocation and rate limits.
+- E2E file-content keys remain in a separate client-controlled hierarchy. Neither credential-vault recovery path may decrypt E2E file content.
 - File bytes continue to flow directly between device and provider APIs; they must not pass through Workers or D1 in the normal transfer path.
 
-## Envelope and recovery requirements
+## Manual recovery bundle and Cloudflare independence
 
-1. Generate a random per-vault data-encryption key (DEK) and encrypt provider credential records with AES-256-GCM, fresh random 96-bit nonce per key, and authenticated metadata binding vault ID, owner UID, provider account ID, credential version and schema version.
-2. Wrap the per-vault DEK with a key-encryption key derived from the Worker Secret using HKDF-SHA-256 with a unique random per-vault salt and a domain-separation label. Store only the wrapped DEK, salt, nonce, key version ID and ciphertext in D1.
-3. Keep the Worker Secret out of source control, D1, GitHub Actions, client apps, logs and analytics. Provision it only through Cloudflare's secret-management interface. Maintain an owner-controlled offline emergency copy under a separate secure storage procedure; never put it in the public repository or chat.
-4. Version the wrapping key. Rotation must support decrypting old envelopes during a controlled migration; never delete the old secret/version until all records are rewrapped and recovery tests pass.
-5. The Worker must validate Firebase ID tokens (signature, issuer, audience, expiry), require verified email for recovery, derive owner identity from the verified token (never a client-supplied UID), enforce per-user/account authorization and rate limits, and fail closed if audit persistence fails.
-6. Recovery must have a short-lived one-time challenge, recent reauthentication, notifications, cooldown, revocation of lost devices/sessions, and audit trail. Do not send decrypted refresh tokens or DEKs to UI code.
-7. Keep local device copies protected by Android Keystore or Windows DPAPI/CNG. A device with an already unlocked local vault should continue to work during a temporary Worker outage, subject to provider token expiry/revocation.
-8. If the Worker Secret is lost, deleted, or unavailable and no valid offline emergency copy exists, affected provider credentials may be unrecoverable and must be relinked. D1 backups alone cannot replace the wrapping key.
-9. Use vetted crypto libraries/platform APIs; never implement AES, HKDF or secure random manually. Add cross-platform test vectors and independent security review before production use.
+- Provide an encrypted, portable Vault Recovery Bundle export/import. It contains the encrypted credential-vault records, both wrapped-DEK envelopes, salts/nonces, algorithm and schema versions, key-version identifiers, and non-secret account/provider identifiers required to interpret the bundle.
+- The bundle must not contain the Manual Recovery Key, Worker Secret, plaintext DEK, provider refresh tokens or access tokens.
+- A bundle must be authenticated, versioned, integrity checked and bound to the AUREON account/vault ID. Import must reject tampering, downgrade, wrong-owner and unsupported-schema cases.
+- The bundle can be stored by the owner outside Cloudflare (for example, an encrypted file in an independent storage location or offline media). AUREON must not assume that a bundle stored only in D1 remains available during a Cloudflare outage.
+- Cache the latest encrypted vault envelope locally on each authorized device. Keep local copies protected by Android Keystore or Windows DPAPI/CNG.
+- If Cloudflare Workers or D1 is unavailable, an owner with the Manual Recovery Key and a current Recovery Bundle can open the vault on another device without contacting Cloudflare. If the bundle is stale, it may not contain the latest provider-account additions or token rotations; show its export timestamp and require reconciliation when service returns.
+- If Cloudflare is unavailable and no current bundle or other copy of encrypted vault data exists, the Manual Recovery Key alone cannot reconstruct missing ciphertext. Explain this limitation in the UI.
+- If the Manual Recovery Key is lost, the Cloudflare path can recover only while the Worker Secret, D1 envelope, identity service and recovery policy remain available.
+- If the Worker Secret and its protected offline emergency copy are lost, the Cloudflare path is unavailable. The Manual Recovery Key plus a current Recovery Bundle remains the independent recovery route.
+- If both recovery factors are lost, or the encrypted vault data itself is unavailable, affected provider accounts must be relinked.
 
-## Security and availability consequences
+## Cryptographic requirements
+
+1. Generate a random per-vault DEK using platform/vetted cryptographic APIs.
+2. Encrypt each credential record with AES-256-GCM, fresh random 96-bit nonce per encryption under a given key, and AAD binding vault ID, owner UID, provider account ID, credential version and schema version.
+3. Manual wrapping: derive KEK with HKDF-SHA-256 from a random 256-bit Manual Recovery Key, unique random per-vault salt and explicit domain-separation label; wrap DEK with AES-256-GCM using a unique nonce.
+4. Cloudflare wrapping: derive a separate KEK from a high-entropy Worker Secret with a different salt/domain-separation label; wrap the same DEK in a separate envelope with a unique nonce.
+5. Use a vetted mnemonic/encoding only to display and transcribe the random Manual Recovery Key; do not use a human-chosen password as the root key. Show the key once, provide copy/export and offline-storage guidance, then require a successful verification challenge before completing setup.
+6. Do not send the Manual Recovery Key, manual KEK or plaintext DEK to Worker APIs, analytics, crash reports, logs or support bundles.
+7. Version both wrapping paths independently. Rotation must preserve the ability to unwrap old envelopes until all vaults are safely rewrapped and verified.
+8. Add cross-platform deterministic test vectors and fuzz tests for envelope parsing, AAD mismatch, nonce handling, tampering, wrong-key, downgrade and import/export.
+9. Never hand-roll cryptographic primitives. Independent cryptographic review is mandatory before production use.
+
+## Cloudflare security and recovery policy
+
+- Validate Firebase ID tokens (signature, issuer, audience, expiry); derive owner UID from verified token, never client-supplied UID.
+- Require verified email, recent reauthentication and one-time challenge for recovery. Prefer passkey or an already trusted device as step-up. If email-only fallback is offered, clearly label it weaker and apply a longer cooldown.
+- Notify existing devices and the account email, rate-limit attempts, audit without secrets, revoke lost sessions/devices and fail closed if audit persistence fails.
+- Do not expose a generic decrypt endpoint. Restrict unwrap to broker operations tied to a user, vault and approved purpose.
+- Worker Secret is not HSM/KMS. A compromised Worker deployment/account may be able to unwrap server envelopes and access provider credentials.
+
+## Consequences
 
 **Benefits**
-- No payment card or paid KMS is required to begin the proposed Firebase Spark + Cloudflare Free deployment.
-- The owner can recover provider credential access on a new device without relying exclusively on the user-held recovery key.
-- Database dumps contain encrypted credential envelopes, not plaintext refresh tokens.
-- Provider file bytes remain direct device-to-provider transfers, independent of Workers/D1 payload bandwidth.
+- Cloudflare outage does not prevent manual recovery when the encrypted bundle is available.
+- Loss of the Manual Recovery Key does not automatically require provider relinking if the Cloudflare recovery path remains healthy.
+- Database-only compromise does not expose provider credentials without either recovery authority.
+- E2E file-content keys remain separate and client-controlled.
 
-**Costs and limitations**
-- This is not zero-knowledge provider credential storage: the Worker runtime has a narrowly intended but real ability to decrypt provider credentials.
-- Worker Secret is not an HSM/KMS and does not provide hardware-backed key isolation or independent cryptographic authorization.
-- A compromised Worker deployment, Cloudflare account or secret-management control plane can compromise the provider credential vault. Minimize Worker permissions, protect account MFA, review deployments and keep immutable audit records where possible.
-- Firebase email verification alone is vulnerable if the email account is compromised. Cooldown and notification reduce risk but do not eliminate it.
-- Cloudflare Free quotas, service availability and D1 limits can pause metadata/recovery operations. Local jobs and known-good files must remain safe while the control plane is unavailable.
-- D1 is not PostgreSQL. Existing Ktor/PostgreSQL backend code and SQL migrations cannot be assumed to run unchanged on Workers/D1.
-- No free-tier service guarantees permanent $0 operation, unlimited usage, or uninterrupted availability.
+**Limitations**
+- Manual Recovery Key without encrypted vault ciphertext is insufficient. Keep an up-to-date encrypted Recovery Bundle outside Cloudflare.
+- Cloudflare recovery is not hardware-backed and creates a server-side trust boundary.
+- Email account compromise can undermine email-assisted recovery; step-up and cooldown reduce but do not eliminate this risk.
+- Cloudflare Free quotas/outages can pause cloud-assisted recovery and metadata sync.
+- No free-tier service guarantees permanent $0 operation or uninterrupted availability.
 
-## Migration and production gates
+## Production gates
 
-- Build a TypeScript Worker API and D1 schema/migrations; preserve the existing public API semantics where practical.
-- Port and test Master Account session validation, provider inventory, vault envelope storage, audit, credential broker and Trash coordination before switching clients.
-- Verify Firebase token validation, account ownership isolation, recovery cooldown, secret rotation, Worker secret loss drill, D1 backup/export and restore procedure.
-- Do not enable production credential recovery until independent security review and end-to-end Android/Windows tests pass.
-- No paid plan, paid domain, billing upgrade, or other charge without explicit owner approval.
+- Implement and test both independent wrapping envelopes and the portable Recovery Bundle.
+- Test manual recovery with Workers/D1 completely unreachable.
+- Test Cloudflare recovery after the Manual Recovery Key is unavailable.
+- Test stale bundle behavior and reconciliation after provider token rotation/account addition.
+- Test Worker Secret rotation, loss, restore and offline emergency procedure.
+- Complete independent cryptographic/security review and Android/Windows integration tests before production credentials are stored.
+- No paid plan, paid domain, billing upgrade or other charge without explicit owner approval.
