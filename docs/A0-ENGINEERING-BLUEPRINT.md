@@ -195,7 +195,7 @@ Never commit deployment credentials. Use GitHub Actions secrets/OIDC where suppo
 ### 4.1 Identity requirements
 
 - AUREON Master Account is distinct from Google/Microsoft/Dropbox accounts.
-- New-device sign-in restores the account inventory and encrypted metadata, not necessarily valid provider authorization.
+- New-device sign-in restores provider account inventory and encrypted metadata. The credential broker attempts provider reconnection from the user-consented vault; only accounts requiring provider interaction become reauth-required.
 - Provider re-authentication must be a normal, clearly explained state when refresh authorization is expired/revoked or consent is required.
 - Users can list and revoke devices.
 - Session revocation must take effect server-side and be reflected on the next client sync.
@@ -211,7 +211,7 @@ Each installation receives a random device ID and a device-bound key pair genera
 
 ## 5. Provider OAuth and credential vault
 
-**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on the final feature boundary and provider review. [Android native OAuth and credential lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) defines native authorization and provider token lifecycle. [Cross-device cloud restore and legacy import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) records the product requirement for seamless provider restoration and indexing of existing content.
+**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on final feature boundaries and provider review. [Android native OAuth and credential lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) defines vault-compatible native authorization, cross-device restoration and refresh concurrency. [Cross-device cloud restore and legacy import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) records account restoration and existing-content indexing requirements.
 
 ### 5.1 OAuth rules
 
@@ -230,13 +230,13 @@ Two legitimate models exist. The product requirement for seamless cross-device p
 
 **Model B — consented backend credential vault:** encrypted refresh tokens are stored server-side using envelope encryption backed by managed KMS, with strict service identity, access logging and rotation. This improves cross-device account restoration but makes backend security more consequential.
 
-**Recommendation:** implement Model B as the target architecture only after threat-model review, provider-terms review, explicit user consent and independent security testing. This is required for the requested cross-device experience; it must never be an invisible default. File-content encryption keys must remain client-controlled and separate from OAuth credentials. Until the vault is approved and operational, do not promise automatic provider reconnection on a new device.
+**Recommendation:** Model B is the target architecture. Implement only after threat-model review, provider-terms review, explicit user consent, managed KMS/HSM provisioning, least-privilege broker identity, audit/rotation/incident-response controls and independent security testing. File-content encryption keys remain client-controlled and separate. Until the vault is approved and operational, do not claim automatic provider reconnection.
 
 ## 6. Database design
 
 Use PostgreSQL for server-side relational metadata. Use migrations from the first schema version. Never rely on application code alone for uniqueness or referential integrity.
 
-**Engineering drafts:** [Relational data model and ER diagram](./DATA-MODEL.md) · [Initial PostgreSQL migration](./migrations/V001__initial_schema.sql). These are proposed A0 artifacts and have not yet been applied to a live database or validated against a running PostgreSQL instance.
+**Engineering drafts:** [Relational data model and ER diagram](./DATA-MODEL.md) · [V001 initial schema](./migrations/V001__initial_schema.sql) · [V002 vault and provider inventory](./migrations/V002__vault-and-provider-inventory.sql). V001 is the baseline; V002 is additive and must run after V001. CI is configured to apply both to PostgreSQL 16 and run separate smoke tests. The workflow result must be observed before either migration is called validated; no live production database is provisioned.
 
 ### 6.1 Core server tables
 
@@ -247,7 +247,11 @@ Use PostgreSQL for server-side relational metadata. Use migrations from the firs
 | `devices` | device ID, user ID, public key, platform, app version, last seen, revoked timestamp |
 | `sessions` | session ID, user ID, device ID, token hash/identifier, expiry, revoked timestamp |
 | `provider_accounts` | account ID, user ID, provider type, provider subject, display label, status, capability snapshot |
-| `provider_credentials` | account ID, encrypted refresh credential envelope, KMS key version, scopes, expiry/rotation metadata |
+| `provider_credentials` | versioned encrypted refresh credential envelope, KMS key reference/version, consent, refresh lease and compare-and-swap version |
+| `provider_oauth_transactions` | one-time state hash, PKCE challenge, encrypted short-lived verifier when server-held, exact redirect and expiry |
+| `provider_inventory_cursors` | account-wide initial scan and incremental change cursors, encrypted opaque page/change tokens |
+| `provider_items` | provider-native item IDs, actual parent IDs, item kind, MIME type and encrypted metadata envelope |
+| `provider_albums` / `provider_album_memberships` | provider-native albums and API-exposed membership; not filesystem folders |
 | `file_records` | logical file ID, owner ID, encrypted metadata envelope, plaintext metadata only where strictly necessary, current version ID, tombstone/status |
 | `file_versions` | version ID, logical file ID, content fingerprint, size, encryption format version, created timestamp |
 | `file_locations` | version ID, provider account ID, provider object ID, remote version/ETag, verified status, canonical flag |
@@ -302,15 +306,16 @@ Base path: `/api/v1`. JSON over HTTPS. Use OpenAPI as the contract source. All a
 - `POST /devices/register`
 - `DELETE /devices/{deviceId}`
 
-### 7.2 Provider accounts
+### 7.2 Provider accounts and inventory
 
 - `GET /providers` — supported provider catalog and capability summary.
-- `POST /provider-accounts/{provider}/oauth/start` — create OAuth state/PKCE transaction.
-- `POST /provider-accounts/{provider}/oauth/callback` — validate callback and bind account.
-- `GET /provider-accounts`
-- `GET /provider-accounts/{accountId}`
-- `POST /provider-accounts/{accountId}/refresh-status`
-- `DELETE /provider-accounts/{accountId}`
+- `POST /provider-accounts/{provider}/oauth/start` — create a one-time OAuth transaction; backend generates state and selects the reviewed PKCE callback mode.
+- Provider callback completion — backend validates state and performs the provider-approved code exchange; raw codes/verifiers are never persisted.
+- `GET /provider-accounts` and `GET /provider-accounts/{accountId}` — safe account inventory and state only; never return refresh credentials.
+- `POST /provider-accounts/{accountId}/refresh-status` — request a safe broker status check; reauth is isolated to the affected account.
+- `GET /provider-accounts/{accountId}/inventory` — paginated metadata-first provider item index with real parent IDs and resumable cursors.
+- `GET /provider-accounts/{accountId}/albums` — provider-native albums only where supported; albums are not filesystem folders.
+- `DELETE /provider-accounts/{accountId}` — revoke/disconnect authorization without deleting provider content.
 
 OAuth callback mechanics may be browser/deep-link based and must follow each provider's registered redirect rules; endpoint names are illustrative until the flow is selected.
 
@@ -512,26 +517,27 @@ Performance should be benchmarked on representative low/mid-range Android device
 
 These are not blockers for documentation, but must be resolved before the relevant code ships:
 
-1. Backend host, deployment region, domain and email provider.
+1. Backend host, deployment region, domain, email provider and operational cost ceiling.
 2. Master Account sign-in and recovery method (passkeys/password/email recovery).
-3. Whether backend-held provider refresh tokens are enabled; exact consent and threat model.
-4. Exact Google Drive OAuth scopes and verification requirements.
-5. Minimum Android API and supported device matrix.
-6. Flutter/Kotlin boundary and Room vs another local persistence adapter.
-7. Backend Ktor validation spike and final framework choice.
-8. Encryption key hierarchy, streaming format, recovery and key rotation protocol.
-9. File metadata visibility to backend and encrypted search strategy.
-10. Provider-specific checksum/read-back guarantees and verification level.
-11. Transfer staging reserve and cache defaults.
-12. Privacy policy, terms, retention, account deletion and incident response.
+3. Managed KMS/HSM vendor, region, envelope format, key rotation and destruction controls.
+4. Exact Google Drive OAuth scopes, verification and restricted-scope security assessment.
+5. Provider-specific callback mode/client registration and consent wording.
+6. Minimum Android API and supported device/test matrix.
+7. Flutter/Kotlin boundary and Room vs another local persistence adapter.
+8. Backend Ktor validation spike and final framework choice.
+9. E2E key hierarchy, streaming format, recovery protocol and cross-platform test vectors.
+10. File metadata visibility, retention and encrypted search strategy.
+11. Provider-specific checksum/read-back guarantees and verification level.
+12. Transfer staging reserve, cache defaults, privacy policy, terms, account deletion and incident response.
 
 ## 15. A0 exit criteria
 
 A0 is complete only when:
 - Architecture and trust boundaries are reviewed.
-- Database entities and uniqueness constraints are agreed.
-- API contract has an OpenAPI draft.
-- OAuth and credential-storage model is selected for the first provider.
+- Database entities and uniqueness constraints are reviewed; V001 and V002 apply cleanly on PostgreSQL 16 and their smoke tests pass.
+- OpenAPI contract validates and covers OAuth vault lifecycle and metadata-first provider inventory without exposing secrets.
+- First-provider OAuth callback mode, scopes and consent are selected and provider review requirements are documented.
+- Credential-vault threat model, KMS boundary, refresh-rotation concurrency and incident-response design receive security review.
 - Encryption/key-recovery design has a reviewable protocol and test vectors.
 - Transfer Coordinator state machine and idempotency behavior are testable.
 - Android minimum API and supported test devices are chosen.
@@ -549,6 +555,12 @@ Until these are met, A0 is **in progress**. This document is the first blueprint
 - Defined OAuth, credential-vault tradeoffs and E2E key separation.
 - Defined Transfer Coordinator interfaces, upload/download algorithms and duplicate reconciliation.
 - Added threat model, Android background/storage rules, test gates and A0 exit criteria.
+
+### 2026-11-07 — Vault and provider inventory alignment
+- Replaced device-held-only OAuth as the target with a user-consented backend credential vault for cross-device restoration.
+- Added V002 design for OAuth transactions, encrypted credential-envelope lifecycle, refresh leases, account-wide inventory cursors, provider item hierarchy and provider-native albums.
+- Clarified that Google Photos albums are not Drive folders and that metadata inventory does not authorize file mutation/deletion.
+- Extended A0 exit gates to require PostgreSQL 16 migration/smoke evidence and an OpenAPI contract for the new flows.
 
 ## 17. Maintenance rules
 
