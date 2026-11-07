@@ -331,12 +331,12 @@ class AureonMetadataRestorePlanner {
   MetadataRestoreResult merge({
     required AureonMetadataSnapshot current,
     required AureonMetadataSnapshot backup,
-    Set<String>? liveProviderStableKeys,
+    Map<String, ProviderFileReference>? liveProviderFiles,
   }) {
     final conflicts = <String>[];
-    final mergedRoots = _mergeFolders(current.rootFolders, backup.rootFolders, conflicts);
+    final mergedRoots = _mergeFolders(current.rootFolders, backup.rootFolders, conflicts, liveProviderFiles);
     final virtuals = _mergeVirtualFolders(current.virtualFolders, backup.virtualFolders, conflicts,
-      liveProviderStableKeys);
+      liveProviderFiles);
     final views = _mergeViews(current.savedViews, backup.savedViews, conflicts);
     final merged = AureonMetadataSnapshot(
       snapshotId: backup.snapshotId,
@@ -353,8 +353,7 @@ class AureonMetadataRestorePlanner {
       conflicts: conflicts,
       pendingProviderReferences: _countPending(merged.rootFolders) +
           merged.virtualFolders.fold<int>(0, (sum, folder) =>
-            sum + folder.items.where((item) => liveProviderStableKeys == null ||
-              !liveProviderStableKeys.contains(item.stableKey)).length),
+            sum + folder.items.where((item) => !item.isReconciled).length),
     );
   }
 
@@ -362,6 +361,7 @@ class AureonMetadataRestorePlanner {
     List<AureonMetadataFolder> current,
     List<AureonMetadataFolder> backup,
     List<String> conflicts,
+    Map<String, ProviderFileReference>? liveProviderFiles,
   ) {
     final currentById = {for (final folder in current) folder.id: folder};
     final result = <AureonMetadataFolder>[];
@@ -370,8 +370,8 @@ class AureonMetadataRestorePlanner {
       if (existing != null && existing.name != saved.name) {
         conflicts.add('Folder "${saved.name}" differs from the current folder with the same ID.');
       }
-      final nested = _mergeFolders(existing?.folders ?? const [], saved.folders, conflicts);
-      final files = _mergeFileEntries(existing?.files ?? const [], saved.files, conflicts);
+      final nested = _mergeFolders(existing?.folders ?? const [], saved.folders, conflicts, liveProviderFiles);
+      final files = _mergeFileEntries(existing?.files ?? const [], saved.files, conflicts, liveProviderFiles);
       result.add(AureonMetadataFolder(
         id: saved.id, name: saved.name, order: saved.order,
         folders: nested, files: files,
@@ -388,24 +388,32 @@ class AureonMetadataRestorePlanner {
     List<AureonMetadataFileEntry> current,
     List<AureonMetadataFileEntry> backup,
     List<String> conflicts,
+    Map<String, ProviderFileReference>? liveProviderFiles,
   ) {
     final currentByKey = {for (final file in current) file.reference.stableKey: file};
     final result = <AureonMetadataFileEntry>[];
     for (final saved in backup) {
-      final existing = currentByKey.remove(saved.reference.stableKey);
+      final key = saved.reference.stableKey;
+      final liveReference = liveProviderFiles?[key];
+      if (liveProviderFiles != null && liveReference == null) {
+        conflicts.add('Provider object is no longer present; skipped: ${saved.reference.name}.');
+        currentByKey.remove(key);
+        continue;
+      }
+      final existing = currentByKey.remove(key);
       if (existing != null && existing.order != saved.order) {
         conflicts.add('File placement changed: ${saved.reference.name}.');
       }
       result.add(AureonMetadataFileEntry(
-        reference: saved.reference,
+        reference: liveReference ?? saved.reference,
         order: saved.order,
         tags: {...?existing?.tags, ...saved.tags}.toList(),
         favorite: saved.favorite || (existing?.favorite ?? false),
         customLabel: saved.customLabel ?? existing?.customLabel,
-        pendingProviderReconciliation: true,
+        pendingProviderReconciliation: liveReference == null,
       ));
     }
-    result.addAll(currentByKey.values);
+    result.addAll(currentByKey.values.where((file) => liveProviderFiles == null || liveProviderFiles.containsKey(file.reference.stableKey)));
     result.sort((a, b) => a.order.compareTo(b.order));
     return result;
   }
@@ -414,7 +422,7 @@ class AureonMetadataRestorePlanner {
     List<AureonVirtualFolder> current,
     List<AureonVirtualFolder> backup,
     List<String> conflicts,
-    Set<String>? liveKeys,
+    Map<String, ProviderFileReference>? liveProviderFiles,
   ) {
     final currentById = {for (final folder in current) folder.id: folder};
     final result = <AureonVirtualFolder>[];
@@ -426,15 +434,27 @@ class AureonMetadataRestorePlanner {
       final items = <ProviderFileReference>[];
       final byKey = <String, ProviderFileReference>{};
       for (final item in [...?existing?.items, ...saved.items]) {
-        if (liveKeys != null && !liveKeys.contains(item.stableKey)) continue;
-        byKey[item.stableKey] = item;
+        final live = liveProviderFiles?[item.stableKey];
+        if (liveProviderFiles != null && live == null) continue;
+        byKey[item.stableKey] = live ?? item;
       }
       items.addAll(byKey.values);
       result.add(AureonVirtualFolder(
         id: saved.id,
         name: saved.name,
         createdAtEpochMs: saved.createdAtEpochMs,
-        items: items,
+        items: items.map((item) => ProviderFileReference(
+          provider: item.provider,
+          providerAccountId: item.providerAccountId,
+          accountLabel: item.accountLabel,
+          providerItemId: item.providerItemId,
+          name: item.name,
+          providerParentId: item.providerParentId,
+          mimeType: item.mimeType,
+          sizeBytes: item.sizeBytes,
+          webUrl: item.webUrl,
+          isReconciled: liveProviderFiles?.containsKey(item.stableKey) ?? false,
+        )).toList(),
       ));
     }
     result.addAll(currentById.values);
