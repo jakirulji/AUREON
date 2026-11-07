@@ -46,6 +46,7 @@ dependencies {
     compileOnly(files("${System.getenv("FLUTTER_ROOT")}/bin/cache/artifacts/engine/android-arm64/flutter.jar"))
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.google.code.gson:gson:2.13.1")
     testImplementation("androidx.room:room-testing:2.8.5")
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("org.robolectric:robolectric:4.17")
