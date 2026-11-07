@@ -9,7 +9,7 @@ Keep the backend portable across managed cloud platforms, but require a producti
 
 ## Credential-vault envelope model
 
-1. The credential broker is the only backend module/service identity allowed to request decrypt operations for provider refresh credentials.
+1. The credential broker is a separately deployed workload with its own cloud workload identity. The ordinary API/backend process has no KMS decrypt permission for provider refresh credentials.
 2. Each credential is encrypted with an authenticated-encryption data key; the data key is wrapped by a managed KMS key. Store only ciphertext, wrapped key, algorithm/format version, nonce/tag, KMS key reference/version and lifecycle metadata.
 3. Use a reviewed AEAD implementation and managed KMS SDK. Do not implement cryptographic primitives.
 4. Decrypt only in broker memory for the shortest practical time. Redact provider tokens from exceptions, traces, request bodies, metrics and logs.
@@ -68,3 +68,5 @@ Do not pick a region solely from latency. Keep account and provider metadata reg
 - Monthly budget ceiling and expected storage/transfer profile.
 
 These are deployment-owner decisions. The architecture is designed to make them swappable; no production data should be stored until they are approved.
+
+The credential broker is the deliberate security exception to the modular-monolith deployment: it must be isolated as a small separately deployed workload so that compromise of the general API process does not automatically grant KMS decrypt permission.
