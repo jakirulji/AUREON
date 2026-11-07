@@ -78,7 +78,8 @@ flowchart TB
 
 **AUREON backend**
 - Master Account identity/session management, device registry, provider-account inventory, encrypted metadata sync, authorization state and audit events.
-- Stores provider refresh credentials only if the user explicitly consents and the security model is approved.
+- Ordinary API process has no KMS decrypt permission for provider refresh credentials.
+- Provider refresh credentials are handled only by a separately deployed credential-broker workload with a distinct workload identity and KMS policy, after explicit consent and security approval.
 - Does not receive plaintext file content or E2E file keys in the normal direct-transfer path.
 
 **Cloud provider**
@@ -90,7 +91,7 @@ flowchart TB
 1. Device OS / app sandbox.
 2. AUREON client process and local database.
 3. AUREON backend and database.
-4. Managed KMS/secret vault.
+4. Isolated credential-broker workload and managed KMS/secret vault.
 5. Third-party OAuth authorization server.
 6. Third-party cloud file API and stored objects.
 
@@ -235,6 +236,8 @@ Two legitimate models exist. The product requirement for seamless cross-device p
 ## 6. Database design
 
 Use PostgreSQL 18 for server-side relational metadata. The current V001+V002 migration and smoke-test workflow has passed against PostgreSQL 18 in GitHub Actions; this is CI evidence, not production deployment evidence. The provisional backend recommendation is Kotlin/JVM + Ktor 3.6.1 as a modular monolith; see [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md). This remains provisional until the architecture spike proves auth, PostgreSQL migrations, credential-broker boundaries, refresh concurrency and outbox behavior. Use ordered migrations from the first schema version; never rely on application code alone for uniqueness or referential integrity.
+
+**Security review:** [A0 Threat Model](./THREAT-MODEL.md) defines STRIDE threats, assets, broker isolation, residual risks and required security test evidence.
 
 **Engineering drafts:** [Backend stack ADR](./adr/ADR-0001-BACKEND-STACK.md) · [Master Account auth/recovery ADR](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) · [Android local data ADR](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) · [KMS/hosting ADR](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) · [Relational data model and ER diagram](./DATA-MODEL.md) · [V001 initial schema](./migrations/V001__initial_schema.sql) · [V002 vault and provider inventory](./migrations/V002__vault-and-provider-inventory.sql). V001 is the baseline; V002 is additive and must run after V001. CI is configured to apply both to PostgreSQL 18 and run separate smoke tests. The workflow result must be observed before either migration is called validated; no live production database is provisioned.
 
