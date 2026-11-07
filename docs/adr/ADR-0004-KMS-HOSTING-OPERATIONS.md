@@ -1,6 +1,6 @@
 # ADR-0004 — KMS, Hosting and Operational Deployment Boundary
 
-**Status:** Architecture recommendation; provider/region selection intentionally open  
+**Status:** Superseded for the current personal no-card deployment by ADR-0005 and ADR-0006; retained as historical managed-KMS guidance  
 **Date:** 2026-11-07
 
 ## Decision
