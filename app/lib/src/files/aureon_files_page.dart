@@ -4,6 +4,7 @@ import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'aureon_operation_history.dart';
 
 enum _FileSort { name, largest, newest, type }
 class AureonFilesPage extends StatefulWidget {
@@ -98,6 +99,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (name == null || name.trim().isEmpty) return;
     try {
       await _files.createFolder(root: root, parentId: _levels.last.id, name: name.trim());
+      await AureonOperationHistory.record(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       await _load();
     } on PlatformException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
@@ -116,6 +118,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       await _files.copyFile(root: root, sourceId: entry.id,
         parentId: _levels.last.id, targetName: name.trim());
+      await AureonOperationHistory.record(kind: 'copy', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +155,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       await _files.moveEntry(root: root, entryId: entry.id,
         sourceParentId: sourceParent.id, targetParentId: targetParent.id);
+      await AureonOperationHistory.record(kind: 'move', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: _levels.take(_levels.length - 1).map((x) => x.name).join(' / '), succeeded: true);
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +203,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           'mode': moved.mode,
         }));
       }
+      await AureonOperationHistory.record(kind: 'trash', itemName: entry.name, sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: moved.mode == 'windows' ? 'Windows Recycle Bin' : 'AUREON Trash', succeeded: true);
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -227,6 +232,12 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     await _load();
   }
 
+  Future<void> _openHistory() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => const AureonOperationHistoryPage(),
+    ));
+  }
+
   Future<void> _rename(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null) return;
@@ -234,6 +245,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (name == null || name.trim().isEmpty || name.trim() == entry.name) return;
     try {
       await _files.renameEntry(root: root, entryId: entry.id, newName: name.trim());
+      await AureonOperationHistory.record(kind: 'rename', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
       await _load();
     } on PlatformException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
@@ -260,6 +272,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (root == null || entry.isDirectory) return;
     try {
       await _files.openFile(root: root, fileId: entry.id);
+      await AureonOperationHistory.record(kind: 'open', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', succeeded: true);
     } on PlatformException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'Unable to open this file.')));
     } catch (error) {
@@ -323,6 +336,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           const Expanded(child: Text('Files', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
+          IconButton(tooltip: 'Operation history', onPressed: _openHistory, icon: const Icon(Icons.history)),
           if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
           OutlinedButton.icon(onPressed: _loading ? null : _choose,
             icon: const Icon(Icons.create_new_folder_outlined), label: const Text('Choose folder')),
@@ -478,6 +492,7 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
           sourceParentId: folderId, targetParentId: meta['originalParentId'] as String);
         await prefs.remove(_metaKey(entry.id));
       }
+      await AureonOperationHistory.record(kind: 'restore', itemName: entry.name, sourceLocation: 'AUREON Trash', destinationLocation: 'Original folder', succeeded: true);
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -517,8 +532,10 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(_metaKey(entry.id));
       }
+      await AureonOperationHistory.record(kind: 'permanent_delete', itemName: entry.name, sourceLocation: 'AUREON Trash', succeeded: true);
       await _load();
     } on PlatformException catch (error) {
+      await AureonOperationHistory.record(kind: 'permanent_delete', itemName: entry.name, sourceLocation: 'AUREON Trash', succeeded: false, errorCode: error.code);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(error.message ?? error.code)),
