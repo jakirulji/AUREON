@@ -258,6 +258,7 @@ class ProviderFileReference {
     this.mimeType,
     this.sizeBytes,
     this.webUrl,
+    this.isReconciled = false,
   });
 
   final ProviderKind provider;
@@ -269,6 +270,8 @@ class ProviderFileReference {
   final String? mimeType;
   final int? sizeBytes;
   final String? webUrl;
+  /// True only after a live provider inventory confirms this stable object ID.
+  final bool isReconciled;
 
   String get stableKey => '${provider.name}|${providerAccountId.length}:$providerAccountId|${providerItemId.length}:$providerItemId';
 
@@ -282,6 +285,7 @@ class ProviderFileReference {
     'mimeType': mimeType,
     'sizeBytes': sizeBytes,
     'webUrl': webUrl,
+    'isReconciled': isReconciled,
   };
 
   factory ProviderFileReference.fromJson(Map<String, Object?> json) {
@@ -307,6 +311,7 @@ class ProviderFileReference {
       mimeType: json['mimeType'] as String?,
       sizeBytes: json['sizeBytes'] as int?,
       webUrl: json['webUrl'] as String?,
+      isReconciled: json['isReconciled'] == true,
     );
   }
 }
