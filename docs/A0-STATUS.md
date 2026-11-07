@@ -1,7 +1,7 @@
 # AUREON A0 — Readiness and Exit-Gate Tracker
 
 **Last updated:** 2026-11-07  
-**Overall status:** <strong>IN PROGRESS</strong> — documentation and contracts are being aligned; implementation has not started.
+**Overall status:** <strong>IN PROGRESS</strong> — core contracts and database validation are green; the Ktor spike is being debugged; production/security and Android prototype gates remain open.
 
 This file is the operational A0 checklist. A document existing in GitHub is not the same as a decision being verified or code being implemented.
 
@@ -19,7 +19,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | OAuth | [Provider OAuth Matrix](./PROVIDER-OAUTH-MATRIX.md), [Android OAuth lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) | Backend refresh-token vault target, native access-token boundary, consent and refresh concurrency documented |
 | Existing cloud content | [Cloud Restore and Legacy Import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) | Drive hierarchy, metadata-first inventory, virtual categories and Photos album constraints documented |
 | E2E encryption | [E2E Encryption and Recovery](./E2E-ENCRYPTION-AND-RECOVERY-DESIGN.md) | Proposal exists; independent crypto review and test vectors remain |
-| CI | [Contract checks workflow](../.github/workflows/aureon-contract-checks.yml) | Workflow configured to validate OpenAPI and apply V001+V002 on PostgreSQL 18; successful run has not been observed |
+| CI | [Contract checks workflow](../.github/workflows/aureon-contract-checks.yml) | GitHub Actions run #42370296201 passed: OpenAPI formal validation and PostgreSQL 18 V001+V002 migration plus both smoke tests all succeeded |
 
 ## 2. Remaining A0 gates
 
@@ -28,24 +28,24 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | OpenAPI formal validation | Pending | GitHub Actions run with OpenAPI validator conclusion = success |
 | PostgreSQL V001 + V002 | Pending | CI run applies both migrations and both smoke tests pass on PostgreSQL 16 |
 | Ktor architecture spike | In progress | Reproducible app, auth/device boundary, DB migrations, fake KMS, refresh concurrency, outbox and container tests |
-| Master Account auth/recovery | Open | Choose passkey-first/password/email recovery and document account recovery threat model |
+| Master Account auth/recovery | Provisional ADR | Passkey-first + offline recovery codes recommended; password fallback and email recovery policy require owner approval |
 | KMS/HSM | Open | Select vendor/region, workload identity, envelope format, rotation/destruction, audit and incident response |
 | Provider OAuth | Open | Select first provider callback mode, exact OAuth scopes, verification/assessment path and explicit consent UX |
 | E2E encryption | Open | Approve protocol, recovery design, cross-platform test vectors and independent cryptographic review |
-| Android platform | Open | Set minimum API, target API, device support matrix and background-work expectations |
-| Local data layer | Open | Validate Room/Kotlin repository boundary versus Flutter database adapter; test process-death persistence |
-| Hosting and operations | Open | Choose region/host, domain, email, backups, monitoring, support, cost ceiling and incident runbook |
-| Privacy and legal | Open | Document provider data visibility, restricted-scope handling, retention, account deletion and privacy notice |
+| Android platform | Provisional ADR | Minimum API 26 / target API 37 recommended; release-time SDK policy and OEM matrix still require validation |
+| Local data layer | Recommended ADR | Room owned by Kotlin + Pigeon typed Flutter boundary; Room/WorkManager/process-death prototype remains |
+| Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
+| Privacy and legal | Open | Data visibility, restricted-scope disclosures, jurisdiction, retention, account deletion and privacy notice require review |
 | A1 backlog | Pending | Break first vertical slice into small acceptance-tested work items |
 
 ## 3. Immediate execution order
 
 1. Observe and resolve the OpenAPI/PostgreSQL CI run. Do not mark validation complete without the actual run and job evidence.
 2. Review V001/V002 against PostgreSQL 16 behavior. If CI exposes an issue, add a new migration or amend V002 only while it remains unapplied; never rewrite V001.
-3. Complete the Ktor proof-of-concept described in [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md).
+3. Diagnose the Ktor CI test failure and extend the spike with PostgreSQL/Flyway, fake KMS boundary, refresh-rotation concurrency and outbox tests.
 4. Decide Master Account authentication/recovery, KMS deployment and first-provider OAuth scope/callback mode.
 5. Conduct security review of credential vault and E2E key recovery.
-6. Close the A0 exit review and create the A1 vertical-slice backlog.
+6. Complete the Android Room/Pigeon/WorkManager prototype, security reviews and operational decisions; then conduct the A0 exit review and start the [A1 vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md).
 
 ## 4. Non-negotiable implementation safety
 
