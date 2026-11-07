@@ -30,7 +30,10 @@ CREATE TABLE trash_items (
         OR (status = 'restored' AND restored_at IS NOT NULL AND permanently_deleted_at IS NULL)
         OR (status = 'permanently_deleted' AND restored_at IS NULL AND permanently_deleted_at IS NOT NULL)
     ),
-    CHECK (trash_mode <> 'provider_native' OR trash_container_provider_item_id IS NULL)
+    CHECK (
+        (trash_mode = 'provider_native' AND trash_container_provider_item_id IS NULL)
+        OR (trash_mode = 'provider_folder' AND trash_container_provider_item_id IS NOT NULL)
+    )
 );
 CREATE UNIQUE INDEX uq_trash_items_one_active_provider_object
     ON trash_items(user_id, provider_account_id, provider_item_id) WHERE status = 'trashed';
