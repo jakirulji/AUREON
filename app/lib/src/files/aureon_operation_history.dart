@@ -79,7 +79,6 @@ class AureonOperationHistory {
   static Future<void> flush() => _writeQueue;
 
   static Future<List<AureonOperationRecord>> load() async {
-    await _writeQueue;
     final preferences = await SharedPreferences.getInstance();
     return _decode(preferences.getString(storageKey));
   }
