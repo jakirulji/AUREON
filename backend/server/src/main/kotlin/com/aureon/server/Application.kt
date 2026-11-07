@@ -2,6 +2,7 @@ package com.aureon.server
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
@@ -23,10 +24,36 @@ data class HealthResponse(val status: String)
 data class SessionResponse(val authenticated: Boolean, val userId: String)
 
 fun Application.module(
-    sessionAuthenticator: SessionAuthenticator = RejectAllSessionAuthenticator,
-    readinessProbe: ReadinessProbe = NotReadyProbe,
+    sessionAuthenticator: SessionAuthenticator? = null,
+    readinessProbe: ReadinessProbe? = null,
     trashRepository: TrashRepository? = null
 ) {
+    val databaseSettings = System.getenv("AUREON_DATABASE_URL")?.takeIf { it.isNotBlank() }?.let { jdbcUrl ->
+        DatabasePoolSettings(
+            jdbcUrl = jdbcUrl,
+            username = System.getenv("AUREON_DATABASE_USER") ?: "",
+            password = System.getenv("AUREON_DATABASE_PASSWORD") ?: ""
+        )
+    }
+    val runtimeDatabase = if (sessionAuthenticator == null && databaseSettings != null) {
+        require(databaseSettings.username.isNotBlank() && databaseSettings.password.isNotBlank()) {
+            "AUREON_DATABASE_USER and AUREON_DATABASE_PASSWORD are required when database URL is configured"
+        }
+        DatabasePool(databaseSettings)
+    } else null
+    val effectiveAuthenticator = sessionAuthenticator
+        ?: runtimeDatabase?.let(::PostgresSessionAuthenticator)
+        ?: RejectAllSessionAuthenticator
+    val effectiveReadiness = readinessProbe
+        ?: runtimeDatabase?.let { database -> ReadinessProbe { database.isReady() } }
+        ?: NotReadyProbe
+    val effectiveTrashRepository = trashRepository
+        ?: runtimeDatabase?.let(::PostgresTrashRepository)
+
+    if (runtimeDatabase != null) {
+        environment.monitor.subscribe(ApplicationStopped) { runtimeDatabase.close() }
+    }
+
     install(ContentNegotiation) {
         json(Json {
             ignoreUnknownKeys = false
@@ -39,7 +66,7 @@ fun Application.module(
         bearer("aureon-session") {
             realm = "AUREON"
             authenticate { credentials ->
-                sessionAuthenticator.authenticate(credentials.token)
+                effectiveAuthenticator.authenticate(credentials.token)
                     ?.let { UserIdPrincipal(it.userId) }
             }
         }
@@ -48,7 +75,7 @@ fun Application.module(
     routing {
         get("/health/live") { call.respond(HttpStatusCode.OK, HealthResponse("alive")) }
         get("/health/ready") {
-            if (readinessProbe.isReady()) call.respond(HttpStatusCode.OK, HealthResponse("ready"))
+            if (effectiveReadiness.isReady()) call.respond(HttpStatusCode.OK, HealthResponse("ready"))
             else call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("not_ready"))
         }
 
@@ -58,8 +85,8 @@ fun Application.module(
                 if (principal == null) call.respond(HttpStatusCode.Unauthorized, HealthResponse("unauthorized"))
                 else call.respond(HttpStatusCode.OK, SessionResponse(true, principal.name))
             }
-            if (trashRepository != null) {
-                configureTrashRoutes(trashRepository)
+            if (effectiveTrashRepository != null) {
+                configureTrashRoutes(effectiveTrashRepository)
             }
         }
     }
