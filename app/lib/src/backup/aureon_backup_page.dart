@@ -71,7 +71,9 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
             FilledButton(
               onPressed: () {
                 if (first.text.trim().length < 14 ||
-                    (confirm && first.text != second.text)) return;
+                    (confirm && first.text != second.text)) {
+                  return;
+                }
                 Navigator.pop(dialogContext, first.text);
               },
               child: const Text('Continue'),
