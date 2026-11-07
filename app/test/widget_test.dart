@@ -85,12 +85,16 @@ void main() {
   testWidgets('Files page filters and reveals hidden entries', (tester) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'pickRoot') return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
-      if (call.method == 'listChildren') return [
+      if (call.method == 'pickRoot') {
+        return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
+      }
+      if (call.method == 'listChildren') {
+        return [
         {'id': 'z', 'name': 'zeta.txt', 'isDirectory': false, 'sizeBytes': 20, 'modifiedEpochMs': 1000},
         {'id': 'a', 'name': 'alpha.txt', 'isDirectory': false, 'sizeBytes': 80, 'modifiedEpochMs': 2000},
         {'id': 'h', 'name': '.secret', 'isDirectory': false, 'isHidden': true, 'sizeBytes': 1},
-      ];
+        ];
+      }
       return null;
     });
     await tester.pumpWidget(const MaterialApp(home: AureonFilesPage()));
