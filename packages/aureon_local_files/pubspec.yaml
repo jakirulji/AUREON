@@ -17,6 +17,6 @@ flutter:
     platforms:
       android:
         package: com.aureon.localfiles
-        pluginClass: AureonLocalFilesPlugin
+        pluginClass: AureonLocalFilesPluginCApi
       windows:
         pluginClass: AureonLocalFilesPlugin

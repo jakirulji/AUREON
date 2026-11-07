@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 AUREON_LOCAL_FILES_PLUGIN_EXPORT void
-AureonLocalFilesPluginRegisterWithRegistrar(
+AureonLocalFilesPluginCApiRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
 #ifdef __cplusplus

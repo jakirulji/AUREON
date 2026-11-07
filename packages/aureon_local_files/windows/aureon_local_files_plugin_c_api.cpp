@@ -5,7 +5,7 @@
 
 #include <flutter/plugin_registrar_windows.h>
 
-void AureonLocalFilesPluginRegisterWithRegistrar(
+void AureonLocalFilesPluginCApiRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar) {
   AureonLocalFilesPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarManager::GetInstance()
