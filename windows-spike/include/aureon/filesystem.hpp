@@ -30,6 +30,8 @@ enum class OperationError {
     permission_denied,
     integrity_mismatch,
     hash_unavailable,
+    recycle_bin_unavailable,
+    operation_aborted,
     io_error,
 };
 
@@ -49,9 +51,11 @@ OperationResult rename_entry(const std::filesystem::path& source,
 OperationResult move_entry(const std::filesystem::path& source,
                            const std::filesystem::path& destination_directory);
 
-// Copies a regular file via a temporary sibling, verifies source stability and
-// destination SHA-256, then promotes it without overwriting an existing file.
 OperationResult copy_file_safely(const std::filesystem::path& source,
                                  const std::filesystem::path& destination);
+
+// Uses the Windows shell's undo-capable recycle operation. If recycling fails,
+// the function reports failure and never falls back to permanent deletion.
+OperationResult move_to_recycle_bin(const std::filesystem::path& source);
 
 }  // namespace aureon::filesystem

@@ -29,4 +29,6 @@ jobs:
       - name: Build native adapter
         run: cmake --build windows-spike/build --config Release --parallel
       - name: Run native filesystem tests
+        env:
+          AUREON_RUN_RECYCLE_BIN_INTEGRATION: "1"
         run: ctest --test-dir windows-spike/build -C Release --output-on-failure

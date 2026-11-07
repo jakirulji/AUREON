@@ -2,6 +2,8 @@
 
 #include <Windows.h>
 #include <bcrypt.h>
+#include <shlobj.h>
+#include <shobjidl.h>
 
 #include <algorithm>
 #include <array>
@@ -9,6 +11,11 @@
 #include <iomanip>
 #include <sstream>
 #include <system_error>
+#include <vector>
+
+#ifndef FOFX_RECYCLEONDELETE
+#define FOFX_RECYCLEONDELETE 0x00080000
+#endif
 
 namespace aureon::filesystem {
 namespace {
@@ -45,13 +52,11 @@ bool sha256_file(const std::filesystem::path& path,
     DWORD object_size = 0;
     DWORD bytes_written = 0;
     std::vector<unsigned char> hash_object;
-    bool success = false;
 
     if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0)
         != 0) {
         return false;
     }
-
     if (BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH,
                           reinterpret_cast<PUCHAR>(&object_size),
                           sizeof(object_size), &bytes_written, 0) != 0) {
@@ -67,6 +72,7 @@ bool sha256_file(const std::filesystem::path& path,
     }
 
     std::ifstream input(path, std::ios::binary);
+    bool success = false;
     if (input) {
         std::array<char, 64 * 1024> buffer{};
         bool read_ok = true;
@@ -74,9 +80,8 @@ bool sha256_file(const std::filesystem::path& path,
             input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
             const auto count = input.gcount();
             if (count > 0 &&
-                BCryptHashData(hash,
-                    reinterpret_cast<PUCHAR>(buffer.data()),
-                    static_cast<ULONG>(count), 0) != 0) {
+                BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()),
+                               static_cast<ULONG>(count), 0) != 0) {
                 read_ok = false;
                 break;
             }
@@ -259,7 +264,6 @@ OperationResult copy_file_safely(const std::filesystem::path& source,
         std::filesystem::remove(temporary, cleanup_error);
         return failure(OperationError::hash_unavailable);
     }
-
     if (source_before != source_after || source_after != destination_hash) {
         std::error_code cleanup_error;
         std::filesystem::remove(temporary, cleanup_error);
@@ -274,6 +278,56 @@ OperationResult copy_file_safely(const std::filesystem::path& source,
     }
     return OperationResult{true, OperationError::none, destination,
                            to_hex(destination_hash)};
+}
+
+OperationResult move_to_recycle_bin(const std::filesystem::path& source) {
+    if (!entry_exists(source)) return failure(OperationError::source_missing);
+
+    std::error_code path_error;
+    const auto absolute_source = std::filesystem::absolute(source, path_error);
+    if (path_error) return failure(map_error(path_error));
+
+    const HRESULT init_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const bool uninitialize_com = init_result == S_OK || init_result == S_FALSE;
+    if (FAILED(init_result) && init_result != RPC_E_CHANGED_MODE) {
+        return failure(OperationError::recycle_bin_unavailable);
+    }
+
+    IFileOperation* file_operation = nullptr;
+    IShellItem* shell_item = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&file_operation));
+    if (SUCCEEDED(hr)) {
+        hr = SHCreateItemFromParsingName(absolute_source.c_str(), nullptr,
+                                         IID_PPV_ARGS(&shell_item));
+    }
+    if (SUCCEEDED(hr)) {
+        // FOFX_RECYCLEONDELETE explicitly requests recycling. No permanent-delete fallback.
+        hr = file_operation->SetOperationFlags(FOF_NOCONFIRMATION |
+                                               FOFX_RECYCLEONDELETE);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = file_operation->DeleteItem(shell_item, nullptr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = file_operation->PerformOperations();
+    }
+
+    BOOL aborted = FALSE;
+    if (SUCCEEDED(hr)) {
+        const HRESULT aborted_result = file_operation->GetAnyOperationsAborted(&aborted);
+        if (FAILED(aborted_result)) hr = aborted_result;
+    }
+
+    if (shell_item != nullptr) shell_item->Release();
+    if (file_operation != nullptr) file_operation->Release();
+    if (uninitialize_com) CoUninitialize();
+
+    if (aborted) return failure(OperationError::operation_aborted);
+    if (FAILED(hr)) return failure(OperationError::recycle_bin_unavailable);
+    if (entry_exists(source)) return failure(OperationError::recycle_bin_unavailable);
+
+    return OperationResult{true, OperationError::none, {}, {}};
 }
 
 }  // namespace aureon::filesystem

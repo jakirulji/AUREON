@@ -4,7 +4,7 @@ project(aureon_windows_native LANGUAGES CXX)
 add_library(aureon_filesystem src/filesystem.cpp)
 target_include_directories(aureon_filesystem PUBLIC include)
 target_compile_features(aureon_filesystem PUBLIC cxx_std_20)
-target_link_libraries(aureon_filesystem PRIVATE bcrypt)
+target_link_libraries(aureon_filesystem PRIVATE bcrypt ole32 shell32)
 
 if(MSVC)
   target_compile_options(aureon_filesystem PRIVATE /W4 /permissive- /utf-8)

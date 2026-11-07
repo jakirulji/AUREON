@@ -1,5 +1,6 @@
 #include "aureon/filesystem.hpp"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -85,6 +86,23 @@ int main() {
             root / "Move Target" / "renamed.txt", root / "Copy Target" / "copy.txt").error ==
             aureon::filesystem::OperationError::destination_exists,
         "copy refuses to overwrite an existing destination");
+
+    ok &= require(
+        aureon::filesystem::move_to_recycle_bin(root / "missing-for-recycle-test.txt").error ==
+            aureon::filesystem::OperationError::source_missing,
+        "recycle operation rejects a missing source without touching the shell");
+
+    if (std::getenv("AUREON_RUN_RECYCLE_BIN_INTEGRATION") != nullptr) {
+        const auto disposable = root / "disposable-recycle-test.txt";
+        {
+            std::ofstream file(disposable, std::ios::binary);
+            file << "Disposable AUREON recycle-bin integration fixture";
+        }
+        const auto recycled = aureon::filesystem::move_to_recycle_bin(disposable);
+        ok &= require(recycled.success, "moves a disposable test file to the recycle bin");
+        ok &= require(!fs::exists(disposable),
+                      "recycled test file is no longer at its original path");
+    }
 
     fs::remove_all(root, ec);
     return ok ? 0 : 1;

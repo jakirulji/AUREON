@@ -11,16 +11,16 @@ This is an A0 native foundation, not a complete file manager and not a Cloud Fil
 - Regular-file copy through a temporary sibling; source is preserved and existing destinations are not overwritten.
 - Copy integrity check using Windows CNG SHA-256: hash source before copy, hash it again after copy, hash the temporary destination, and promote only if all digests match.
 - A source that changes while being copied causes the temporary destination to be discarded; the original is never deleted.
-- Tests cover enumeration, rename, move, copy, overwrite rejection, traversal-name rejection and SHA-256 digest output.
+- Windows Shell `IFileOperation` adapter explicitly requests `FOFX_RECYCLEONDELETE`. If the recycle operation fails, the adapter returns an error and never falls back to permanent deletion.
+- Windows CI includes a disposable-file recycle-bin integration check on the ephemeral hosted runner.
 
 ## Deliberately not included yet
 
-- Delete/recycle-bin integration (normal UI deletion must use the Windows shell's undo-capable operation path, never raw permanent deletion).
 - ACL/security descriptor editing and full Windows error-code mapping.
 - Cloud Files API sync-root registration, hydration or dehydration.
 - Shell extensions, Explorer replacement or default-app hijacking.
 
-Keep Windows Explorer available. The next native increment should add an undo-capable recycle-bin adapter and a disposable-user-profile Cloud Files API integration harness.
+Keep Windows Explorer available. Next native work should add a disposable-user-profile Cloud Files API integration harness and shell-compatible status/hydration behavior.
 
 ## Build
 
