@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:aureon_contracts/aureon_contracts.dart';
 
@@ -90,7 +89,7 @@ class AureonMetadataStore {
       if (folder.id != folderId) return folder;
       found = true;
       if (folder.files.any((file) => file.reference.stableKey == reference.stableKey)) return folder;
-      final order = folder.files.isEmpty ? 0 : folder.files.map((file) => file.order).reduce(max) + 1;
+      final order = folder.files.isEmpty ? 0 : folder.files.map((file) => file.order).reduce((a, b) => a > b ? a : b) + 1;
       return AureonMetadataFolder(
         id: folder.id, name: folder.name, order: folder.order,
         folders: folder.folders,
@@ -159,40 +158,25 @@ class AureonMetadataStore {
       if (siblings.any((item) => item.name.toLowerCase() == folder.name.toLowerCase())) {
         throw StateError('A sibling folder already has this name.');
       }
-      final result = [...siblings, _copyFolder(folder, order: siblings.length)];
-      return result;
+      return [...siblings, _copyFolder(folder, order: siblings.length)];
     }
     var found = false;
-    var found = false;
-    final result = siblings.map((item) {
-      if (item.id == parentId) {
-        found = true;
-        if (item.folders.any((child) => child.name.toLowerCase() == folder.name.toLowerCase())) {
-          throw StateError('A sibling folder already has this name.');
-        }
-        return _copyFolder(item, folders: [...item.folders, _copyFolder(folder, order: item.folders.length)]);
-      }
-      return _copyFolder(item, folders: _insertFolderIfPresent(item.folders, folder, parentId, (value) { found = found || value; }));
-    }).toList();
+    List<AureonMetadataFolder> visit(List<AureonMetadataFolder> items) =>
+        items.map((item) {
+          if (item.id == parentId) {
+            found = true;
+            if (item.folders.any((child) => child.name.toLowerCase() == folder.name.toLowerCase())) {
+              throw StateError('A sibling folder already has this name.');
+            }
+            return _copyFolder(item, folders: [
+              ...item.folders,
+              _copyFolder(folder, order: item.folders.length),
+            ]);
+          }
+          return _copyFolder(item, folders: visit(item.folders));
+        }).toList();
+    final result = visit(siblings);
     if (!found) throw StateError('Parent folder not found.');
-    return result;
-  }
-
-  List<AureonMetadataFolder> _insertFolderIfPresent(
-    List<AureonMetadataFolder> siblings, AureonMetadataFolder folder, String parentId, void Function(bool) report,
-  ) {
-    var found = false;
-    final result = siblings.map((item) {
-      if (item.id == parentId) {
-        found = true;
-        if (item.folders.any((child) => child.name.toLowerCase() == folder.name.toLowerCase())) {
-          throw StateError('A sibling folder already has this name.');
-        }
-        return _copyFolder(item, folders: [...item.folders, _copyFolder(folder, order: item.folders.length)]);
-      }
-      return _copyFolder(item, folders: _insertFolderIfPresent(item.folders, folder, parentId, (value) { found = found || value; }));
-    }).toList();
-    report(found);
     return result;
   }
 
