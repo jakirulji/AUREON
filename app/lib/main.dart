@@ -1,4 +1,5 @@
 import 'package:aureon/src/files/aureon_files_page.dart';
+import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
 
 void main() => runApp(const AureonApp());
@@ -76,7 +77,9 @@ class _AureonHomeState extends State<AureonHome> {
 
   Widget _content(bool wide) => selected == 1
       ? const AureonFilesPage()
-      : SingleChildScrollView(
+      : selected == 2
+          ? const AureonVirtualFoldersPage()
+          : SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(wide ? 34 : 20, 22, wide ? 34 : 20, 28),
     child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1180),
