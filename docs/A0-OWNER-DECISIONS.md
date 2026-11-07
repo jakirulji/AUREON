@@ -78,3 +78,14 @@ The following are already recommended or validated and should not be reopened wi
 - Metadata-first Drive inventory preserving parent IDs.
 - Google Photos albums remain distinct from Drive folders.
 - No quota pooling or file sharding to evade provider limits.
+
+
+## Dual recovery requirement — owner-approved (2026-11-08)
+
+- The owner requires two independent recovery paths for the provider credential vault: a manually held random recovery key and a Cloudflare-assisted recovery path.
+- Either path should be sufficient to unwrap the same vault DEK, provided the encrypted vault ciphertext is available.
+- The manual key must never be sent to Cloudflare. It must work locally on a compatible device using an encrypted portable Recovery Bundle or cached encrypted vault snapshot.
+- Cloudflare recovery should remain available if the manual key is lost, using Firebase verified identity and recovery policy.
+- The encrypted Recovery Bundle must be exportable and storable outside Cloudflare. A bundle stored only in D1 is not an independent fallback.
+- The two recovery KEK hierarchies must be cryptographically independent. E2E file-content keys remain separate and client-controlled.
+- Recovery must be tested under Cloudflare outage and manual-key-loss scenarios before production.
