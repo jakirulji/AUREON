@@ -285,8 +285,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   trailing: PopupMenuButton<String>(
                     tooltip: 'Item actions',
                     onSelected: (action) {
-                      if (action == 'rename') _rename(e);
-                      if (action == 'copy' && !e.isDirectory) _copyFile(e);
+                      if (action == 'rename') { _rename(e); }
+                      if (action == 'copy' && !e.isDirectory) { _copyFile(e); }
                     },
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'rename', child: Text('Rename')),
