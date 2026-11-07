@@ -438,7 +438,16 @@ class AureonMetadataRestorePlanner {
         pendingProviderReconciliation: liveReference == null,
       ));
     }
-    result.addAll(currentByKey.values.where((file) => liveProviderFiles == null || liveProviderFiles.containsKey(file.reference.stableKey)));
+    for (final entry in currentByKey.values) {
+      final live = liveProviderFiles?[entry.reference.stableKey];
+      if (liveProviderFiles != null && live == null) continue;
+      result.add(AureonMetadataFileEntry(
+        reference: _withReconciliation(live ?? entry.reference, live != null),
+        order: entry.order, tags: entry.tags, favorite: entry.favorite,
+        customLabel: entry.customLabel,
+        pendingProviderReconciliation: live == null,
+      ));
+    }
     result.sort((a, b) => a.order.compareTo(b.order));
     return result;
   }
@@ -460,7 +469,10 @@ class AureonMetadataRestorePlanner {
       final byKey = <String, ProviderFileReference>{};
       for (final item in [...?existing?.items, ...saved.items]) {
         final live = liveProviderFiles?[item.stableKey];
-        if (liveProviderFiles != null && live == null) continue;
+        if (liveProviderFiles != null && live == null) {
+          conflicts.add('Provider object is no longer present; skipped from virtual folder: ${item.name}.');
+          continue;
+        }
         byKey[item.stableKey] = live ?? item;
       }
       items.addAll(byKey.values);
