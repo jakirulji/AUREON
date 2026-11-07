@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -113,7 +114,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     final uri = await FilePicker.saveFile(
       dialogTitle: 'Save plaintext AUREON recovery keys',
       fileName: 'AUREON-Recovery-Keys.txt',
-      bytes: utf8.encode(set.toPlainText()),
+      bytes: Uint8List.fromList(utf8.encode(set.toPlainText())),
     );
     if (uri != null && mounted) setState(() => _status = 'Plaintext recovery key TXT exported. Keep it offline and protected.');
   });
@@ -127,7 +128,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     final uri = await FilePicker.saveFile(
       dialogTitle: 'Save encrypted AUREON recovery key',
       fileName: 'AUREON-Recovery.key',
-      bytes: bytes,
+      bytes: Uint8List.fromList(bytes),
     );
     if (uri != null && mounted) setState(() => _status = 'Encrypted .key file exported. The passphrase is not stored by AUREON.');
   });
@@ -173,7 +174,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     final uri = await FilePicker.saveFile(
       dialogTitle: 'Save encrypted AUREON metadata backup',
       fileName: 'AUREON-Metadata-Backup.aureon-meta',
-      bytes: bytes,
+      bytes: Uint8List.fromList(bytes),
     );
     if (uri == null) return;
     await _metadataStore.save(snapshot);
