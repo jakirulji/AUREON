@@ -244,3 +244,123 @@ class TransferStateMachine {
     return _allowed[from]?.contains(to) ?? false;
   }
 }
+
+/// Stable identity for a provider-backed object. The provider account and
+/// item IDs—not display names or paths—are the cross-device identity.
+class ProviderFileReference {
+  const ProviderFileReference({
+    required this.provider,
+    required this.providerAccountId,
+    required this.accountLabel,
+    required this.providerItemId,
+    required this.name,
+    this.providerParentId,
+    this.mimeType,
+    this.sizeBytes,
+    this.webUrl,
+  });
+
+  final ProviderKind provider;
+  final String providerAccountId;
+  final String accountLabel;
+  final String providerItemId;
+  final String name;
+  final String? providerParentId;
+  final String? mimeType;
+  final int? sizeBytes;
+  final String? webUrl;
+
+  String get stableKey => '${provider.name}:$providerAccountId:$providerItemId';
+
+  Map<String, Object?> toJson() => {
+    'provider': provider.name,
+    'providerAccountId': providerAccountId,
+    'accountLabel': accountLabel,
+    'providerItemId': providerItemId,
+    'name': name,
+    'providerParentId': providerParentId,
+    'mimeType': mimeType,
+    'sizeBytes': sizeBytes,
+    'webUrl': webUrl,
+  };
+
+  factory ProviderFileReference.fromJson(Map<String, Object?> json) {
+    final providerName = json['provider'] as String?;
+    final provider = ProviderKind.values.where((value) => value.name == providerName).firstOrNull;
+    if (provider == null) throw const FormatException('Unknown provider kind.');
+    final accountId = json['providerAccountId'] as String?;
+    final itemId = json['providerItemId'] as String?;
+    final name = json['name'] as String?;
+    final label = json['accountLabel'] as String?;
+    if ([accountId, itemId, name, label].any((value) => value == null || value.trim().isEmpty)) {
+      throw const FormatException('Provider file identity fields are required.');
+    }
+    return ProviderFileReference(
+      provider: provider,
+      providerAccountId: accountId!,
+      accountLabel: label!,
+      providerItemId: itemId!,
+      name: name!,
+      providerParentId: json['providerParentId'] as String?,
+      mimeType: json['mimeType'] as String?,
+      sizeBytes: json['sizeBytes'] as int?,
+      webUrl: json['webUrl'] as String?,
+    );
+  }
+}
+
+/// AUREON-only logical folder. Membership references remote objects and never
+/// changes provider-native parents or copies remote bytes.
+class AureonVirtualFolder {
+  const AureonVirtualFolder({
+    required this.id,
+    required this.name,
+    required this.createdAtEpochMs,
+    this.items = const [],
+  });
+
+  final String id;
+  final String name;
+  final int createdAtEpochMs;
+  final List<ProviderFileReference> items;
+
+  AureonVirtualFolder add(ProviderFileReference file) {
+    if (items.any((item) => item.stableKey == file.stableKey)) return this;
+    return AureonVirtualFolder(
+      id: id, name: name, createdAtEpochMs: createdAtEpochMs,
+      items: [...items, file],
+    );
+  }
+
+  AureonVirtualFolder remove(String stableKey) => AureonVirtualFolder(
+    id: id, name: name, createdAtEpochMs: createdAtEpochMs,
+    items: items.where((item) => item.stableKey != stableKey).toList(),
+  );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'createdAtEpochMs': createdAtEpochMs,
+    'items': items.map((item) => item.toJson()).toList(),
+  };
+
+  factory AureonVirtualFolder.fromJson(Map<String, Object?> json) {
+    final id = json['id'] as String?;
+    final name = json['name'] as String?;
+    final created = json['createdAtEpochMs'] as int?;
+    final rawItems = json['items'];
+    if (id == null || id.isEmpty || name == null || name.trim().isEmpty || created == null || rawItems is! List) {
+      throw const FormatException('Invalid AUREON virtual folder record.');
+    }
+    return AureonVirtualFolder(
+      id: id,
+      name: name,
+      createdAtEpochMs: created,
+      items: rawItems.map((value) {
+        if (value is! Map) throw const FormatException('Invalid virtual folder item.');
+        return ProviderFileReference.fromJson(value.cast<String, Object?>());
+      }).toList(),
+    );
+  }
+}
+
