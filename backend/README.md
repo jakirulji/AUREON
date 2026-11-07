@@ -8,7 +8,7 @@ This is a disposable A0 architecture spike, **not a production backend**.
 - Modular-monolith starting point.
 - Public liveness endpoint.
 - Protected sample route with an injected session-authentication boundary.
-- Deny-all default authenticator: no real login, JWT issuer, database or provider OAuth is implemented.
+- Deny-all default authenticator: no real Master Account login, JWT issuer, device-key verification or provider OAuth exchange is implemented. PostgreSQL is used only for the tested lease/outbox persistence spike.
 - A KMS data-key port with a test proving KMS failure blocks the credential operation and zeroes the plaintext test key after use. It does not implement cryptography or connect to a real KMS.
 - PostgreSQL/HikariCP pool and a real PostgreSQL compare-and-swap refresh-lease repository with a concurrent two-worker race test.
 - PostgreSQL outbox leasing, stale-lease completion protection and retry/reschedule tests.
@@ -17,7 +17,7 @@ This is a disposable A0 architecture spike, **not a production backend**.
 
 ## Run
 
-Requires JDK 21 and Gradle 9.5+.
+Requires JDK 21 and Gradle 9.9.0 or compatible newer version.
 
 ```bash
 cd backend
@@ -36,4 +36,4 @@ Do not add real secrets, production credentials, provider tokens, KMS key materi
 
 ## Exit status
 
-This spike only starts the Ktor module and exercises the authentication seam. It does **not** close the full ADR-0001 architecture spike or A0.
+This spike validates Ktor HTTP/authentication boundaries, PostgreSQL 18 connectivity and selected lease/outbox transactions, OAuth PKCE primitives and a fake KMS boundary. It does **not** close the full ADR-0001 architecture spike or A0.
