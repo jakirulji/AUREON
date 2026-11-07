@@ -3,6 +3,7 @@ project(aureon_local_files_plugin LANGUAGES CXX)
 
 add_library(aureon_local_files_plugin SHARED
   "aureon_local_files_plugin.cpp"
+  "aureon_local_files_plugin_c_api.cpp"
 )
 apply_standard_settings(aureon_local_files_plugin)
 set_target_properties(aureon_local_files_plugin PROPERTIES
