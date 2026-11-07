@@ -188,11 +188,12 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       final moved = await _files.moveToTrash(root: root, entryId: entry.id, parentId: parent.id);
       final prefs = await SharedPreferences.getInstance();
       final rootKey = base64Url.encode(utf8.encode(root.rootId)).replaceAll('=', '');
-      await prefs.setString('aureon.trash.folder.$rootKey', moved.trashFolderId);
+      if (moved.mode == 'managed') await prefs.setString('aureon.trash.folder.$rootKey', moved.trashFolderId);
       await prefs.setString('aureon.trash.meta.$rootKey.${moved.id}', jsonEncode({
         'originalParentId': moved.originalParentId,
         'originalName': moved.name,
         'trashedAt': moved.trashedAt,
+        'mode': moved.mode,
       }));
       await _load();
       if (mounted) {
@@ -442,11 +443,11 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
           }
         }
       }
-      if (folderId == null) {
-        if (mounted) setState(() { _entries = []; _trashFolderId = null; _loading = false; });
-        return;
-      }
-      final rows = await widget.files.listChildren(root: widget.root, parentId: folderId);
+      final managedRows = folderId == null
+        ? <AureonLocalEntry>[]
+        : await widget.files.listChildren(root: widget.root, parentId: folderId);
+      final systemRows = await widget.files.listSystemTrash(root: widget.root);
+      final rows = <AureonLocalEntry>[...systemRows, ...managedRows];
       if (mounted) setState(() { _entries = rows; _trashFolderId = folderId; _loading = false; });
     } on PlatformException catch (error) {
       if (mounted) setState(() { _error = error.message ?? error.code; _loading = false; });
@@ -457,21 +458,20 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
 
   Future<void> _restore(AureonLocalEntry entry) async {
     final folderId = _trashFolderId;
-    if (folderId == null) return;
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-    final raw = prefs.getString(_metaKey(entry.id));
-    if (raw == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Restore information is missing. The item remains in Trash.'),
-      ));
-      return;
-    }
     try {
-      final meta = jsonDecode(raw) as Map<String, dynamic>;
-      await widget.files.moveEntry(root: widget.root, entryId: entry.id,
-        sourceParentId: folderId, targetParentId: meta['originalParentId'] as String);
-      await prefs.remove(_metaKey(entry.id));
+      if (entry.isSystemTrash) {
+        await widget.files.restoreSystemTrashEntry(root: widget.root, entryId: entry.id);
+      } else {
+        if (folderId == null) throw StateError('AUREON Trash folder is unavailable.');
+        final raw = prefs.getString(_metaKey(entry.id));
+        if (raw == null) throw StateError('Restore information is missing. The item remains in Trash.');
+        final meta = jsonDecode(raw) as Map<String, dynamic>;
+        await widget.files.moveEntry(root: widget.root, entryId: entry.id,
+          sourceParentId: folderId, targetParentId: meta['originalParentId'] as String);
+        await prefs.remove(_metaKey(entry.id));
+      }
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -489,7 +489,7 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
 
   Future<void> _deletePermanently(AureonLocalEntry entry) async {
     final folderId = _trashFolderId;
-    if (folderId == null) return;
+    if (!entry.isSystemTrash && folderId == null) return;
     final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
       title: const Text('Delete permanently?'),
       content: Text('This will permanently delete "${entry.name}". This cannot be undone.'),
@@ -500,9 +500,13 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
     ));
     if (confirmed != true) return;
     try {
-      await widget.files.deleteTrashEntry(root: widget.root, entryId: entry.id, trashFolderId: folderId);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_metaKey(entry.id));
+      if (entry.isSystemTrash) {
+        await widget.files.deleteSystemTrashEntry(root: widget.root, entryId: entry.id);
+      } else {
+        await widget.files.deleteTrashEntry(root: widget.root, entryId: entry.id, trashFolderId: folderId!);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_metaKey(entry.id));
+      }
       await _load();
     } on PlatformException catch (error) {
       if (mounted) {
