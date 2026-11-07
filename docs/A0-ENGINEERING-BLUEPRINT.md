@@ -313,6 +313,7 @@ Base path: `/api/v1`. JSON over HTTPS. Use OpenAPI as the contract source. All a
 - Provider callback completion — backend validates state and performs the provider-approved code exchange; raw codes/verifiers are never persisted.
 - `GET /provider-accounts` and `GET /provider-accounts/{accountId}` — safe account inventory and state only; never return refresh credentials.
 - `POST /provider-accounts/{accountId}/refresh-status` — request a safe broker status check; reauth is isolated to the affected account.
+- `POST /provider-accounts/{accountId}/access-token` — issue a short-lived access token to the authenticated native provider adapter when direct provider API calls require it; refresh tokens never leave the backend vault.
 - `GET /provider-accounts/{accountId}/inventory` — paginated metadata-first provider item index with real parent IDs and resumable cursors.
 - `GET /provider-accounts/{accountId}/albums` — provider-native albums only where supported; albums are not filesystem folders.
 - `DELETE /provider-accounts/{accountId}` — revoke/disconnect authorization without deleting provider content.
