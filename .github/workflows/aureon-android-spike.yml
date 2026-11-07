@@ -47,7 +47,7 @@ jobs:
           gradle-version: "8.13"
       - name: Run Room persistence tests
         working-directory: android-spike
-        run: gradle --no-daemon :storage:testDebugUnitTest
+        run: gradle --no-daemon --stacktrace --info :storage:testDebugUnitTest
       - name: Assemble Android storage module
         working-directory: android-spike
         run: gradle --no-daemon :storage:assembleDebug
