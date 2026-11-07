@@ -10,7 +10,9 @@ void main(){
  tearDown(()=>TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel,null));
  testWidgets('Files page browses a user-selected folder', (tester) async {
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel,(call) async {
-   if(call.method=='pickRoot')return {'rootId':'content://tree/root','rootDocumentId':'root-doc','displayName':'Documents'};
+   if(call.method=='pickRoot') {
+    return {'rootId':'content://tree/root','rootDocumentId':'root-doc','displayName':'Documents'};
+   }
    if(call.method=='listChildren')return [
     {'id':'folder-1','name':'Projects','isDirectory':true},
     {'id':'file-1','name':'notes.txt','isDirectory':false,'sizeBytes':42}

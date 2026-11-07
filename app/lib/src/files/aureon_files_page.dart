@@ -62,7 +62,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
         const SizedBox(height:12),const Text('No folder selected'),
         const SizedBox(height:12),FilledButton.icon(onPressed:_choose,icon:const Icon(Icons.folder_open),label:const Text('Choose folder'))])))
       else Expanded(child:_entries.isEmpty&&!_loading?const Center(child:Text('This folder is empty.')):
-        ListView.separated(itemCount:_entries.length,separatorBuilder:(_,__)=>const Divider(height:1),
+        ListView.separated(itemCount:_entries.length,separatorBuilder:(_,_)=>const Divider(height:1),
           itemBuilder:(context,i){final e=_entries[i];return ListTile(
             leading:Icon(e.isDirectory?Icons.folder_outlined:Icons.insert_drive_file_outlined),
             title:Text(e.name,maxLines:1,overflow:TextOverflow.ellipsis),
