@@ -10,6 +10,7 @@ dependencies:
   aureon_local_files:
     path: ../packages/aureon_local_files
   shared_preferences: ^2.5.3
+  cryptography: ^2.9.0
   aureon_contracts:
     path: ../shared/aureon_contracts
 dev_dependencies:
