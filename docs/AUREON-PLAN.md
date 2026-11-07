@@ -394,6 +394,7 @@ Performance targets must be measured on representative devices and networks; do 
 - [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md) — Kotlin/Ktor modular-monolith recommendation and proof-of-concept gates.
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first recommendation, device-bound sessions and separate recovery domains.
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room as Kotlin-owned source of truth and Pigeon bridge for Flutter.
+- [Android Storage Spike](../android-spike/README.md) — Room transfer checkpoint prototype, WorkManager constraints and cleanup safety tests.
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — credential-vault KMS boundary, deployment requirements and open vendor/region decisions.
 - [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — proposed implementation sequence after A0 exit.
 
