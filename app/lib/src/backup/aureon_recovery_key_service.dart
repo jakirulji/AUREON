@@ -169,6 +169,107 @@ class VaultRecoveryBundle {
   }
 }
 
+
+/// Encrypts credential records with one random per-vault DEK, wraps that DEK
+/// independently under all five manual keys, and restores with any one key.
+class CredentialVaultCryptoService {
+  static final _cipher = AesGcm.with256bits();
+  static final _random = Random.secure();
+  final AureonRecoveryKeyService _recovery = AureonRecoveryKeyService();
+
+  Future<VaultRecoveryBundle> createBundle({
+    required ManualRecoveryKeySet keySet,
+    required List<int> vaultDek,
+    required List<Map<String, Object?>> credentialRecords,
+    Map<String, Object?>? cloudflareEnvelope,
+  }) async {
+    if (vaultDek.length != 32) throw ArgumentError('Vault DEK must be 256 bits.');
+    if (keySet.vaultId.trim().isEmpty || keySet.generation < 1 || keySet.keys.length != 5) {
+      throw const FormatException('Invalid five-key recovery set.');
+    }
+    final encrypted = <Map<String, Object?>>[];
+    for (final record in credentialRecords) {
+      final accountId = record['providerAccountId'];
+      if (accountId is! String || accountId.trim().isEmpty) {
+        throw const FormatException('Credential record requires a stable provider account ID.');
+      }
+      final nonce = _randomBytes(12);
+      final recordVersion = 1;
+      final aad = utf8.encode('AUREON|PROVIDER-CREDENTIAL|v1|${keySet.vaultId}|${keySet.generation}|$accountId|$recordVersion');
+      final box = await _cipher.encrypt(
+        utf8.encode(jsonEncode(record)),
+        secretKey: SecretKey(vaultDek),
+        nonce: nonce,
+        aad: aad,
+      );
+      encrypted.add({
+        'formatVersion': 1,
+        'providerAccountId': accountId,
+        'recordVersion': recordVersion,
+        'cipher': 'AES-256-GCM',
+        'nonce': base64Url.encode(nonce),
+        'cipherText': base64Url.encode(box.cipherText),
+        'mac': base64Url.encode(box.mac.bytes),
+      });
+    }
+    final envelopes = await _recovery.wrapVaultDek(keySet: keySet, vaultDek: vaultDek);
+    return VaultRecoveryBundle(
+      vaultId: keySet.vaultId,
+      generation: keySet.generation,
+      createdAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+      encryptedCredentialRecords: encrypted,
+      manualKeyEnvelopes: envelopes,
+      cloudflareEnvelope: cloudflareEnvelope,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> restoreBundle({
+    required VaultRecoveryBundle bundle,
+    required ManualRecoveryKeySet keySet,
+    required String manualKeyId,
+  }) async {
+    if (bundle.vaultId != keySet.vaultId || bundle.generation != keySet.generation) {
+      throw const FormatException('Recovery key set and Vault Recovery Bundle generation do not match.');
+    }
+    final key = keySet.keys.where((entry) => entry.id == manualKeyId).firstOrNull;
+    if (key == null) throw const FormatException('Selected manual recovery key is not part of this key set.');
+    final envelope = bundle.manualKeyEnvelopes.where((entry) => entry.keyId == manualKeyId).firstOrNull;
+    if (envelope == null) throw const FormatException('No matching wrapped DEK envelope exists for this key.');
+    final dek = await _recovery.unwrapVaultDek(
+      manualKey: key.value,
+      keyId: key.id,
+      vaultId: bundle.vaultId,
+      generation: bundle.generation,
+      envelope: envelope,
+    );
+    final records = <Map<String, Object?>>[];
+    for (final encrypted in bundle.encryptedCredentialRecords) {
+      if (encrypted['formatVersion'] != 1 || encrypted['cipher'] != 'AES-256-GCM' ||
+          encrypted['providerAccountId'] is! String || encrypted['recordVersion'] != 1) {
+        throw const FormatException('Unsupported encrypted provider credential record.');
+      }
+      final accountId = encrypted['providerAccountId'] as String;
+      final nonce = _decodeBase64(_requiredString(encrypted, 'nonce'), expectedLength: 12);
+      final cipherText = _decodeBase64(_requiredString(encrypted, 'cipherText'));
+      final mac = _decodeBase64(_requiredString(encrypted, 'mac'), expectedLength: 16);
+      final aad = utf8.encode('AUREON|PROVIDER-CREDENTIAL|v1|${bundle.vaultId}|${bundle.generation}|$accountId|1');
+      final clear = await _cipher.decrypt(
+        SecretBox(cipherText, nonce: nonce, mac: Mac(mac)),
+        secretKey: SecretKey(dek),
+        aad: aad,
+      );
+      final value = jsonDecode(utf8.decode(clear));
+      if (value is! Map || value['providerAccountId'] != accountId) {
+        throw const FormatException('Decrypted credential record identity mismatch.');
+      }
+      records.add(value.cast<String, Object?>());
+    }
+    return records;
+  }
+
+  List<int> _randomBytes(int count) => List<int>.generate(count, (_) => _random.nextInt(256));
+}
+
 class AureonRecoveryKeyService {
   static const keyCount = 5;
   static const keyBytes = 32;
