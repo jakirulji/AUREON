@@ -307,7 +307,14 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                     if (cursor.moveToFirst()) { name = cursor.getString(0); mime = cursor.getString(1) }
                 } ?: throw IllegalStateException("The selected item cannot be inspected.")
                 val displayName = name ?: throw IllegalStateException("The selected item has no name.")
-                if (displayName == ".AUREON Trash") throw IllegalArgumentException("The Trash folder itself cannot be moved to Trash.")
+                if (displayName == ".AUREON Trash (AUREON)") throw IllegalArgumentException("The Trash folder itself cannot be moved to Trash.")
+                var sourceIsInParent = false
+                resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId),
+                    arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
+                    val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+                    while (cursor.moveToNext()) if (cursor.getString(idCol) == entryId) sourceIsInParent = true
+                } ?: throw IllegalStateException("The source parent cannot be listed.")
+                if (!sourceIsInParent) throw SecurityException("The selected item is not inside the supplied parent folder.")
                 val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootId)
                 var trashId: String? = null
                 resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE),
@@ -316,12 +323,12 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                     val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
                     val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
                     while (cursor.moveToNext()) {
-                        if (cursor.getString(nameCol) == ".AUREON Trash" &&
+                        if (cursor.getString(nameCol) == ".AUREON Trash (AUREON)" &&
                             cursor.getString(mimeCol) == Document.MIME_TYPE_DIR) trashId = cursor.getString(idCol)
                     }
                 } ?: throw IllegalStateException("The selected folder cannot be listed.")
                 if (trashId == null) {
-                    val created = DocumentsContract.createDocument(resolver, rootDoc, Document.MIME_TYPE_DIR, ".AUREON Trash")
+                    val created = DocumentsContract.createDocument(resolver, rootDoc, Document.MIME_TYPE_DIR, ".AUREON Trash (AUREON)")
                         ?: throw UnsupportedOperationException("This provider cannot create AUREON's Trash folder.")
                     trashId = DocumentsContract.getDocumentId(created)
                 }
