@@ -1,20 +1,32 @@
-import 'package:aureon/main.dart';
+import 'dart:io';
+
+import 'package:aureon/src/backup/aureon_metadata_store.dart';
+import 'package:aureon/src/virtual_folders/aureon_virtual_folder_store.dart';
+import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  late Directory root;
+  late AureonVirtualFolderStore store;
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('aureon-virtual-page-test-');
+    store = AureonVirtualFolderStore(
+      metadataStore: AureonMetadataStore(rootDirectory: root, keyStore: _FakeKeyStore()),
+    );
+  });
+  tearDown(() async {
+    if (await root.exists()) await root.delete(recursive: true);
+  });
 
-  testWidgets('Cloud navigation opens persistent virtual folders', (tester) async {
+  testWidgets('Virtual folders page creates a persistent folder', (tester) async {
     tester.view.physicalSize = const Size(900, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const AureonApp());
-    await tester.tap(find.text('Cloud').first);
+    await tester.pumpWidget(MaterialApp(home: AureonVirtualFoldersPage(store: store)));
     await tester.pumpAndSettle();
     expect(find.text('Virtual folders'), findsOneWidget);
     expect(find.textContaining('live cloud account browsing'), findsOneWidget);
@@ -26,4 +38,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Research'), findsOneWidget);
   });
+}
+
+class _FakeKeyStore implements AureonMetadataKeyStore {
+  String? value;
+  @override
+  Future<String?> readKey() async => value;
+  @override
+  Future<void> writeKey(String next) async { value = next; }
 }
