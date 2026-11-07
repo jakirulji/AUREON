@@ -50,6 +50,32 @@ BEGIN
         'AES-256-GCM', 1, 'active', now()
     );
 
+    -- Explicit user consent is mandatory before a credential can become active.
+    BEGIN
+        INSERT INTO provider_credentials(
+            provider_account_id, user_id, encrypted_refresh_envelope,
+            envelope_version, kms_key_reference, kms_key_version,
+            credential_status
+        ) VALUES (
+            p3, u1, decode('aabbdd', 'hex'), 1, 'ci/kms/aureon-test', 'key-v1',
+            'active'
+        );
+        RAISE EXCEPTION 'Unconsented active credential unexpectedly succeeded';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+
+    -- A newly stored but unconsented credential remains reauth-required by default.
+    INSERT INTO provider_credentials(
+        provider_account_id, user_id, encrypted_refresh_envelope,
+        envelope_version, kms_key_reference, kms_key_version
+    ) VALUES (
+        p3, u1, decode('aabbdd', 'hex'), 1, 'ci/kms/aureon-test', 'key-v1'
+    );
+    IF (SELECT credential_status FROM provider_credentials WHERE provider_account_id = p3) <> 'reauth_required' THEN
+        RAISE EXCEPTION 'Unconsented credential did not default to reauth_required';
+    END IF;
+
     INSERT INTO provider_oauth_transactions(
         user_id, device_id, provider, state_sha256, pkce_challenge_sha256,
         callback_mode, redirect_uri, requested_scopes, expires_at
