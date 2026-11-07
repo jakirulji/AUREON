@@ -187,8 +187,8 @@ class PostgresTrashRepository(private val database: DatabasePool) : TrashReposit
                     """
                     INSERT INTO trash_items(user_id, provider_account_id, provider_item_id,
                         original_parent_provider_item_id, trash_mode, trash_container_provider_item_id,
-                        operation_id, created_by_device_id, updated_by_device_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        operation_id, created_by_device_id, updated_by_device_id, provider_outcome_reference)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (user_id, operation_id) DO NOTHING
                     """.trimIndent()
                 ).use { statement ->
@@ -201,6 +201,7 @@ class PostgresTrashRepository(private val database: DatabasePool) : TrashReposit
                     statement.setObject(7, operationId)
                     statement.setObject(8, deviceId)
                     statement.setObject(9, deviceId)
+                    statement.setString(10, request.providerOutcomeReference)
                     statement.executeUpdate()
                 }
                 val response = connection.prepareStatement(
@@ -208,7 +209,7 @@ class PostgresTrashRepository(private val database: DatabasePool) : TrashReposit
                     SELECT id, provider_account_id, provider_item_id, original_parent_provider_item_id,
                            trash_mode, trash_container_provider_item_id, status, trashed_at,
                            restored_at, permanently_deleted_at, row_version, operation_id,
-                           created_by_device_id
+                           created_by_device_id, provider_outcome_reference
                     FROM trash_items WHERE user_id = ? AND operation_id = ?
                     """.trimIndent()
                 ).use { statement ->
@@ -218,7 +219,9 @@ class PostgresTrashRepository(private val database: DatabasePool) : TrashReposit
                         if (!rows.next()) throw IllegalArgumentException("Idempotency operation not found")
                         if (rows.getObject("provider_account_id", UUID::class.java) != accountId ||
                             rows.getString("provider_item_id") != request.providerItemId ||
-                            rows.getString("trash_mode") != request.trashMode) {
+                            rows.getString("trash_mode") != request.trashMode ||
+                            rows.getString("provider_outcome_reference") != request.providerOutcomeReference ||
+                            rows.getObject("created_by_device_id", UUID::class.java) != deviceId) {
                             throw IllegalArgumentException("Idempotency key reused with different request")
                         }
                         rows.toTrashResponse()
@@ -251,7 +254,7 @@ class PostgresTrashRepository(private val database: DatabasePool) : TrashReposit
                     UPDATE trash_items t
                     SET status = ?, restored_at = CASE WHEN ? = 'restored' THEN now() ELSE NULL END,
                         permanently_deleted_at = CASE WHEN ? = 'permanently_deleted' THEN now() ELSE NULL END,
-                        updated_by_device_id = ?, updated_at = now(), row_version = row_version + 1
+                        updated_by_device_id = ?, provider_outcome_reference = ?, updated_at = now(), row_version = row_version + 1
                     WHERE t.user_id = ? AND t.id = ? AND t.status = 'trashed'
                       AND t.row_version = ?
                       AND EXISTS (SELECT 1 FROM devices d WHERE d.user_id = ? AND d.id = ?)
@@ -264,11 +267,12 @@ class PostgresTrashRepository(private val database: DatabasePool) : TrashReposit
                     statement.setString(2, targetStatus)
                     statement.setString(3, targetStatus)
                     statement.setObject(4, deviceId)
-                    statement.setObject(5, userId)
-                    statement.setObject(6, trashItemId)
-                    statement.setLong(7, request.expectedRowVersion)
-                    statement.setObject(8, userId)
-                    statement.setObject(9, deviceId)
+                    statement.setString(5, request.providerOutcomeReference)
+                    statement.setObject(6, userId)
+                    statement.setObject(7, trashItemId)
+                    statement.setLong(8, request.expectedRowVersion)
+                    statement.setObject(9, userId)
+                    statement.setObject(10, deviceId)
                     statement.executeQuery().use { rows -> if (rows.next()) rows.toTrashResponse() else null }
                 }
                 connection.commit()
