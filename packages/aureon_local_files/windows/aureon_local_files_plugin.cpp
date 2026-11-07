@@ -4,11 +4,14 @@
 #include <flutter/standard_method_codec.h>
 
 #include <windows.h>
+#include <bcrypt.h>
 #include <shellapi.h>
 #include <shobjidl.h>
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <array>
+#include <fstream>
 #include <cstdint>
 #include <chrono>
 #include <filesystem>
@@ -128,6 +131,72 @@ bool ValidLeafName(const std::string& name) {
       name.find_first_of("<>:\"|?*") == std::string::npos &&
       name.back() != '.' && name.back() != ' ';
 }
+bool HashFileSha256(const std::filesystem::path& path, std::array<unsigned char, 32>* digest) {
+  BCRYPT_ALG_HANDLE algorithm = nullptr; BCRYPT_HASH_HANDLE hash = nullptr;
+  DWORD object_size = 0, returned = 0, hash_size = 0; std::vector<unsigned char> object;
+  bool ok = false;
+  if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0) return false;
+  if (BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&object_size), sizeof(object_size), &returned, 0) < 0 ||
+      BCryptGetProperty(algorithm, BCRYPT_HASH_LENGTH, reinterpret_cast<PUCHAR>(&hash_size), sizeof(hash_size), &returned, 0) < 0 ||
+      hash_size != digest->size()) goto cleanup;
+  object.resize(object_size);
+  if (BCryptCreateHash(algorithm, &hash, object.data(), object_size, nullptr, 0, 0) < 0) goto cleanup;
+  {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) goto cleanup;
+    std::array<char, 262144> buffer{};
+    while (input) {
+      input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+      const auto count = input.gcount();
+      if (count > 0 && BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()), static_cast<ULONG>(count), 0) < 0) goto cleanup;
+    }
+    if (!input.eof()) goto cleanup;
+  }
+  ok = BCryptFinishHash(hash, digest->data(), static_cast<ULONG>(digest->size()), 0) >= 0;
+cleanup:
+  if (hash) BCryptDestroyHash(hash);
+  BCryptCloseAlgorithmProvider(algorithm, 0);
+  return ok;
+}
+
+void CopyFileVerified(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  const auto* root = GetString(args, "rootId"); const auto* source_arg = GetString(args, "sourceId");
+  const auto* parent_arg = GetString(args, "parentId"); const auto* name = GetString(args, "targetName");
+  if (!root || !source_arg || !parent_arg || !name || !ValidLeafName(*name)) {
+    result->Error("invalid_arguments", "A valid source, destination folder and file name are required."); return;
+  }
+  std::error_code ec;
+  const auto base = std::filesystem::canonical(PathFromUtf8(*root), ec);
+  if (ec) { result->Error("invalid_root", "Selected root unavailable."); return; }
+  const auto source_input = std::filesystem::absolute(PathFromUtf8(*source_arg), ec).lexically_normal();
+  if (ec) { result->Error("not_found", "Source unavailable."); return; }
+  const auto source_parent = std::filesystem::canonical(source_input.parent_path(), ec);
+  if (ec || !IsWithinRoot(base, source_parent)) { result->Error("outside_root", "Source outside selected root."); return; }
+  const auto source_status = std::filesystem::symlink_status(source_input, ec);
+  if (ec || std::filesystem::is_symlink(source_status) || !std::filesystem::is_regular_file(source_status)) {
+    result->Error("unsupported_item", "Only regular files can be copied; links and folders are not supported."); return;
+  }
+  const auto source = std::filesystem::canonical(source_input, ec);
+  const auto parent = std::filesystem::canonical(PathFromUtf8(*parent_arg), ec);
+  if (ec || !IsWithinRoot(base, parent) || !std::filesystem::is_directory(parent, ec) || ec) {
+    result->Error("outside_root", "Destination outside selected root."); return;
+  }
+  const auto target = parent / PathFromUtf8(*name);
+  if (std::filesystem::exists(target, ec) || ec) { result->Error("conflict", "Name already exists; nothing overwritten."); return; }
+  const auto temp = parent / PathFromUtf8(".aureon-copy-" + std::to_string(GetCurrentProcessId()) + "-" +
+      std::to_string(GetTickCount64()) + ".partial");
+  std::array<unsigned char, 32> before{}, after{}, copied{};
+  if (!HashFileSha256(source, &before)) { result->Error("hash_failed", "Could not hash source."); return; }
+  if (!CopyFileW(source.c_str(), temp.c_str(), TRUE)) { result->Error("copy_failed", "Could not create temporary copy."); return; }
+  if (!HashFileSha256(source, &after) || !HashFileSha256(temp, &copied) || before != after || before != copied) {
+    std::filesystem::remove(temp, ec); result->Error("verification_failed", "SHA-256 verification failed; source preserved."); return;
+  }
+  std::filesystem::rename(temp, target, ec);
+  if (ec) { std::filesystem::remove(temp, ec); result->Error("finalize_failed", "Verified copy could not be finalized."); return; }
+  const auto value = target.u8string();
+  result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
+}
+
 void RenameEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   const auto* root = GetString(args, "rootId");
   const auto* entry = GetString(args, "entryId");
@@ -274,6 +343,7 @@ void AureonLocalFilesPlugin::HandleMethodCall(
     ListChildren(args, std::move(result));
     return;
   }
+  if (call.method_name() == "copyFile") { CopyFileVerified(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return; }
   if (call.method_name() == "renameEntry") {
     RenameEntry(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return;
   }

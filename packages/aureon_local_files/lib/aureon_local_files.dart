@@ -77,6 +77,14 @@ class AureonLocalFiles {
     return AureonLocalRoot.fromMap(value);
   }
 
+  Future<String> copyFile({required AureonLocalRoot root, required String sourceId, required String parentId, required String targetName}) async {
+    final value = await _channel.invokeMethod<Object?>('copyFile', <String, Object?>{
+      'rootId': root.rootId, 'sourceId': sourceId, 'parentId': parentId, 'targetName': targetName,
+    });
+    if (value is! String || value.isEmpty) throw const FormatException('Native copy returned an invalid identity.');
+    return value;
+  }
+
   Future<String> renameEntry({required AureonLocalRoot root, required String entryId, required String newName}) async {
     final value = await _channel.invokeMethod<Object?>('renameEntry', <String, Object?>{
       'rootId': root.rootId, 'entryId': entryId, 'newName': newName,

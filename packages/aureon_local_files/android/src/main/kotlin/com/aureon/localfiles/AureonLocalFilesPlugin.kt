@@ -5,6 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import android.os.Handler
+import android.os.Looper
+import java.security.MessageDigest
+import java.util.UUID
+import java.nio.file.FileAlreadyExistsException
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -51,6 +56,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "listChildren" -> listChildren(call, result)
             "openFile" -> openFile(call, result)
             "renameEntry" -> renameEntry(call, result)
+            "copyFile" -> copyFile(call, result)
             "createFolder" -> createFolder(call, result)
             else -> result.notImplemented()
         }
@@ -113,6 +119,85 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         )
         return resolver.query(documentUri, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }
+
+    private fun copyFile(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val sourceId = call.argument<String>("sourceId")
+        val parentId = call.argument<String>("parentId")
+        val targetName = call.argument<String>("targetName")?.trim()
+        if (root.isNullOrBlank() || sourceId.isNullOrBlank() || parentId.isNullOrBlank() ||
+            targetName.isNullOrBlank() || targetName == "." || targetName == ".." ||
+            targetName.contains("/") || targetName.contains("\\")) {
+            result.error("invalid_arguments", "A valid source, destination folder and file name are required.", null); return
+        }
+        val resolver = activityBinding?.activity?.contentResolver
+        if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
+        Thread {
+            var temporary: Uri? = null
+            try {
+                val treeUri = Uri.parse(root)
+                val source = DocumentsContract.buildDocumentUriUsingTree(treeUri, sourceId)
+                val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentId)
+                val rootDocument = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
+                if (!DocumentsContract.isChildDocument(resolver, rootDocument, source) ||
+                    (parentId != DocumentsContract.getTreeDocumentId(treeUri) &&
+                     !DocumentsContract.isChildDocument(resolver, rootDocument, parent))) {
+                    throw SecurityException("Source or destination is outside the selected folder.")
+                }
+                val sourceMime = resolver.getType(source)
+                if (sourceMime == null || sourceMime == Document.MIME_TYPE_DIR) {
+                    throw IllegalArgumentException("Only regular files can be copied in this operation.")
+                }
+                resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId),
+                    arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    val col = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+                    while (cursor.moveToNext()) if (cursor.getString(col).equals(targetName, ignoreCase = true))
+                        throw FileAlreadyExistsException("An item with that name already exists. Nothing was overwritten.")
+                } ?: throw IllegalStateException("Destination folder cannot be listed.")
+                temporary = DocumentsContract.createDocument(resolver, parent, sourceMime,
+                    ".aureon-copy-" + UUID.randomUUID().toString() + ".partial")
+                    ?: throw IllegalStateException("Provider cannot create a temporary copy.")
+                val sourceHash = MessageDigest.getInstance("SHA-256")
+                resolver.openInputStream(source)?.use { input ->
+                    resolver.openOutputStream(temporary, "w")?.use { output ->
+                        val buffer = ByteArray(256 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            sourceHash.update(buffer, 0, count)
+                            output.write(buffer, 0, count)
+                        }
+                        output.flush()
+                    } ?: throw IllegalStateException("Cannot write the temporary copy.")
+                } ?: throw IllegalStateException("Cannot read the source file.")
+                val copiedHash = MessageDigest.getInstance("SHA-256")
+                resolver.openInputStream(temporary)?.use { input ->
+                    val buffer = ByteArray(256 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        copiedHash.update(buffer, 0, count)
+                    }
+                } ?: throw IllegalStateException("Cannot read back the temporary copy.")
+                if (!MessageDigest.isEqual(sourceHash.digest(), copiedHash.digest()))
+                    throw IllegalStateException("SHA-256 verification failed. The source was preserved.")
+                val finalized = DocumentsContract.renameDocument(resolver, temporary, targetName)
+                    ?: throw UnsupportedOperationException("Provider cannot finalize the verified copy.")
+                temporary = null
+                Handler(Looper.getMainLooper()).post { result.success(DocumentsContract.getDocumentId(finalized)) }
+            } catch (error: Exception) {
+                temporary?.let { try { DocumentsContract.deleteDocument(resolver, it) } catch (_: Exception) { } }
+                val code = when (error) {
+                    is SecurityException -> "permission_denied"
+                    is FileAlreadyExistsException -> "conflict"
+                    is UnsupportedOperationException -> "unsupported"
+                    is IllegalArgumentException -> "unsupported_item"
+                    else -> "copy_failed"
+                }
+                Handler(Looper.getMainLooper()).post { result.error(code, error.message ?: "Copy failed; source preserved.", null) }
+            }
+        }.start()
     }
 
     private fun renameEntry(call: MethodCall, result: MethodChannel.Result) {
