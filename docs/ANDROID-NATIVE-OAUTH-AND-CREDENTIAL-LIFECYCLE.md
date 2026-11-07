@@ -54,7 +54,7 @@ Do not assume one callback pattern works for every provider. Record the selected
 
 Flutter calls a typed provider-authorization repository. Kotlin owns browser handoff, Android callback delivery and platform-specific secure operations. AUREON backend owns OAuth transaction coordination and the credential-vault broker where the selected provider flow permits it.
 
-Never expose raw provider tokens to Flutter widgets or arbitrary MethodChannel calls. Flutter receives only safe state: internal account ID, provider, masked account label, granted-scope summary, connection state, reauth state and safe timestamps. Provider access tokens should be short-lived and held only in the narrowest process/service boundary needed for API calls.
+Never expose raw provider tokens to Flutter widgets or arbitrary MethodChannel calls. Flutter receives only safe state: internal account ID, provider, masked account label, granted-scope summary, connection state, reauth state and safe timestamps. Because direct client-to-provider transfers and metadata calls may require bearer authorization, the credential broker may issue a short-lived access token to the authenticated Kotlin provider adapter over TLS for a specific operation. The token stays in native process memory, is never persisted, logged or returned to Flutter UI, and expires quickly. Refresh tokens are never returned to any client.
 
 ## 3. Credential storage decision
 
@@ -146,7 +146,7 @@ AUREON must not read Gmail, scrape authenticator apps, collect OTPs/TOTP seeds, 
 - Store only a hash of OAuth state for lookup/validation; never store raw state beyond the active request context.
 - Protect any server-held PKCE verifier as a short-lived encrypted transaction secret; delete it on success, cancellation or expiry.
 - Never persist raw authorization codes. Exchange them immediately and consume the transaction once.
-- Keep access tokens in broker memory only for the duration needed; do not persist them unless a provider-specific protocol and reviewed design proves it necessary.
+- Keep refresh tokens exclusively in the backend vault. The broker may return a short-lived access token to the authenticated native provider adapter when direct provider API access requires it; scope it to the granted provider permissions, keep it in Kotlin process memory only, never persist/log it, and never expose it to Flutter widgets. Do not return refresh tokens to clients.
 - Do not put provider credentials, codes, PKCE verifiers or session URLs in outbox payloads, generic audit details, error messages or telemetry.
 - Enforce short transaction TTL, replay rejection, rate limits, callback allowlists and CSRF/state validation.
 
