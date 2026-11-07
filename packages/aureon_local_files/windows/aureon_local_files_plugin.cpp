@@ -32,6 +32,11 @@ std::string Utf8(const std::wstring& value) {
   return output;
 }
 
+std::filesystem::path PathFromUtf8(const std::string& value) {
+  const auto* begin = reinterpret_cast<const char8_t*>(value.data());
+  return std::filesystem::path(std::u8string(begin, begin + value.size()));
+}
+
 std::wstring Wide(const std::string& value) {
   if (value.empty()) return {};
   const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
@@ -97,9 +102,9 @@ void OpenFile(const EncodableMap* args,
   const auto* file = GetString(args, "fileId");
   if (!root || !file || root->empty() || file->empty()) { result->Error("invalid_arguments", "rootId and fileId are required."); return; }
   std::error_code ec;
-  const auto canonical_root = std::filesystem::weakly_canonical(std::filesystem::u8path(*root), ec);
+  const auto canonical_root = std::filesystem::weakly_canonical(PathFromUtf8(*root), ec);
   if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
-  const auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(*file), ec);
+  const auto path = std::filesystem::weakly_canonical(PathFromUtf8(*file), ec);
   if (ec) { result->Error("not_found", "The selected file is unavailable."); return; }
   const auto relative = path.lexically_relative(canonical_root);
   if (relative.empty() || relative.is_absolute() || (!relative.empty() && *relative.begin() == std::filesystem::path(".."))) {
@@ -122,7 +127,7 @@ void ListChildren(const EncodableMap* args,
   std::error_code ec;
   const auto canonical_root = std::filesystem::weakly_canonical(std::filesystem::u8path(*root), ec);
   if (ec) { result->Error("invalid_root", "The selected root is no longer accessible."); return; }
-  const auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(*parent), ec);
+  const auto path = std::filesystem::weakly_canonical(PathFromUtf8(*parent), ec);
   if (ec) { result->Error("not_a_directory", "The selected path is not accessible."); return; }
   const auto relative = path.lexically_relative(canonical_root);
   if (relative.empty() || relative.is_absolute() ||
@@ -158,7 +163,9 @@ void ListChildren(const EncodableMap* args,
     };
     const auto modified = it->last_write_time(ec);
     if (!ec) {
-      const auto system_time = decltype(modified)::clock::to_sys(modified);
+      const auto system_time = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+          modified - std::filesystem::file_time_type::clock::now() +
+          std::chrono::system_clock::now());
       const auto epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch()).count();
       map.emplace(EncodableValue("modifiedEpochMs"), EncodableValue(static_cast<int64_t>(epoch_ms)));
     }
