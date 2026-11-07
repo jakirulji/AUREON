@@ -38,6 +38,8 @@ dependencies {
     kapt("androidx.room:room-compiler:2.8.5")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
 
+    compileOnly(files("${System.getenv("FLUTTER_ROOT")}/bin/cache/artifacts/engine/android-arm64/flutter.jar"))
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.room:room-testing:2.8.5")
     testImplementation("androidx.test:core:1.7.0")
