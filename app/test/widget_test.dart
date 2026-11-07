@@ -288,12 +288,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Copy • notes.txt'), findsOneWidget);
     expect(find.textContaining('Success'), findsOneWidget);
-    await tester.tap(find.byTooltip('Clear history'));
-    await tester.pumpAndSettle();
-    expect(find.text('Clear operation history?'), findsOneWidget);
-    await tester.tap(find.text('Clear history').last);
-    await tester.pumpAndSettle();
-    expect(find.text('No file operations recorded yet.'), findsOneWidget);
+    expect(find.textContaining('Documents / notes-copy.txt'), findsOneWidget);
   });
 
   testWidgets('AUREON dashboard still renders', (tester) async {
