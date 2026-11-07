@@ -16,6 +16,10 @@ on:
       - ".github/workflows/aureon-app-preview.yml"
   workflow_dispatch:
 
+concurrency:
+  group: aureon-app-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
