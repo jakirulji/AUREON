@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -174,8 +175,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Move to Trash?'),
-        content: Text('Move "${entry.name}" to the system Recycle Bin/Trash? It may be recoverable there.'),
+        title: const Text('Move to AUREON Trash?'),
+        content: Text('Move "${entry.name}" to AUREON Trash? You can restore it later. The original file will not be permanently deleted.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Move to Trash')),
@@ -184,20 +185,37 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     );
     if (confirmed != true) return;
     try {
-      await _files.moveToTrash(root: root, entryId: entry.id, parentId: parent.id);
+      final moved = await _files.moveToTrash(root: root, entryId: entry.id, parentId: parent.id);
+      final prefs = await SharedPreferences.getInstance();
+      final rootKey = root.rootId.hashCode;
+      await prefs.setString('aureon.trash.folder.$rootKey', moved.trashFolderId);
+      await prefs.setString('aureon.trash.meta.$rootKey.${moved.id}', jsonEncode({
+        'originalParentId': moved.originalParentId,
+        'originalName': moved.name,
+        'trashedAt': moved.trashedAt,
+      }));
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Moved to the Windows Recycle Bin. Restore it there if needed.')),
+          const SnackBar(content: Text('Moved to AUREON Trash. Original data is preserved.')),
         );
       }
     } on PlatformException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? error.code)),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? error.code)),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
     }
+  }
+
+  Future<void> _openTrash() async {
+    final root = _root;
+    if (root == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => AureonTrashPage(root: root, files: _files),
+    ));
+    await _load();
   }
 
   Future<void> _rename(AureonLocalEntry entry) async {
@@ -260,7 +278,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   }
   List<AureonLocalEntry> get _visibleEntries {
     final q = _searchController.text.trim().toLowerCase();
-    final rows = _entries.where((e) => (_showHidden || !e.isHidden) &&
+    final rows = _entries.where((e) => e.name != '.AUREON Trash' && (_showHidden || !e.isHidden) &&
       (q.isEmpty || e.name.toLowerCase().contains(q))).toList();
     rows.sort((a, b) {
       if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
@@ -296,6 +314,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           const Expanded(child: Text('Files', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
+          if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
           OutlinedButton.icon(onPressed: _loading ? null : _choose,
             icon: const Icon(Icons.create_new_folder_outlined), label: const Text('Choose folder')),
         ]),
@@ -379,4 +398,128 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       ],
     ));
   }
+}
+
+
+class AureonTrashPage extends StatefulWidget {
+  const AureonTrashPage({super.key, required this.root, required this.files});
+  final AureonLocalRoot root;
+  final AureonLocalFiles files;
+
+  @override
+  State<AureonTrashPage> createState() => _AureonTrashPageState();
+}
+
+class _AureonTrashPageState extends State<AureonTrashPage> {
+  List<AureonLocalEntry> _entries = [];
+  String? _trashFolderId;
+  bool _loading = true;
+  String? _error;
+
+  String get _rootKey => widget.root.rootId.hashCode.toString();
+  String _metaKey(String id) => 'aureon.trash.meta.$_rootKey.$id';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var folderId = prefs.getString('aureon.trash.folder.$_rootKey');
+      if (folderId == null) {
+        final roots = await widget.files.listChildren(root: widget.root, parentId: widget.root.rootDocumentId);
+        for (final entry in roots) {
+          if (entry.name == '.AUREON Trash' && entry.isDirectory) {
+            folderId = entry.id;
+            await prefs.setString('aureon.trash.folder.$_rootKey', folderId);
+            break;
+          }
+        }
+      }
+      if (folderId == null) {
+        if (mounted) setState(() { _entries = []; _trashFolderId = null; _loading = false; });
+        return;
+      }
+      final rows = await widget.files.listChildren(root: widget.root, parentId: folderId);
+      if (mounted) setState(() { _entries = rows; _trashFolderId = folderId; _loading = false; });
+    } on PlatformException catch (error) {
+      if (mounted) setState(() { _error = error.message ?? error.code; _loading = false; });
+    } catch (error) {
+      if (mounted) setState(() { _error = error.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _restore(AureonLocalEntry entry) async {
+    final folderId = _trashFolderId;
+    if (folderId == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_metaKey(entry.id));
+    if (raw == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Restore information is missing. The item remains in Trash.')));
+      return;
+    }
+    try {
+      final meta = jsonDecode(raw) as Map<String, dynamic>;
+      await widget.files.moveEntry(root: widget.root, entryId: entry.id,
+        sourceParentId: folderId, targetParentId: meta['originalParentId'] as String);
+      await prefs.remove(_metaKey(entry.id));
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Restored "${entry.name}" to its original folder.')));
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? error.code)));
+    }
+  }
+
+  Future<void> _deletePermanently(AureonLocalEntry entry) async {
+    final folderId = _trashFolderId;
+    if (folderId == null) return;
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete permanently?'),
+      content: Text('This will permanently delete "${entry.name}". This cannot be undone.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Delete permanently')),
+      ],
+    ));
+    if (confirmed != true) return;
+    try {
+      await widget.files.deleteTrashEntry(root: widget.root, entryId: entry.id, trashFolderId: folderId);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_metaKey(entry.id));
+      await _load();
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? error.code)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('AUREON Trash'), actions: [
+      IconButton(tooltip: 'Refresh', onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
+    ]),
+    body: _loading ? const Center(child: CircularProgressIndicator())
+      : _error != null ? Center(child: Text(_error!))
+      : _entries.isEmpty ? const Center(child: Text('Trash is empty'))
+      : ListView.separated(itemCount: _entries.length, separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final entry = _entries[index];
+          return ListTile(
+            leading: Icon(entry.isDirectory ? Icons.folder_delete_outlined : Icons.delete_outline),
+            title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text(entry.sizeBytes == null ? 'In AUREON Trash' : '${(entry.sizeBytes! / 1024).toStringAsFixed(1)} KB'),
+            trailing: Wrap(mainAxisSize: MainAxisSize.min, spacing: 4, children: [
+              IconButton(tooltip: 'Restore', onPressed: () => _restore(entry), icon: const Icon(Icons.restore)),
+              IconButton(tooltip: 'Delete permanently', onPressed: () => _deletePermanently(entry), icon: const Icon(Icons.delete_forever_outlined)),
+            ]),
+          );
+        }),
+  );
 }
