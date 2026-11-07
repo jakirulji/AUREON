@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:aureon/src/backup/aureon_metadata_backup.dart';
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,6 +83,15 @@ void main() {
       codec.decrypt(bytes, 'incorrect-independent-passphrase'),
       throwsA(anything),
     );
+    final envelope = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+    final header = Map<String, dynamic>.from(envelope['header'] as Map);
+    header['memoryKiB'] = 1;
+    final unsafeParameters = utf8.encode(jsonEncode({...envelope, 'header': header}));
+    await expectLater(codec.decrypt(unsafeParameters, 'independent-metadata-backup-passphrase'), throwsFormatException);
+    final tampered = Map<String, dynamic>.from(envelope);
+    final mac = tampered['mac'] as String;
+    tampered['mac'] = '${mac.substring(0, mac.length - 1)}${mac.endsWith('A') ? 'B' : 'A'}';
+    await expectLater(codec.decrypt(utf8.encode(jsonEncode(tampered)), 'independent-metadata-backup-passphrase'), throwsA(anything));
   });
 
   test('restore keeps exact backup tree and marks provider references pending', () {
@@ -110,6 +121,8 @@ void main() {
     );
     expect(result.snapshot.virtualFolders.single.items, hasLength(1));
     expect(result.snapshot.virtualFolders.single.items.single.providerItemId, 'provider-item-01');
+    expect(result.snapshot.virtualFolders.single.items.single.name, 'current-name.pdf');
+    expect(result.snapshot.rootFolders.single.folders.single.files.single.reference.name, 'current-name.pdf');
     expect(result.pendingProviderReferences, 0);
   });
 }
