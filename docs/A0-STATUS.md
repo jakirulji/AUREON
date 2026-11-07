@@ -117,3 +117,14 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - Added `app/lib/src/files/aureon_trash_sync_client.dart`: HTTPS-only authenticated transport contract, concrete Dart `HttpClient` adapter, provider-backed Trash list/create/restore/purge requests, provider-outcome-reference requirement, and HTTP 409 stale-state conflict mapping.
 - Added Dart tests for authenticated listing, provider receipt requirement, HTTPS enforcement and no-session fail-closed behavior.
 - This client is not yet wired into the Trash page because the app does not yet have a production Master Account session/token provider or deployed API base URL. It does not sync device-local SAF/Win32 Trash.
+
+
+## Master Account session and provider Trash runtime wiring (2026-11-08)
+
+- Added `PostgresSessionAuthenticator`: hashes opaque bearer tokens with SHA-256 and validates the hash against `sessions`, active user and active device rows, expiry and revocation on each request. It updates last-used time and never stores or logs the raw token.
+- `Application.module()` now wires the PostgreSQL session authenticator and `PostgresTrashRepository` when `AUREON_DATABASE_URL`, `AUREON_DATABASE_USER` and `AUREON_DATABASE_PASSWORD` are supplied. Without DB configuration, authentication remains deny-all and readiness remains not-ready. The DB pool is closed on application shutdown.
+- Added `ProviderAccessTokenBroker` as an isolated, fail-closed boundary. The default implementation deliberately refuses provider operations until a separate reviewed credential-broker workload is deployed. It must decrypt the user's consented refresh credential via managed KMS/HSM, refresh provider tokens, and expose only a short-lived access token within a scoped callback.
+- Fixed Google Drive adapter URL interpolation so provider item IDs are URL-encoded and interpolated rather than sent as a literal placeholder.
+- App Trash client supports an injected AUREON session-token provider and concrete HTTPS transport, but it is not yet mounted in the Files/Trash UI. The app still has no Master Account login/session lifecycle, and no deployed API base URL or credential-broker endpoint.
+- Important: the current Trash record API accepts provider outcome references from an authenticated client. Before production enablement, move provider mutations behind a backend coordinator that obtains provider credentials from the isolated broker and records only backend-confirmed receipts; do not treat client-supplied receipt strings as proof of provider mutation.
+- No production KMS/HSM integration, OAuth refresh implementation, provider operation coordinator, production deployment, or live Google Drive test has been completed. CI success proves compilation/schema tests only, not end-to-end cross-device sync.
