@@ -125,24 +125,27 @@ class VaultRecoveryBundle {
     final parsedRecords = records.map((entry) {
       if (entry is! Map) throw const FormatException('Invalid encrypted credential record.');
       final record = entry.cast<String, Object?>();
-      if (record.containsKey('accessToken') || record.containsKey('refreshToken') ||
-          record.containsKey('password') || record.containsKey('plaintext')) {
-        throw const FormatException('Plaintext credential fields are forbidden in a recovery bundle.');
-      }
+      _rejectPlaintextSecrets(record);
       return record;
     }).toList();
+    final parsedEnvelopes = envelopes.map((entry) {
+      if (entry is! Map) throw const FormatException('Invalid manual key envelope.');
+      return ManualKeyEnvelope.fromJson(entry.cast<String, Object?>());
+    }).toList();
+    if (parsedEnvelopes.map((entry) => entry.keyId).toSet().length != keyCount) {
+      throw const FormatException('Recovery bundle manual key envelope IDs must be unique.');
+    }
+    final cloudflare = json['cloudflareEnvelope'] is Map
+        ? (json['cloudflareEnvelope'] as Map).cast<String, Object?>()
+        : null;
+    if (cloudflare != null) _rejectPlaintextSecrets(cloudflare);
     return VaultRecoveryBundle(
       vaultId: _requiredString(json, 'vaultId'),
       generation: _requiredInt(json, 'generation'),
       createdAtEpochMs: _requiredInt(json, 'createdAtEpochMs'),
       encryptedCredentialRecords: parsedRecords,
-      manualKeyEnvelopes: envelopes.map((entry) {
-        if (entry is! Map) throw const FormatException('Invalid manual key envelope.');
-        return ManualKeyEnvelope.fromJson(entry.cast<String, Object?>());
-      }).toList(),
-      cloudflareEnvelope: json['cloudflareEnvelope'] is Map
-          ? (json['cloudflareEnvelope'] as Map).cast<String, Object?>()
-          : null,
+      manualKeyEnvelopes: parsedEnvelopes,
+      cloudflareEnvelope: cloudflare,
     );
   }
 }
@@ -390,4 +393,23 @@ List<int> _decodeBase64(String value, {int? expectedLength}) {
     throw const FormatException('Invalid encoded field length.');
   }
   return decoded;
+}
+
+
+void _rejectPlaintextSecrets(Object? value) {
+  const forbidden = {
+    'accesstoken', 'refreshtoken', 'password', 'clientsecret',
+    'manualrecoverykey', 'recoverykey', 'dek', 'plaintext',
+    'privatekey', 'workersecret', 'passphrase',
+  };
+  if (value is Map) {
+    for (final entry in value.entries) {
+      if (entry.key is String && forbidden.contains((entry.key as String).toLowerCase())) {
+        throw const FormatException('Plaintext credentials or key material are forbidden in a recovery bundle.');
+      }
+      _rejectPlaintextSecrets(entry.value);
+    }
+  } else if (value is List) {
+    for (final entry in value) { _rejectPlaintextSecrets(entry); }
+  }
 }
