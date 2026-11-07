@@ -243,15 +243,16 @@ void main() {
     await prefs.setString('aureon.trash.meta.${base64Url.encode(utf8.encode(root.rootId)).replaceAll('=', '')}.trashed-1',
       jsonEncode({'originalParentId': 'original-parent', 'originalName': 'notes.txt', 'trashedAt': 1700000000000}));
     final calls = <MethodCall>[];
+    var restored = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (call.method == 'listSystemTrash') return <Map<String, Object?>>[];
       if (call.method == 'listChildren') {
-        return (call.arguments as Map)['parentId'] == 'trash-root'
+        return (call.arguments as Map)['parentId'] == 'trash-root' && !restored
           ? [{'id': 'trashed-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}]
           : <Map<String, Object?>>[];
       }
-      if (call.method == 'moveEntry') return 'restored-1';
+      if (call.method == 'moveEntry') { restored = true; return 'restored-1'; }
       return null;
     });
     await tester.pumpWidget(MaterialApp(home: AureonTrashPage(root: root, files: AureonLocalFiles())));
