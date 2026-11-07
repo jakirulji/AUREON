@@ -12,8 +12,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory and policy framework; public policy/legal review remains open.
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and offline recovery-code recommendation; owner approval pending.
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
-- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — future managed KMS/HSM boundary; paid deployment deferred.
-- [ADR-0005 Zero-cost Credential Vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md) — accepted client-encrypted provider-token vault; server stores ciphertext only and new devices require one recovery-key unlock.
+- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — historical managed-KMS proposal; superseded for the current no-card personal deployment by ADR-0005 and the Cloudflare/Firebase direction.
+- [ADR-0005 Zero-cost Credential Vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md) — accepted Worker-Secret-wrapped provider credential vault with server-assisted recovery; not HSM/KMS or zero-knowledge.
 - [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; Android first vertical slice plus parallel Windows workstream after shared contracts freeze.
 - [Windows File Manager Specification](./WINDOWS-FILE-MANAGER-SPEC.md) — accepted product direction; native filesystem spike started.
 
@@ -48,13 +48,13 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | PostgreSQL V001 + V002 | **Passed** | Both migrations and smoke tests succeeded on PostgreSQL 18 |
 | Ktor architecture spike | Partially validated | HTTP/auth, PKCE/state/redirect primitives, HikariCP/JDBC, PostgreSQL refresh-lease and outbox concurrency tests, KMS fail-closed/key-zeroization tests passed. Real provider code exchange, production KMS adapter, container image and production migration-runner behavior remain |
 | Master Account auth/recovery | Provisional ADR | Passkey-first + offline recovery codes recommended; password fallback and email recovery policy require owner approval |
-| KMS/HSM | Architecture specified; deployment open | Separate credential-broker workload identity and KMS-only decrypt boundary specified; vendor/region, production IAM, rotation/destruction and independent review remain |
+| Credential vault recovery | Architecture direction accepted; implementation open | Worker Secret-derived envelope wrapping; not HSM/KMS; recovery policy, secret rotation/offline copy and independent review remain |
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
 | E2E encryption | Open | Protocol proposal exists; recovery design approval, cross-platform test vectors and independent cryptographic review remain |
 | Android platform | Provisional ADR | Minimum API 26 / prototype target API 36; release-time SDK policy and OEM matrix still require validation |
 | Local data layer | Prototype in progress | Room checkpoint persistence, cleanup eligibility gate, WorkManager constraints and unique scheduling, Pigeon bridge and FlutterEngine plugin lifecycle source exist. Android CI Run #41 passed Room persistence/recovery, Pigeon, Kotlin bridge and synthetic WorkManager scheduling/Worker tests. A separate Flutter plugin now implements read-only SAF root selection and child listing. Android app compilation passed on the previous native plugin integration commit; latest run #42383436463 includes saved-folder restoration tests and is pending. Live FlutterEngine↔Dart round-trip for transfer APIs, provider-session reconciliation, provider-aware Worker, process-death/reboot/OEM testing and Keystore integration remain |
 | Windows platform | Prototype in progress | C++20 directory enumeration, safe rename/move/copy/recycle-bin operations and Cloud Files sync-root registration pass prior Windows CI. A Flutter plugin now adds user-selected root picking and read-only listing with canonical-root containment. The Windows C API registration convention was corrected after a CI compile failure; verification is pending in run #42383436463. ACL/path error mapping, Cloud Files callbacks/placeholders/hydration, pinning and supported shell integration remain |
-| Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
+| Hosting and operations | Platform direction accepted; implementation open | Firebase Spark + Cloudflare Workers + D1; no-card/no-custom-domain target; Worker API and D1 migration remain |
 | Privacy and legal | Baseline drafted; approval open | Data inventory, consent, retention and subprocessor framework documented; jurisdiction, actual retention, public privacy policy and legal review remain |
 | A1 backlog | Drafted; not started | Start only after A0 exit review |
 
@@ -67,11 +67,11 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 5. Add the Android transfer UI and prove live FlutterEngine↔Dart bridge behavior before wiring provider adapters.
 6. Extend the backend OAuth exchange path with provider-specific validation and callback transaction binding; keep credentials out of logs and UI.
 7. Implement Cloud Files API callback connection, placeholder population/hydration and Explorer status integration; registration alone is not a functioning cloud placeholder provider.
-8. Resolve Master Account auth/recovery, OAuth scopes/callback, KMS/hosting/cost, privacy/legal and E2E recovery decisions with the owner; obtain independent security review before A0 exit. Do not start A1 before this review.
+8. Implement and review Firebase auth, Worker/D1 migration, OAuth scopes/callback, credential-vault recovery, privacy/legal and E2E recovery; obtain independent security review before A0 exit. Do not start A1 before this review.
 
 ## 4. Non-negotiable implementation safety
 
-- No plaintext provider refresh token, OAuth authorization code, PKCE verifier, KMS key material or E2E content key in source control, ordinary database fields, logs or telemetry.
+- No plaintext provider refresh token, OAuth authorization code, PKCE verifier, Worker Secret material or E2E content key in source control, ordinary database fields, logs or telemetry.
 - Refresh tokens remain in the consented backend vault. Short-lived access tokens are delivered only to the authenticated native provider adapter when needed and remain memory-only.
 - E2E content keys remain client-controlled and separate from OAuth credentials.
 - Provider accounts restore independently. A reauth challenge pauses only the affected account.
