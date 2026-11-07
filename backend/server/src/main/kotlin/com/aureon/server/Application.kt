@@ -24,16 +24,15 @@ data class SessionResponse(val authenticated: Boolean, val userId: String)
 
 fun Application.module(
     sessionAuthenticator: SessionAuthenticator = RejectAllSessionAuthenticator,
-    readinessProbe: ReadinessProbe = NotReadyProbe
+    readinessProbe: ReadinessProbe = NotReadyProbe,
+    trashRepository: TrashRepository? = null
 ) {
     install(ContentNegotiation) {
-        json(
-            Json {
-                ignoreUnknownKeys = false
-                encodeDefaults = true
-                explicitNulls = false
-            }
-        )
+        json(Json {
+            ignoreUnknownKeys = false
+            encodeDefaults = true
+            explicitNulls = false
+        })
     }
 
     install(Authentication) {
@@ -47,29 +46,20 @@ fun Application.module(
     }
 
     routing {
-        get("/health/live") {
-            call.respond(HttpStatusCode.OK, HealthResponse("alive"))
-        }
-
+        get("/health/live") { call.respond(HttpStatusCode.OK, HealthResponse("alive")) }
         get("/health/ready") {
-            if (readinessProbe.isReady()) {
-                call.respond(HttpStatusCode.OK, HealthResponse("ready"))
-            } else {
-                call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("not_ready"))
-            }
+            if (readinessProbe.isReady()) call.respond(HttpStatusCode.OK, HealthResponse("ready"))
+            else call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("not_ready"))
         }
 
         authenticate("aureon-session") {
             get("/v1/me") {
                 val principal = call.principal<UserIdPrincipal>()
-                if (principal == null) {
-                    call.respond(HttpStatusCode.Unauthorized, HealthResponse("unauthorized"))
-                } else {
-                    call.respond(
-                        HttpStatusCode.OK,
-                        SessionResponse(authenticated = true, userId = principal.name)
-                    )
-                }
+                if (principal == null) call.respond(HttpStatusCode.Unauthorized, HealthResponse("unauthorized"))
+                else call.respond(HttpStatusCode.OK, SessionResponse(true, principal.name))
+            }
+            if (trashRepository != null) {
+                configureTrashRoutes(trashRepository)
             }
         }
     }
