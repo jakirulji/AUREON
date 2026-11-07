@@ -1,0 +1,43 @@
+name: AUREON Android Storage Spike
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android-spike/**"
+      - ".github/workflows/aureon-android-spike.yml"
+  pull_request:
+    paths:
+      - "android-spike/**"
+      - ".github/workflows/aureon-android-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-storage:
+    name: Compile and test Room storage spike
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android 17 SDK
+        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.9.0"
+      - name: Run Room persistence tests
+        working-directory: android-spike
+        run: gradle --no-daemon :storage:testDebugUnitTest
+      - name: Assemble Android storage module
+        working-directory: android-spike
+        run: gradle --no-daemon :storage:assembleDebug
