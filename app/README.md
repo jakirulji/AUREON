@@ -1,21 +1,23 @@
 # AUREON App
 
-This directory contains the shared Flutter application layer. Android and Windows host projects are generated in CI while the platform integration work is being developed.
+This directory contains the shared Flutter application layer. Android and Windows host projects are generated in CI while platform integration is being developed.
 
 ## Current scope
 
 - Responsive AUREON navigation and dark visual system.
-- Read-only local folder browsing through the Android SAF and Windows native folder picker.
-- Selected folder bookmark is stored in app-local preferences and restored on next launch; Android's persisted SAF read grant remains the authority to access it.
-- Storage overview and recent-file layout still contain sample data.
+- Read-only local folder browsing through Android Storage Access Framework (SAF) and the Windows native folder picker.
+- Selected folder bookmarks persist across launches. Android's persisted SAF read grant remains the authority to access the folder.
+- In-folder name search, sorting by name/size/modified time/file type, hidden-entry filtering, file size and modified-time metadata.
+- File open hand-off to the Android system viewer or Windows' default associated application. Windows validates that the canonical file path remains inside the selected root before opening.
+- Storage overview and recent-file cards still contain sample data.
 
 ## Validation
 
 The app validation workflow runs Flutter dependency resolution, static analysis, widget tests and platform compilation for Android and Windows. It does **not** upload or retain APK/EXE artifacts. Final installable builds will be produced once the agreed implementation scope is complete.
 
-## Important limitation
+## Important limitations
 
-The Files screen now performs real, read-only local directory browsing on Android and Windows and remembers the selected folder in app-local preferences. It cannot yet open file contents, modify files, connect cloud accounts, upload, download or sync. Storage overview and recent-file cards still use sample data. Do not treat it as a finished replacement for File Explorer.
+The Files screen currently browses and opens local files but does not modify them. Copy, move, rename, recycle-bin/delete, file-content preview inside AUREON, cloud account connection, upload, download and sync are not implemented yet. Android may report that no compatible viewer is installed for a particular file type. Storage overview and recent-file cards still use sample data. AUREON is not yet a finished replacement for Windows File Explorer.
 
 ## Local validation
 
