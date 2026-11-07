@@ -211,7 +211,7 @@ Each installation receives a random device ID and a device-bound key pair genera
 
 ## 5. Provider OAuth and credential vault
 
-**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on the final feature boundary and provider review.
+**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on the final feature boundary and provider review. [Android native OAuth and credential lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) defines the native authorization, device-held credential baseline, refresh/revocation behavior and required security tests.
 
 ### 5.1 OAuth rules
 
