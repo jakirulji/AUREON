@@ -12,7 +12,7 @@ This document translates AUREON's initial provider scope strategy into a least-p
 - Show the provider, account identity, requested access and connected/disconnected status clearly.
 - Never collect provider passwords, OTPs, recovery codes or user session cookies.
 - Never treat a granted write scope as permission for automatic deletion. Product-level deletion policy remains stricter than provider capability.
-- Keep provider tokens separate from E2E file-content keys. Token vaulting remains an explicit, separately reviewed decision.
+- Keep provider refresh credentials separate from E2E file-content keys. A user-consented backend refresh-token vault is the target for cross-device restoration and must pass a separate security review.
 
 ## Initial scope matrix
 
@@ -90,7 +90,7 @@ Provider scopes may technically permit destructive operations. AUREON's product 
 4. Native OAuth redirect strategy and exact supported account types for each provider.
 5. Backend credential vault is the required target for user-consented cross-device provider restoration; production approval depends on threat-model review, KMS design, provider-terms review and independent security testing.
 6. Google Drive backend HTTPS callback is the recommended OAuth mode; exact client registration, redirect URI and PKCE implementation require a provider spike.
-6. Provider app registration ownership, consent-screen branding, verification submissions and production redirect domains.
+7. Provider app registration ownership, consent-screen branding, verification submissions and production redirect domains.
 
 ## Official references
 
