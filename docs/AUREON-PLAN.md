@@ -248,7 +248,117 @@ Decisions required before implementation:
 - Strict client-side E2E encryption is the target.
 - Root support is optional/experimental; rootless Android is primary.
 
-## 16. Plan maintenance
+## 16. Transfer Engine and Performance Architecture
+
+### 16.1 Architectural decision
+
+AUREON will use a **common Transfer Coordinator with provider-native transfer adapters**. It will not force every cloud provider through one universal upload protocol.
+
+- The Coordinator owns the user experience and global job lifecycle: queue, priority, pause/resume, progress, retry/backoff, scheduling, cancellation, persistence, notifications and telemetry.
+- Each provider adapter uses that provider's official, supported upload/download APIs and semantics.
+- A shared transfer interface normalizes behavior without hiding provider-specific capabilities, limits or failure conditions.
+- The download path may optionally use a separately audited open-source engine (aria2 is an evaluation candidate), but only where licensing, Android integration, security and provider authentication are compatible. It is not a universal requirement and must not replace provider-specific authorization or integrity checks.
+- AUREON should avoid proxying all file bytes through its own backend when direct client-to-provider transfer is supported. Backend relay is an explicit fallback only, with documented privacy, bandwidth, cost and operational implications.
+
+### 16.2 Upload strategy — provider-native resumable upload
+
+Use the cloud provider's official resumable/session-based upload mechanism whenever available. Examples to implement and validate:
+- **Google Drive:** resumable upload session for large files or unreliable mobile networks; persist the session URI securely and query server-acknowledged progress after interruption. Follow Google's chunk alignment and resume rules. Session URLs are sensitive capabilities and must be protected.
+- **Microsoft OneDrive/Graph:** upload sessions and byte-range fragments; persist the session URL/expiry and follow the API's required fragment sizing, ordering and retry behavior.
+- **Dropbox:** use its upload-session/chunked upload API and provider-specific append/finish semantics.
+- **Other providers:** implement the official resumable/multipart mechanism where available; do not assume all providers behave identically.
+
+The Coordinator exposes a consistent UX, but the adapter controls chunk sizing, parallelism, retry semantics, session expiry and finalization according to the provider's documented contract.
+
+### 16.3 Upload reliability and duplicate prevention
+
+The upload engine must be designed for **at-least-once network delivery with idempotent/reconciled finalization**, not an unsafe assumption that a request is delivered exactly once.
+
+For every logical upload:
+1. Create and persist a unique AUREON operation ID before network transfer.
+2. Persist the source identity, stable source snapshot/staging reference, byte length, MIME type, modification metadata where available, and a cryptographic fingerprint.
+3. Resolve the target provider/account and canonical file identity before starting.
+4. Create or resume one provider upload session; securely persist its identifier/URL, expiry and acknowledged offset/parts.
+5. After timeouts or ambiguous responses, query provider session/status or reconcile remote metadata before sending bytes again or creating a new object.
+6. Use provider-supported idempotency/precondition/conflict controls where available. Never blindly repeat a create/finalize request after an uncertain response.
+7. Finalize exactly once from the Coordinator's perspective. If the provider response is lost, search/reconcile using the operation metadata and remote object identity before retrying finalization.
+8. Record the resulting provider object ID and canonical FileLocation transactionally. Enforce a uniqueness constraint for the logical operation and canonical object mapping.
+9. Verify the completed remote object before marking the job successful.
+
+If the provider does not offer a reliable idempotency key, use persisted session identity, deterministic AUREON operation metadata and remote reconciliation. Do not promise absolute exactly-once semantics where the provider API cannot guarantee them; make retries safe and duplicates detectable/remediable.
+
+### 16.4 Chunking, speed and adaptive behavior
+
+- Use resumable chunks for large files and unstable connections; small files may use a provider's simpler upload method when it is more efficient.
+- Start with conservative provider-compliant chunk sizes, then tune through measured device/network/provider performance.
+- Adapt chunk size and concurrency to connection quality, server responses, device memory, thermal/battery state and provider limits.
+- Do not assume more parallel connections mean higher throughput. Respect rate limits and use bounded concurrency.
+- Use exponential backoff with jitter for transient network and server failures; honor Retry-After and provider-specific guidance. Do not endlessly retry permanent errors such as revoked authorization, quota exhaustion or invalid requests.
+- Support pause/resume, cancellation, queue priority, per-job and global speed limits, and background scheduling subject to Android/OEM restrictions.
+- Preserve source bytes and staged chunks until remote finalization and verification succeed. Never delete the source merely because all chunks were transmitted.
+
+### 16.5 Data integrity and file-corruption prevention
+
+- Capture a stable source snapshot or stage a copy before transfer. If the source changes during upload, detect it and do not silently mark the uploaded object as the current version.
+- Compute SHA-256 over the exact bytes being uploaded (ciphertext when client-side E2E encryption is enabled); where practical also retain a plaintext source fingerprint locally for change detection.
+- Verify per-part/chunk checksums when supported by the provider/protocol.
+- Verify final remote size and provider checksum/metadata where available. If the provider does not expose a comparable cryptographic checksum, perform a read-back verification where feasible or clearly record the lower assurance level.
+- Do not treat an ETag as SHA-256 unless the provider explicitly documents that meaning; multipart ETags commonly are not whole-file hashes.
+- Only mark `VERIFIED` after the applicable verification policy passes. A verification failure leaves the source intact and the job failed/retryable or quarantined for diagnosis.
+- For encrypted files, persist versioned encryption metadata and key-envelope readiness before declaring the object recoverable.
+
+### 16.6 Download engine and open-source integration
+
+- Keep the same Transfer Coordinator for download jobs, with provider-native download adapters.
+- Evaluate aria2 as an optional large-file download backend only after checking GPL-2.0-or-later obligations, Android process/binary integration, security maintenance, memory/battery use, OAuth header handling and compatibility with provider download URLs.
+- Use segmented/range downloads only when the provider endpoint supports byte ranges and returns stable validators (such as ETag/If-Range) or equivalent consistency guarantees.
+- Fall back to a single-stream resumable download when range support is absent or unsafe.
+- Persist range progress and validate the remote object identity before resuming. If the remote version changed, restart safely rather than combining bytes from different versions.
+- Download to a temporary file, verify length and checksum, decrypt if applicable, then atomically promote to the final destination where the filesystem permits.
+- Never expose a partial or unverified download as a completed file.
+
+### 16.7 Proposed job states
+
+Extend the transfer state model with explicit states such as:
+`QUEUED`, `PREPARING`, `SOURCE_SNAPSHOTTED`, `SESSION_CREATING`, `SESSION_ACTIVE`, `TRANSFERRING`, `PAUSED`, `RETRY_WAIT`, `RECONCILING`, `FINALIZING`, `REMOTE_PENDING_VERIFICATION`, `VERIFIED`, `COMPLETED`, `CANCELLED`, `FAILED_RETRYABLE`, `FAILED_PERMANENT`, `SESSION_EXPIRED`.
+
+Persist state and provider session metadata across process death and reboot. Session URLs/tokens must be encrypted at rest and excluded from logs, crash reports and analytics. Session expiry should trigger provider-specific recovery/restart only after remote reconciliation.
+
+### 16.8 Acceptance tests and performance gates
+
+Before release, test:
+- Upload pause/resume after app process kill, device reboot, network switch and temporary offline periods.
+- Lost response after chunk acceptance and after finalization; prove reconciliation does not create duplicate cloud objects.
+- Repeated taps/retries and concurrent requests for the same logical file; prove only one canonical object is recorded.
+- Source file modified or removed during upload; preserve data and report a clear state.
+- Corrupted chunk, truncated transfer, checksum mismatch and remote object mutation.
+- Expired upload session, revoked OAuth token, quota exhaustion, provider throttling and 5xx responses.
+- Large files, small files, low RAM, low storage, thermal/battery constraints and flaky networks.
+- Provider checksum unavailable or not comparable; verify fallback behavior and disclose verification confidence.
+- Encrypted upload/download round trip and key recovery.
+- No source deletion before verified remote copy and explicit cleanup permission.
+
+Performance targets must be measured on representative devices and networks; do not promise a fixed speed. Release gates require no silent corruption, no untracked duplicate canonical objects, safe resume after interruption, and preservation of the only known-good copy.
+
+### 16.9 Initial implementation order
+
+1. Define provider-neutral Transfer Coordinator interfaces, persistent job database and state machine.
+2. Implement Google Drive adapter using official resumable upload and download APIs.
+3. Build deterministic retry/reconciliation and duplicate-prevention tests before optimizing speed.
+4. Add adaptive chunking/concurrency and benchmark under realistic mobile network conditions.
+5. Add the next provider adapter only after its official API and policy review.
+6. Evaluate aria2 independently for Android download use; adopt only if it materially improves measured performance and passes licensing/security review.
+
+
+### 2026-11-07 — Transfer architecture accepted
+- Added a common Transfer Coordinator with provider-native upload/download adapters.
+- Selected official provider resumable/session upload APIs over a universal upload engine.
+- Added persisted session state, safe resume, idempotent/reconciled finalization and duplicate prevention.
+- Added source snapshotting, chunk/final integrity verification and strict preservation of originals until verified completion and explicit cleanup permission.
+- Added adaptive chunking/concurrency, bounded retries, background scheduling and provider-specific download behavior.
+- aria2 remains an optional download-engine evaluation candidate, subject to license, security, Android and performance review.
+
+## 17. Plan maintenance
 
 For each new idea:
 1. Add a dated Change Log entry.
