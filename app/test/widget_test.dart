@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:aureon/main.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
+import 'package:aureon/src/files/aureon_operation_history.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -173,10 +174,6 @@ void main() {
       'parentId': 'root-doc', 'targetName': 'notes-copy.txt',
     });
     expect(find.text('Copy completed and SHA-256 verified. Original preserved.'), findsOneWidget);
-    await tester.tap(find.byTooltip('Operation history'));
-    await tester.pumpAndSettle();
-    expect(find.text('Copy • notes.txt'), findsOneWidget);
-    expect(find.textContaining('Success'), findsOneWidget);
   });
 
   testWidgets('Files page moves an item to its parent only after confirmation', (tester) async {
@@ -270,6 +267,33 @@ void main() {
       'sourceParentId': 'trash-root', 'targetParentId': 'original-parent',
     });
     expect(find.text('Trash is empty'), findsOneWidget);
+  });
+
+  testWidgets('Operation history page displays and clears local records', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      AureonOperationHistory.storageKey: jsonEncode([
+        {
+          'id': 'history-1',
+          'kind': 'copy',
+          'itemName': 'notes.txt',
+          'sourceLocation': 'Documents',
+          'destinationLocation': 'Documents / notes-copy.txt',
+          'succeeded': true,
+          'occurredAtMs': 1700000000000,
+          'errorCode': null,
+        },
+      ]),
+    });
+    await tester.pumpWidget(const MaterialApp(home: AureonOperationHistoryPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy • notes.txt'), findsOneWidget);
+    expect(find.textContaining('Success'), findsOneWidget);
+    await tester.tap(find.byTooltip('Clear history'));
+    await tester.pumpAndSettle();
+    expect(find.text('Clear operation history?'), findsOneWidget);
+    await tester.tap(find.text('Clear history').last);
+    await tester.pumpAndSettle();
+    expect(find.text('No file operations recorded yet.'), findsOneWidget);
   });
 
   testWidgets('AUREON dashboard still renders', (tester) async {
