@@ -9,6 +9,7 @@ DECLARE
     d1 uuid;
     p1 uuid;
     p2 uuid;
+    p3 uuid;
     tx1 uuid;
     album1 uuid;
 BEGIN
@@ -35,6 +36,9 @@ BEGIN
     INSERT INTO provider_accounts(user_id, provider, provider_subject)
     VALUES (u2, 'google_drive', 'v002-other-subject')
     RETURNING id INTO p2;
+    INSERT INTO provider_accounts(user_id, provider, provider_subject)
+    VALUES (u1, 'google_photos', 'v002-photos-subject')
+    RETURNING id INTO p3;
 
     -- Envelope is opaque test ciphertext; production bytes must be KMS-wrapped AEAD.
     INSERT INTO provider_credentials(
@@ -100,17 +104,14 @@ BEGIN
         NULL;
     END;
 
-    INSERT INTO provider_accounts(user_id, provider, provider_subject)
-    VALUES (u1, 'google_photos', 'v002-photos-subject');
-
     INSERT INTO provider_albums(
         user_id, provider_account_id, provider_album_id, metadata_envelope, metadata_format_version
-    ) VALUES (u1, p1, 'album-1', decode('04', 'hex'), 1)
+    ) VALUES (u1, p3, 'album-1', decode('04', 'hex'), 1)
     RETURNING id INTO album1;
 
     INSERT INTO provider_album_memberships(
         user_id, provider_account_id, album_id, provider_media_item_id
-    ) VALUES (u1, p1, album1, 'media-1');
+    ) VALUES (u1, p3, album1, 'media-1');
 
     -- A completed transaction must have a consumed timestamp and account binding.
     BEGIN
