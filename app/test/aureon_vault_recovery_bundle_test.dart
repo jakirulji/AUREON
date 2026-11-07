@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:aureon/src/backup/aureon_recovery_key_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,8 +13,10 @@ void main() {
         {'providerAccountId': 'drive-1', 'cipherText': 'opaque-ciphertext'},
       ],
       manualKeyEnvelopes: List.generate(5, (index) => ManualKeyEnvelope(
-        keyId: 'key-$index', salt: 'c2FsdA==', nonce: 'bm9uY2U=',
-        cipherText: 'Y2lwaGVy', mac: 'bWFj',
+        keyId: 'key-$index', salt: base64Url.encode(List<int>.filled(32, index + 1)),
+        nonce: base64Url.encode(List<int>.filled(12, index + 2)),
+        cipherText: base64Url.encode(List<int>.filled(32, index + 3)),
+        mac: base64Url.encode(List<int>.filled(16, index + 4)),
       )),
       cloudflareEnvelope: const {'keyVersion': 'cf-v1', 'cipherText': 'opaque'},
     );
