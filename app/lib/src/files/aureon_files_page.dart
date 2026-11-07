@@ -103,6 +103,27 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     }
   }
 
+  Future<void> _copyFile(AureonLocalEntry entry) async {
+    final root = _root;
+    if (root == null || entry.isDirectory || _levels.isEmpty) return;
+    final dot = entry.name.lastIndexOf('.');
+    final suggested = dot > 0
+        ? '${entry.name.substring(0, dot)} - copy${entry.name.substring(dot)}'
+        : '${entry.name} - copy';
+    final name = await _nameDialog('Copy file', 'New copy name', initial: suggested);
+    if (name == null || name.trim().isEmpty) return;
+    try {
+      await _files.copyFile(root: root, sourceId: entry.id,
+        parentId: _levels.last.id, targetName: name.trim());
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copy completed and SHA-256 verified. Original preserved.')));
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? error.code)));
+    }
+  }
+
   Future<void> _rename(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null) return;
@@ -263,8 +284,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   subtitle: Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis),
                   trailing: PopupMenuButton<String>(
                     tooltip: 'Item actions',
-                    onSelected: (action) { if (action == 'rename') _rename(e); },
-                    itemBuilder: (_) => const [PopupMenuItem(value: 'rename', child: Text('Rename'))],
+                    onSelected: (action) {
+                      if (action == 'rename') _rename(e);
+                      if (action == 'copy' && !e.isDirectory) _copyFile(e);
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                      if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
+                    ],
                   ),
                   onTap: e.isDirectory ? () => _open(e) : () => _openFile(e),
                 ));

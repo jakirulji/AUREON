@@ -46,6 +46,21 @@ void main() {
     expect(entries.last.sizeBytes, 120);
   });
 
+  test('copy file sends source, parent and target name', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'copyFile');
+      expect(call.arguments, {
+        'rootId': 'root-uri', 'sourceId': 'source-id',
+        'parentId': 'parent-id', 'targetName': 'copy.txt',
+      });
+      return 'copied-document-id';
+    });
+    const root = AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc');
+    expect(await files.copyFile(root: root, sourceId: 'source-id',
+      parentId: 'parent-id', targetName: 'copy.txt'), 'copied-document-id');
+  });
+
   test('rename and create folder send scoped identities', () async {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {

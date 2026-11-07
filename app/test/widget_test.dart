@@ -38,6 +38,7 @@ void main() {
       }
       if (call.method == 'openFile') return true;
       if (call.method == 'createFolder') return 'folder-new';
+      if (call.method == 'copyFile') return 'copied-id';
       if (call.method == 'renameEntry') return 'renamed-id';
       return null;
     });
