@@ -5,7 +5,7 @@
 **Date:** 2026-11-07  
 **Status:** Proposed baseline; decisions marked Accepted are inherited from the product plan. This document does not claim that any component has been implemented.
 
-Related source of truth: [AUREON Product & Technical Planning](./AUREON-PLAN.md)
+Related source of truth: [AUREON Product & Technical Planning](./AUREON-PLAN.md) · [A0 readiness tracker](./A0-STATUS.md) · [A1 first vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md)
 
 ---
 
@@ -21,15 +21,15 @@ Related source of truth: [AUREON Product & Technical Planning](./AUREON-PLAN.md)
 | Local deletion | Never automatic by default; explicit opt-in plus verified remote copy and OS permission required | Accepted |
 | Encryption | Client-side E2E encryption target; backend must not hold content keys | Accepted |
 | Backend style | Modular monolith, not microservices at MVP | Proposed |
-| Backend language | Kotlin/Ktor is the recommended first candidate to align with Android Kotlin; validate operational and hosting fit before locking | Proposed |
-| Primary database | PostgreSQL | Proposed |
-| Local Android database | Room (SQLite) through Kotlin data layer; Flutter accesses through a typed platform boundary or a selected Flutter database adapter | Proposed |
+| Backend language | Kotlin 2.4.21 + Ktor 3.6.1 on JDK 21; modular monolith | Provisional; CI spike in progress |
+| Primary database | PostgreSQL 18 | CI migration and smoke tests passed; hosting provider pending |
+| Local Android database | Room (SQLite) owned by Kotlin; Flutter accesses through Pigeon typed APIs | Recommended; Android prototype pending |
 | API style | Versioned REST + OpenAPI; JSON metadata, binary content stays provider-direct | Proposed |
 | Background work | WorkManager for durable scheduling; foreground service only for user-visible long-running transfers where Android policy permits | Accepted direction |
 | Download acceleration | Provider-native range/resume first; aria2 is an optional, separately reviewed experiment | Accepted direction |
 | Public repository | Source and documentation may be public; secrets and credentials never enter Git | Accepted |
 
-**Important:** The backend-language and local-database choices remain proposals until a small architecture spike validates build complexity, migrations, testing and deployment.
+**Important:** The Ktor spike is a scaffold with a deny-all default authentication seam; its CI test run is still being debugged. It is not a production backend. Room/Pigeon remains a recommendation until an Android prototype validates process-death recovery and platform integration.
 
 ## 1. System context and trust boundaries
 
@@ -234,9 +234,9 @@ Two legitimate models exist. The product requirement for seamless cross-device p
 
 ## 6. Database design
 
-Use PostgreSQL 18 for server-side relational metadata. The provisional backend recommendation is Kotlin/JVM + Ktor 3.6.1 as a modular monolith; see [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md). This remains provisional until the architecture spike proves auth, PostgreSQL migrations, credential-broker boundaries, refresh concurrency and outbox behavior. Use ordered migrations from the first schema version; never rely on application code alone for uniqueness or referential integrity.
+Use PostgreSQL 18 for server-side relational metadata. The current V001+V002 migration and smoke-test workflow has passed against PostgreSQL 18 in GitHub Actions; this is CI evidence, not production deployment evidence. The provisional backend recommendation is Kotlin/JVM + Ktor 3.6.1 as a modular monolith; see [ADR-0001 Backend Stack](./adr/ADR-0001-BACKEND-STACK.md). This remains provisional until the architecture spike proves auth, PostgreSQL migrations, credential-broker boundaries, refresh concurrency and outbox behavior. Use ordered migrations from the first schema version; never rely on application code alone for uniqueness or referential integrity.
 
-**Engineering drafts:** [Relational data model and ER diagram](./DATA-MODEL.md) · [V001 initial schema](./migrations/V001__initial_schema.sql) · [V002 vault and provider inventory](./migrations/V002__vault-and-provider-inventory.sql). V001 is the baseline; V002 is additive and must run after V001. CI is configured to apply both to PostgreSQL 18 and run separate smoke tests. The workflow result must be observed before either migration is called validated; no live production database is provisioned.
+**Engineering drafts:** [Backend stack ADR](./adr/ADR-0001-BACKEND-STACK.md) · [Master Account auth/recovery ADR](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) · [Android local data ADR](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) · [KMS/hosting ADR](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) · [Relational data model and ER diagram](./DATA-MODEL.md) · [V001 initial schema](./migrations/V001__initial_schema.sql) · [V002 vault and provider inventory](./migrations/V002__vault-and-provider-inventory.sql). V001 is the baseline; V002 is additive and must run after V001. CI is configured to apply both to PostgreSQL 18 and run separate smoke tests. The workflow result must be observed before either migration is called validated; no live production database is provisioned.
 
 ### 6.1 Core server tables
 
