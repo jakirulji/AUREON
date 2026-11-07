@@ -83,6 +83,7 @@ erDiagram
 - Every read/mutation query includes authenticated `user_id`, even when UUIDs are globally unique.
 - Integration tests attempt cross-user access for every repository method.
 - Credential broker decrypt permissions are separate from ordinary API and inventory services.
+- New credential rows default to reauth-required. A credential may become active only after explicit user consent is recorded; migration must never silently activate legacy or unconsented credentials.
 
 ## File versions and canonical locations
 
