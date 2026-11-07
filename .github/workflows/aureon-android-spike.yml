@@ -35,9 +35,11 @@ jobs:
         run: |
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -mindepth 3 -maxdepth 3 -type f -name sdkmanager | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
-          set +o pipefail
+          set +e
           yes | "$SDKMANAGER" --licenses
-          set -o pipefail
+          LICENSE_STATUS=${PIPESTATUS[1]}
+          set -e
+          if [ "$LICENSE_STATUS" -ne 0 ]; then exit "$LICENSE_STATUS"; fi
           "$SDKMANAGER" --install "platforms;android-37" "build-tools;36.0.0" "platform-tools"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
