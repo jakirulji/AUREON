@@ -77,6 +77,22 @@ class AureonLocalFiles {
     return AureonLocalRoot.fromMap(value);
   }
 
+  Future<String> renameEntry({required AureonLocalRoot root, required String entryId, required String newName}) async {
+    final value = await _channel.invokeMethod<Object?>('renameEntry', <String, Object?>{
+      'rootId': root.rootId, 'entryId': entryId, 'newName': newName,
+    });
+    if (value is! String || value.isEmpty) throw const FormatException('Native rename returned an invalid identity.');
+    return value;
+  }
+
+  Future<String> createFolder({required AureonLocalRoot root, required String parentId, required String name}) async {
+    final value = await _channel.invokeMethod<Object?>('createFolder', <String, Object?>{
+      'rootId': root.rootId, 'parentId': parentId, 'name': name,
+    });
+    if (value is! String || value.isEmpty) throw const FormatException('Native folder creation returned an invalid identity.');
+    return value;
+  }
+
   Future<void> openFile({required AureonLocalRoot root, required String fileId}) async {
     await _channel.invokeMethod<void>('openFile', <String, Object?>{'rootId': root.rootId, 'fileId': fileId});
   }

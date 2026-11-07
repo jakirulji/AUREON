@@ -46,6 +46,21 @@ void main() {
     expect(entries.last.sizeBytes, 120);
   });
 
+  test('rename and create folder send scoped identities', () async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return call.method == 'renameEntry' ? 'renamed-id' : 'new-folder-id';
+    });
+    const root = AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc');
+    expect(await files.renameEntry(root: root, entryId: 'old-id', newName: 'new.txt'), 'renamed-id');
+    expect(await files.createFolder(root: root, parentId: 'parent-id', name: 'New folder'), 'new-folder-id');
+    expect(calls[0].method, 'renameEntry');
+    expect(calls[0].arguments, {'rootId': 'root-uri', 'entryId': 'old-id', 'newName': 'new.txt'});
+    expect(calls[1].method, 'createFolder');
+    expect(calls[1].arguments, {'rootId': 'root-uri', 'parentId': 'parent-id', 'name': 'New folder'});
+  });
+
   test('openFile sends the selected root and file identity', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       expect(call.method, 'openFile');
