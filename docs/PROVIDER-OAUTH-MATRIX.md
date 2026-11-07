@@ -52,7 +52,7 @@ For a full file browser, start with metadata read + content read + content write
 2. Client creates a short-lived OAuth transaction with random state and PKCE verifier/challenge.
 3. Redirect callback is validated; authorization code is exchanged through the correct public-client flow.
 4. Client records granted scopes and provider account subject. It must not assume the requested scopes were all granted.
-5. Tokens are stored in platform secure storage on device unless a separately approved backend vault is enabled with explicit consent.
+5. Refresh tokens are stored only in the user-consented backend credential vault as KMS-wrapped authenticated encrypted envelopes. Never return refresh tokens to clients. Short-lived access tokens may be issued to the authenticated native provider adapter for direct API operations; keep them in memory only, never expose them to Flutter UI or persist them.
 6. Refresh is serialized per account; handle rotation, invalid_grant, revoked consent, expired refresh tokens, conditional access and provider throttling.
 7. If refresh fails, mark account `reauth_required`; preserve local originals, staging data and transfer queue. Do not claim cloud sync is complete.
 8. Disconnect revokes tokens where supported and removes local credentials. It does not delete remote files.
