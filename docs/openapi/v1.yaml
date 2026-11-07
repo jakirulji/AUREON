@@ -972,12 +972,12 @@ components:
           enum: [backend_https, native_app]
           description: Must match the provider registration and reviewed callback design.
         codeChallenge:
-          type: [string, 'null']
+          type: string
           minLength: 43
           maxLength: 128
           description: Required for native_app; omitted for backend_https where the backend creates and protects the PKCE verifier.
         codeChallengeMethod:
-          type: [string, 'null']
+          type: string
           const: S256
       allOf:
         - if:
@@ -991,11 +991,10 @@ components:
               callbackMode:
                 const: backend_https
           then:
-            properties:
-              codeChallenge:
-                type: 'null'
-              codeChallengeMethod:
-                type: 'null'
+            not:
+              anyOf:
+                - required: [codeChallenge]
+                - required: [codeChallengeMethod]
     OAuthStartResponse:
       type: object
       required: [transactionId, authorizationUrl, expiresAt]
