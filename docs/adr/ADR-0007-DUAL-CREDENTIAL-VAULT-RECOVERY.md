@@ -94,3 +94,20 @@ The bundle is versioned, account/vault-bound, integrity-checked and protected ag
 ## Availability limitation
 
 Any manual key alone cannot reconstruct encrypted vault ciphertext that is no longer available. The encrypted `.key` file protects all five Manual Recovery Keys; it does not contain the vault. Cloudflare outage independence therefore requires a portable Recovery Bundle or a cached encrypted vault copy, stored outside Cloudflare. No system can guarantee recovery if all active key paths and all ciphertext copies are lost.
+
+
+## Disaster recovery after all manual keys are lost
+
+Losing all five Manual Recovery Keys and the `.key` export must not make the user's original cloud files inaccessible. AUREON must provide a separate **provider re-link and re-index** path:
+
+- The user can authorize each cloud provider again through its official OAuth flow, including provider MFA where required. AUREON never requests provider passwords or bypasses MFA.
+- Provider identity must be matched by stable provider subject/account ID after successful authorization, not by email/display-name similarity alone.
+- AUREON rebuilds the file inventory from provider APIs using paginated metadata-first scans, preserving provider object IDs and actual parent relationships. This reconstructs the provider's original folder tree and current file list without moving, renaming, duplicating or deleting originals.
+- This path restores access to files that remain in the provider account. It does not recover provider objects that the user/provider has permanently deleted, nor does it restore encrypted file contents if their separate E2E content keys have been lost.
+- AUREON-specific organization (user tags, favorites, virtual collections, custom organization, sync preferences and related settings) must be backed up independently of the credential vault and all five manual keys. Use a separate versioned, integrity-protected metadata backup and separate client-controlled metadata key hierarchy. Never reuse the credential-vault DEK, Manual Recovery Keys, `.key` passphrase or E2E file-content keys.
+- Store an encrypted metadata snapshot outside the Cloudflare-only failure domain and cache one on authorized devices. Use stable provider account subject + provider object ID for reconciliation. Metadata restore is a merge, never a blind overwrite of provider truth.
+- Do not back up device-specific SAF URIs, Windows paths, local folder handles or OS permission grants as portable state; the user must reselect/re-authorize local folders on each device.
+- If the metadata backup is missing, re-link and re-index still restores current provider files and original provider hierarchy, but AUREON cannot guarantee restoration of AUREON-only tags, favorites, virtual collections or custom settings that existed only in the lost metadata.
+- Provider OAuth re-link is independent of manual recovery. If the user also loses access to the provider's own account, AUREON cannot bypass the provider's account recovery process.
+
+This is a disaster-recovery path, not a way to recover the old provider credential vault or E2E content keys. The product must explain these distinctions in the recovery UI.
