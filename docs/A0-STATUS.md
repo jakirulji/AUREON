@@ -1,6 +1,6 @@
 # AUREON A0 — Readiness and Exit-Gate Tracker
 
-**Last updated:** 2026-11-07  
+**Last updated:** 2026-11-08  
 **Overall status:** <strong>IN PROGRESS</strong> — Contract and database CI are green; Android and Windows native prototypes are progressing. Production security approval, live platform integration and owner-controlled deployment/provider decisions remain open.
 
 This file is the operational A0 checklist. A document existing in GitHub is not the same as a decision being verified or code being implemented.
@@ -12,7 +12,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory and policy framework; public policy/legal review remains open.
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and offline recovery-code recommendation; owner approval pending.
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
-- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — managed KMS/HSM boundary; vendor and region intentionally undecided.
+- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — future managed KMS/HSM boundary; paid deployment deferred.
+- [ADR-0005 Zero-cost Credential Vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md) — accepted client-encrypted provider-token vault; server stores ciphertext only and new devices require one recovery-key unlock.
 - [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; Android first vertical slice plus parallel Windows workstream after shared contracts freeze.
 - [Windows File Manager Specification](./WINDOWS-FILE-MANAGER-SPEC.md) — accepted product direction; native filesystem spike started.
 
@@ -137,3 +138,14 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - No Android APK or Windows EXE artifacts were created or uploaded.
 - Next production-critical backend work remains: server-side provider Trash command coordinator, real credential broker with managed KMS/HSM, OAuth refresh/rotation and consented provider-account inventory. The current client-supplied provider outcome reference must not be accepted as proof of provider mutation in production.
 - Owner-facing hosting decision and a no-purchase-until-approved deployment checklist are recorded in `docs/DEPLOYMENT-AND-OWNER-ACTIONS.md`.
+
+
+## Zero-cost-first hosting and credential-vault decision (2026-11-08)
+
+- Added ADR-0005: provider refresh credentials are encrypted client-side using per-account AES-256-GCM data keys wrapped by a user-held random recovery key. Backend stores opaque ciphertext only; no server-held plaintext master key and no KMS dependency in the free phase.
+- New-device restore returns provider account inventory and encrypted vault data after Master Account login; the user enters the recovery key once to unlock provider credentials. Losing the recovery key requires relinking affected providers.
+- Android Keystore / Windows OS-protected storage protect locally unlocked key material. E2E file-content keys remain in a separate key hierarchy.
+- Updated deployment and runtime docs to distinguish free-tier staging from production. Neon Free can suspend at quota; Cloud Run free compute/request allowance does not make all network egress and related services free. No paid resource has been provisioned.
+- Provider file bytes remain direct device-to-provider transfers; backend/database/KMS quotas must not cap file payload throughput. If metadata API/database is unavailable, persist jobs locally and resume metadata sync later.
+- Bangladesh/VPN reliability cannot be guaranteed by any host. The design avoids backend file relay and requires real ISP/VPN route testing, resumable sessions, network-change recovery and provider Retry-After/backoff handling.
+- No APK/EXE artifacts were generated or uploaded.
