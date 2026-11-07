@@ -214,7 +214,7 @@ void main() {
       calls.add(call);
       if (call.method == 'pickRoot') return {'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Home'};
       if (call.method == 'listChildren') return [{'id': 'file-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}];
-      if (call.method == 'moveToTrash') return null;
+      if (call.method == 'moveToTrash') return {'id': 'trashed-1', 'name': 'notes.txt', 'trashFolderId': 'trash-root', 'originalParentId': 'root-doc', 'trashedAt': 1700000000000};
       return null;
     });
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage())));
@@ -224,7 +224,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move to Trash / Recycle Bin'));
     await tester.pumpAndSettle();
-    expect(find.text('Move "notes.txt" to the system Recycle Bin/Trash? It may be recoverable there.'), findsOneWidget);
+    expect(find.text('Move "notes.txt" to AUREON Trash? You can restore it later. The original file will not be permanently deleted.'), findsOneWidget);
     expect(calls.where((call) => call.method == 'moveToTrash'), isEmpty);
     await tester.tap(find.text('Move to Trash').last);
     await tester.pumpAndSettle();
