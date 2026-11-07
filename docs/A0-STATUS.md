@@ -1,7 +1,7 @@
 # AUREON A0 — Readiness and Exit-Gate Tracker
 
 **Last updated:** 2026-11-08  
-**Overall status:** <strong>IN PROGRESS</strong> — Contract and database CI are green; Android and Windows native prototypes are progressing. Production security approval, live platform integration and owner-controlled deployment/provider decisions remain open.
+**Overall status:** <strong>IN PROGRESS</strong> — Contract and existing Ktor/PostgreSQL CI are green; Android and Windows native prototypes are progressing. Owner selected Firebase Spark + Cloudflare Workers/D1, but the Worker/D1 migration, production security approval and live platform integration remain open.
 
 This file is the operational A0 checklist. A document existing in GitHub is not the same as a decision being verified or code being implemented.
 
@@ -14,6 +14,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — historical managed-KMS proposal; superseded for the current no-card personal deployment by ADR-0005 and the Cloudflare/Firebase direction.
 - [ADR-0005 Zero-cost Credential Vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md) — accepted Worker-Secret-wrapped provider credential vault with server-assisted recovery; not HSM/KMS or zero-knowledge.
+- [ADR-0006 Firebase and Cloudflare Free Platform](./adr/ADR-0006-FIREBASE-CLOUDFLARE-FREE-PLATFORM.md) — selected no-card platform direction; TypeScript Worker + D1 migration required.
 - [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; Android first vertical slice plus parallel Windows workstream after shared contracts freeze.
 - [Windows File Manager Specification](./WINDOWS-FILE-MANAGER-SPEC.md) — accepted product direction; native filesystem spike started.
 
