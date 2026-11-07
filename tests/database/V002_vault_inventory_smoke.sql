@@ -113,6 +113,16 @@ BEGIN
         user_id, provider_account_id, album_id, provider_media_item_id
     ) VALUES (u1, p3, album1, 'media-1');
 
+    -- Album membership cannot bind an album from another account.
+    BEGIN
+        INSERT INTO provider_album_memberships(
+            user_id, provider_account_id, album_id, provider_media_item_id
+        ) VALUES (u1, p1, album1, 'cross-account-media');
+        RAISE EXCEPTION 'Cross-account album membership unexpectedly succeeded';
+    EXCEPTION WHEN foreign_key_violation THEN
+        NULL;
+    END;
+
     -- A completed transaction must have a consumed timestamp and account binding.
     BEGIN
         UPDATE provider_oauth_transactions
