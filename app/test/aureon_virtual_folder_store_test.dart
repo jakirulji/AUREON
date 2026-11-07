@@ -57,6 +57,6 @@ void main() {
   test('duplicate folder names are rejected case-insensitively', () async {
     final store = AureonVirtualFolderStore();
     await store.create('Projects');
-    expect(() => store.create('projects'), throwsStateError);
+    await expectLater(store.create('projects'), throwsStateError);
   });
 }
