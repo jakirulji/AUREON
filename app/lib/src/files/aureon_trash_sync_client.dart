@@ -116,7 +116,7 @@ class AureonTrashSyncClient {
   }) =>
       _request(
         'POST',
-        _uri('/v1/trash/items/$trashItemId/\${permanentlyDelete ? 'purge' : 'restore'}'),
+        _uri('/v1/trash/items/$trashItemId/${permanentlyDelete ? 'purge' : 'restore'}'),
         body: {
           'operationId': operationId,
           'deviceId': deviceId,
@@ -177,7 +177,7 @@ class AureonIoTrashHttpTransport implements AureonTrashHttpTransport {
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException(
-        'AUREON Trash API request failed (' + response.statusCode.toString() + ').',
+        'AUREON Trash API request failed (${response.statusCode}).',
         uri: uri,
       );
     }
