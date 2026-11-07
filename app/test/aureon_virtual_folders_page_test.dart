@@ -29,7 +29,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(MaterialApp(home: AureonVirtualFoldersPage(store: store)));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Virtual folders'), findsOneWidget);
     expect(find.textContaining('live cloud account browsing'), findsOneWidget);
 
@@ -37,7 +38,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, 'Research');
     await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Research'), findsOneWidget);
   });
 }
