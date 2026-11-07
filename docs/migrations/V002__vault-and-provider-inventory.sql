@@ -77,6 +77,7 @@ CREATE TABLE provider_oauth_transactions (
     CHECK (expires_at > created_at),
     CHECK ((status = 'pending') = (consumed_at IS NULL)),
     CHECK (status <> 'completed' OR completed_provider_account_id IS NOT NULL),
+    CHECK (status = 'completed' OR completed_provider_account_id IS NULL),
     CHECK (callback_mode <> 'backend_https' OR pkce_verifier_envelope IS NOT NULL)
 );
 CREATE INDEX ix_provider_oauth_transactions_expiry
@@ -160,7 +161,8 @@ CREATE TABLE provider_albums (
     last_seen_at        timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (user_id, provider_account_id)
         REFERENCES provider_accounts(user_id, id) ON DELETE RESTRICT,
-    UNIQUE (user_id, provider_account_id, provider_album_id)
+    UNIQUE (user_id, provider_account_id, provider_album_id),
+    UNIQUE (user_id, provider_account_id, id)
 );
 
 CREATE TABLE provider_album_memberships (
