@@ -60,19 +60,16 @@ jobs:
         working-directory: packages/aureon_local_files
         run: |
           flutter pub get
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           flutter test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test shared cross-platform contracts
         working-directory: shared/aureon_contracts
         run: |
           dart pub get
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dart test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Analyze, test and compile
         working-directory: ${{ runner.temp }}/aureon-android
         run: |
+          set -euo pipefail
           flutter pub get
           flutter analyze
           flutter test
@@ -111,13 +108,17 @@ jobs:
         working-directory: packages/aureon_local_files
         run: |
           flutter pub get
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           flutter test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test shared cross-platform contracts
         shell: pwsh
         working-directory: shared/aureon_contracts
         run: |
           dart pub get
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dart test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Analyze, test and compile
         shell: pwsh
         working-directory: ${{ runner.temp }}/aureon-windows
