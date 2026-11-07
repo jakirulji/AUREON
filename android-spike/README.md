@@ -42,3 +42,16 @@ gradle :storage:assembleDebug
 ```
 
 The GitHub Actions workflow runs both commands on every relevant change.
+
+
+## Flutter application integration
+
+The eventual Android Flutter host must register this plugin once per FlutterEngine, before Dart calls the generated API:
+
+```kotlin
+flutterEngine.plugins.add(AureonStoragePlugin())
+```
+
+If the module is later packaged as a Flutter plugin and included in the generated plugin registrant, use automatic registration instead of manual registration; never do both. Each engine gets its own Pigeon message handler, while all engines share the app-scoped Room database.
+
+The plugin lifecycle registration is compile-validated by CI, but a live FlutterEngine-to-Dart round trip is still an open integration test. No provider transfer, SAF picker, production WorkManager scheduling, Keystore wrapping or Flutter UI is implemented in this spike.
