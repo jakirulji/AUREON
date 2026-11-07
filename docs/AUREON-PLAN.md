@@ -383,6 +383,7 @@ Performance targets must be measured on representative devices and networks; do 
 ## 17. Engineering documents
 
 - [A0 Status and Exit-Gate Tracker](./A0-STATUS.md) — evidence-based readiness matrix; distinguishes authored documents from validated tests and implemented code.
+- [A0 Owner Decisions](./A0-OWNER-DECISIONS.md) — remaining owner approvals, recommended defaults and decisions that cannot be made safely without budget/account/legal authority.
 - [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) — system boundaries, backend structure, data model, API contract, OAuth/security decisions, transfer contract, validation gates and A0 exit criteria.
 - [A0 Threat Model](./THREAT-MODEL.md) — STRIDE threat register, security invariants, isolated credential-broker requirement and security test gates.
 - [Privacy and Data Governance Baseline](./PRIVACY-DATA-GOVERNANCE.md) — data inventory, consent, retention, subprocessors and provider compliance requirements; legal approval remains open.
