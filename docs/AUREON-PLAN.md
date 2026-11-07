@@ -4,7 +4,7 @@
 **Status:** Living specification / planning baseline  
 **Version:** 0.1  
 **Last updated:** 2026-11-07  
-**Priority:** Android first; Windows later
+**Priority:** Android delivery first; Windows co-development begins once shared contracts are stable
 
 > This document records product decisions and plans. It is not evidence that any feature has been implemented. Implementation status must be supported by code and test evidence.
 
@@ -13,7 +13,7 @@
 - **Product:** AUREON
 - **Category:** Unified cloud storage, file management, synchronization and backup ecosystem.
 - **Positioning:** Premium, futuristic, intelligent and minimal.
-- **Platforms:** Android first; Windows later.
+- **Platforms:** Android is the first delivery target; Windows is developed in parallel after the shared contracts and lifecycle rules are stable.
 - **Principles:** Data safety first; one canonical cloud copy by default; transparent storage location; automatic operation where permitted; privacy and encryption by design; recoverability; incremental delivery.
 
 AUREON aims to provide one coherent interface for files stored across supported cloud accounts and devices: discovery, upload, download, sync, backup, offline access and storage-health monitoring. A unified interface does not turn cloud storage into physical device storage.
@@ -25,8 +25,16 @@ Brand, domain and trademark availability have not been verified.
 ### Android first
 Preferred architecture: Flutter UI and application workflows, with Kotlin for Android-native integrations and platform services. Use Android Storage Access Framework (SAF), DocumentsProvider and WorkManager where appropriate. Root is not required for the baseline app.
 
-### Windows later
-Begin Windows work only after Android's core file lifecycle is stable. Proposed architecture: Flutter Desktop UI plus native C++ integration with Microsoft's Cloud Files API for File Explorer placeholders, hydration and on-demand files.
+### Windows — primary desktop file manager
+Windows is a first-class AUREON client, not merely a cloud-sync companion. Its main experience is an Explorer-style file manager intended to become the user's preferred everyday file manager.
+
+- Build the desktop UI in Flutter, with a native Windows integration layer in C++/Win32/WinRT for filesystem operations, shell integration and Microsoft Cloud Files API.
+- Provide a familiar navigation tree, address/breadcrumb bar, tabs, file list/details, preview, search, sorting/grouping, context menus, drag-and-drop, clipboard, keyboard shortcuts and file properties.
+- Manage both local files and cloud-backed files from one consistent interface. Preserve ordinary Windows paths and provider/account provenance; show hydration/offline state clearly.
+- Use Cloud Files API for supported cloud sync-root placeholders, on-demand hydration, pinning and free-up-space behavior. Cloud placeholders must not be presented as ordinary fully-local files until hydrated.
+- Integrate with Windows through supported mechanisms: file/folder associations where Windows permits, Open With, context-menu entries, Send To, shell links, startup opt-in and pinned shortcuts. Do not kill, patch or replace explorer.exe, hijack protected shell behavior or promise a global default-file-manager setting that Windows does not expose.
+- AUREON should be the preferred launch target for the user's everyday file-management workflow, while Windows Explorer remains available for desktop/taskbar/system surfaces and compatibility.
+- Windows-specific work may proceed in parallel after shared file identity, provider, transfer and encryption contracts are frozen. Keep platform-specific APIs behind adapters and share contract tests.
 
 ### Backend
 The backend is primarily a control plane:
@@ -199,8 +207,18 @@ Store minimal metadata and encrypt sensitive metadata where appropriate. Never l
 - **A9 — Cross-device restore/sync:** metadata/account inventory restoration, provider re-authentication when required, conflict resolution.
 - **A10 — Beta/hardening:** failure injection, large-file, process-death/reboot, network-transition, restore, key-recovery, performance, accessibility and security tests.
 
-### Later Windows milestones
-Flutter desktop client; native C++ Cloud Files API; Explorer placeholders/hydration; offline pinning and free-up-space; shared identity/metadata/provider engine; installer, signing and CI. Start only after Android core is stable.
+### Windows parallel workstream
+Start Windows architecture and a thin native/UI vertical slice once shared file identity, provider capabilities, transfer lifecycle, encryption envelope and deletion-safety contracts are stable; do not wait for the entire Android app to finish.
+
+- **W0 — Windows UX/specification:** Explorer-style information architecture, interaction model, accessibility, keyboard map and Windows support matrix.
+- **W1 — Desktop shell:** Flutter desktop shell, navigation pane, address/breadcrumb bar, tabs, file list/details, preview pane, search, sorting/grouping and responsive layouts.
+- **W2 — Native filesystem adapter:** safe local enumeration, file operations, metadata, permissions, recycle-bin semantics, file locks and conflict handling.
+- **W3 — Cloud Files integration:** sync-root registration, placeholders, hydration/dehydration, pin/unpin, progress and provider-state mapping.
+- **W4 — Shell integration:** supported file/folder associations, Open With, context menu, Send To, pinned shortcuts and optional startup; no explorer.exe replacement or unsupported shell hijacking.
+- **W5 — Shared cloud workflows:** Master Account, linked provider inventory, unified search, transfer queue, offline status and account-aware File Details.
+- **W6 — Windows hardening:** installer/update/signing, crash recovery, long-path/Unicode/network-drive tests, permission and locked-file tests, accessibility, performance and security review.
+
+Android remains the first delivery target. Shared contracts and tests are common; Android Kotlin/SAF/WorkManager and Windows C++/Cloud Files implementations are separate platform workstreams.
 
 ### Optional later work
 Experimental Root module, additional providers, advanced backup policies and optional multi-copy encrypted backup.
@@ -230,7 +248,7 @@ Use GitHub Actions. Keep build configuration changes small, reviewed and verifie
 4. E2E encryption complicates recovery and multi-device onboarding.
 5. Android background execution varies by OEM and battery settings.
 6. SAF does not grant universal filesystem access or guaranteed deletion.
-7. Windows Cloud Files API is a separate native integration.
+7. Windows Cloud Files API is a separate native integration; Explorer-like UI cannot safely or universally replace protected Windows shell components.
 8. Provider quotas, pricing, API limits and terms can change.
 9. Brand/domain/trademark availability is unverified.
 
@@ -396,7 +414,8 @@ Performance targets must be measured on representative devices and networks; do 
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room as Kotlin-owned source of truth and Pigeon bridge for Flutter.
 - [Android Storage Spike](../android-spike/README.md) — Room transfer checkpoint prototype, WorkManager constraints and cleanup safety tests.
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — credential-vault KMS boundary, deployment requirements and open vendor/region decisions.
-- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — proposed implementation sequence after A0 exit.
+- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — proposed Android vertical slice plus parallel Windows workstream after shared contracts stabilize.
+- [Windows File Manager Specification](./WINDOWS-FILE-MANAGER-SPEC.md) — Explorer-style desktop UX, local/cloud operations and supported Windows shell integration.
 
 ## 18. Plan maintenance
 
@@ -409,3 +428,11 @@ For each new idea:
 6. Never silently rewrite a prior decision; record why it changed.
 
 **Source of truth:** this planning document in the AUREON GitHub repository. Keep implementation status separate from planned scope.
+
+
+### 2026-11-07 — Windows primary file-manager direction accepted
+- Confirmed Windows AUREON should be the user's preferred everyday file manager, with an Explorer-familiar interface and full local/cloud file workflows.
+- Added navigation tree, address/breadcrumb bar, tabs, details/list views, preview, search, sorting/grouping, context menus, drag-and-drop, clipboard, keyboard shortcuts and file properties to the Windows UX baseline.
+- Added a Windows C++ native filesystem and Cloud Files API integration track alongside the Flutter desktop UI.
+- Adopted hybrid parallel development: freeze shared file/provider/transfer/encryption/deletion contracts first, then advance Android and Windows platform adapters in parallel.
+- Clarified that AUREON will integrate through supported Windows associations and shell entry points; it will not kill, patch or replace explorer.exe or promise a global default-file-manager switch unsupported by Windows.

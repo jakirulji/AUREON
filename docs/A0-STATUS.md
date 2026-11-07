@@ -14,7 +14,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and offline recovery-code recommendation; owner approval pending.
 - [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
 - [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — managed KMS/HSM boundary; vendor and region intentionally undecided.
-- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; starts only after A0 exit review.
+- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; Android first vertical slice plus parallel Windows workstream after shared contracts freeze.
+- [Windows File Manager Specification](./WINDOWS-FILE-MANAGER-SPEC.md) — accepted product direction; implementation not started.
 
 | Area | Artifact | Current evidence |
 |---|---|---|
@@ -42,7 +43,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
 | E2E encryption | Open | Protocol proposal exists; approve recovery design, cross-platform test vectors and independent cryptographic review |
 | Android platform | Provisional ADR | Minimum API 26 / prototype target API 36; raise to 37 when stable SDK is available; release-time SDK policy and OEM matrix still require validation |
-| Local data layer | Prototype in progress | Room transfer checkpoint entity/DAO/repository, cleanup eligibility gate and WorkManager constraints scaffolded under android-spike; SDK setup and Gradle configuration pass. Diagnostic CI identified two toolchain constraints: Room's annotation processor supports Kotlin metadata only through 2.3, so Kotlin is pinned to 2.3.10; Android SDK 36 requires JDK 21, so CI uses JDK 21 while Java/Kotlin bytecode targets remain 17. Robolectric's JDK 21 access to jdk.internal.access.SharedSecrets is explicitly opened for the test JVM. The rerun must pass both unit tests and assembleDebug before this gate can be marked green. Pigeon contract drafted but code generation not yet validated |
+| Local data layer | Prototype in progress | Room transfer checkpoint entity/DAO/repository, cleanup eligibility gate and WorkManager constraints scaffolded under android-spike. Kotlin 2.3.10 is pinned for Room metadata compatibility; Android SDK 36 CI uses JDK 21 while Java/Kotlin bytecode targets remain 17; Robolectric's JDK 21 access to jdk.internal.access.SharedSecrets is explicitly opened for the test JVM. Pigeon 29.1.1 generation and Dart analysis, Room persistence tests, generated Kotlin bridge compilation and Android storage module assembly all passed in GitHub Actions run #42373734253. Kotlin Host API implementation is now compile/test-validated; runtime FlutterEngine registration and end-to-end Flutter↔native messenger integration remain open. |
 | Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
 | Privacy and legal | Baseline drafted; approval open | Data inventory, consent, retention and subprocessor framework documented; jurisdiction, actual retention, public privacy policy and legal review remain |
 | A1 backlog | Drafted | [First vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) created; start only after A0 exit review |
@@ -54,7 +55,8 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 3. Extend the Ktor spike with PostgreSQL transactional refresh-lease repository tests, provider OAuth code exchange, outbox processing and container build.
 4. Decide Master Account authentication/recovery, KMS deployment and first-provider OAuth scope/callback mode.
 5. Obtain independent security review of the isolated credential broker, credential vault and E2E key recovery.
-6. Complete the Android Room/Pigeon/WorkManager prototype, security reviews and operational decisions; then conduct the A0 exit review and start the [A1 vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md).
+6. Complete Android Room/Pigeon runtime registration and Flutter↔native integration, security reviews and operational decisions; then conduct the A0 exit review and start the [A1 vertical-slice backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md).
+7. Freeze shared file/provider/transfer/encryption contracts; then begin the Windows file-manager UI and native Cloud Files prototype in parallel with Android platform work.
 
 ## 4. Non-negotiable implementation safety
 

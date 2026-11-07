@@ -1,7 +1,7 @@
 # AUREON A1 — First Vertical-Slice Backlog
 
 **Status:** Draft backlog; A0 exit review still required  
-**Goal:** Deliver one end-to-end, testable Android-first path before adding multiple providers or advanced sync features.
+**Goal:** Deliver the first end-to-end Android path while establishing a parallel Windows desktop file-manager workstream after shared contracts are stable.
 
 ## A1.0 — Identity and device foundation
 - [ ] Implement Master Account registration and passkey-first authentication after ADR-0002 approval.
@@ -42,9 +42,23 @@
 - [ ] Cost model, hosting/KMS selection, backup restore drill and incident runbook.
 - [ ] Accessibility, low-storage, network-loss, token-expiry, process-death and OEM background test matrix.
 
+## Parallel Windows workstream (after shared contracts freeze)
+
+This workstream may proceed alongside Android implementation. It does not block the first Android vertical slice, and Windows-specific code must not redefine shared contracts independently.
+
+- [ ] Approve the Explorer-style Windows information architecture and interaction specification.
+- [ ] Create Flutter Windows desktop shell with navigation pane, address/breadcrumb bar, tabs, file list/details, preview, search and sorting/grouping.
+- [ ] Define keyboard shortcuts, context-menu actions, drag/drop, clipboard, file properties and accessibility behavior.
+- [ ] Implement a native C++ filesystem adapter for safe local listing and file operations, including recycle-bin semantics, permissions, locked files and conflict handling.
+- [ ] Prototype Cloud Files API sync-root registration, placeholders, hydration/dehydration, pin/unpin and progress mapping.
+- [ ] Add supported Windows shell entry points: file/folder associations where permitted, Open With, context menu, Send To and pinned shortcuts.
+- [ ] Test local and cloud files together while preserving canonical provider/account provenance and no-auto-delete rules.
+- [ ] Package, sign and test the Windows installer/update path.
+- [ ] Keep Windows Explorer available for OS shell/system surfaces; do not patch or terminate explorer.exe.
+
 ## Explicitly out of first vertical slice
 - OneDrive/Dropbox production integrations.
-- Windows Cloud Files API integration.
+- Production-grade Windows Cloud Files API integration (a prototype may proceed in parallel after shared contracts freeze).
 - Root/FUSE filesystem.
 - AI file classification or content analysis.
 - Automatic provider quota pooling or file sharding.
