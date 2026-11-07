@@ -211,7 +211,7 @@ Each installation receives a random device ID and a device-bound key pair genera
 
 ## 5. Provider OAuth and credential vault
 
-**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on the final feature boundary and provider review. [Android native OAuth and credential lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) defines the native authorization, device-held credential baseline, refresh/revocation behavior and required security tests.
+**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on the final feature boundary and provider review. [Android native OAuth and credential lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) defines native authorization and provider token lifecycle. [Cross-device cloud restore and legacy import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) records the product requirement for seamless provider restoration and indexing of existing content.
 
 ### 5.1 OAuth rules
 
@@ -224,13 +224,13 @@ Each installation receives a random device ID and a device-bound key pair genera
 
 ### 5.2 Credential storage decision
 
-Two legitimate models exist:
+Two legitimate models exist. The product requirement for seamless cross-device provider restoration now makes the consented backend vault the required target architecture, subject to security approval:
 
 **Model A — device-held provider authorization:** provider tokens remain on each device. Stronger separation from backend compromise, but a new device may need provider re-authentication.
 
 **Model B — consented backend credential vault:** encrypted refresh tokens are stored server-side using envelope encryption backed by managed KMS, with strict service identity, access logging and rotation. This improves cross-device account restoration but makes backend security more consequential.
 
-**Recommendation:** keep Model B as a proposed capability only after threat-model review, provider terms review and explicit user consent. Do not implement a backend token vault as an invisible default. File-content encryption keys must remain client-controlled and separate from OAuth credentials.
+**Recommendation:** implement Model B as the target architecture only after threat-model review, provider-terms review, explicit user consent and independent security testing. This is required for the requested cross-device experience; it must never be an invisible default. File-content encryption keys must remain client-controlled and separate from OAuth credentials. Until the vault is approved and operational, do not promise automatic provider reconnection on a new device.
 
 ## 6. Database design
 
