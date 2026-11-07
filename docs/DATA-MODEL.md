@@ -144,3 +144,28 @@ erDiagram
 - Names, local paths, Windows paths, SAF tree URIs, content:// URIs and file bytes are not stored. Display names are resolved from provider inventory.
 - Local-only files remain local-only. SAF/Win32 IDs and selected folder bookmarks are device-specific and are not portable; uploading them would create misleading Trash entries that another device cannot safely restore.
 - These records are metadata, not provider commands. Provider adapters perform actions and report confirmed outcomes. Provider retention/expiry remains authoritative.
+
+
+## Independent AUREON organization backup and provider re-link recovery
+
+The user's five Manual Recovery Keys and provider credential-vault envelopes are not the only source of recoverability. The AUREON catalog and user-created organization require an independent backup domain so provider accounts can be re-linked even after all manual keys are lost.
+
+### Logical data to preserve
+
+- Stable provider identity mapping: provider type, immutable provider subject/account ID and user-confirmed account association.
+- Provider object references: provider account ID, provider object ID, parent ID, item kind and provider version/change markers needed for safe reconciliation. Re-read mutable provider facts from provider APIs after re-link.
+- AUREON-only organization: user-created tags, favorites, virtual collections, saved views, custom sort/group preferences and other user-authored metadata.
+- Sync preferences, offline/pinning policy and resumable job checkpoints where they remain valid. Revalidate transfer state against provider truth before resuming side effects.
+- Versioned metadata schema, snapshot generation, creation time, integrity/authentication data and change-journal position.
+
+### Isolation and restore rules
+
+- Metadata backup encryption uses a separate client-controlled metadata key hierarchy. Never reuse the provider credential-vault DEK, any of the five Manual Recovery Keys, the .key passphrase or E2E file-content keys.
+- Keep encrypted snapshots and versioned deltas outside the Cloudflare-only failure domain, and cache an encrypted snapshot on authorized devices. D1-only storage does not satisfy independent disaster recovery.
+- Do not include provider passwords, access/refresh tokens, Manual Recovery Keys, Worker Secret, plaintext DEK, E2E content keys, device-local absolute paths, SAF tree URIs, Windows paths or OS permission grants.
+- Re-link provider accounts only through official OAuth authorization. Match account ownership by stable provider subject/account ID after authorization; email/display-name similarity is insufficient.
+- Re-index provider state with complete paginated scans, preserving provider IDs and actual parent relationships. The provider remains authoritative for current names, paths, hierarchy, content, permissions and trash state.
+- Restore metadata as a conflict-aware merge keyed by stable provider account subject + provider object ID. Never blindly overwrite newer provider state or resurrect provider-deleted objects.
+- Device-specific local folders and permissions must be reselected/regranted on each device.
+- If the metadata backup is lost, provider re-link still restores current cloud files and their provider folder hierarchy, but AUREON-only tags, favorites, virtual collections and custom organization may be unrecoverable.
+
