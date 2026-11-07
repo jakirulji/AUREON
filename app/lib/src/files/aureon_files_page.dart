@@ -122,7 +122,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       title: Text(title),
       content: TextFormField(initialValue: initial, autofocus: true,
         decoration: InputDecoration(labelText: label), onChanged: (value) => draft = value,
-        onSubmitted: (value) => Navigator.of(context).pop(value),
+        onFieldSubmitted: (value) => Navigator.of(context).pop(value),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
