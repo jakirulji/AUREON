@@ -6,7 +6,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 
 - Android library module: compileSdk 36 for the current prototype, minSdk 26. Move to API 37 when the stable SDK package is published and validated.
 - Room 2.8.5 stores durable transfer checkpoints. Kotlin is pinned to 2.3.10 because this Room compiler version does not yet parse Kotlin 2.4 metadata.
-- WorkManager 2.12.0 transfer constraints require connected network, battery not low and storage not low.
+- WorkManager 2.12.0 transfer constraints require connected network, battery not low and storage not low. A unique-work scheduler persists one work request per operation ID and carries the ID in input data; it accepts a provider-aware Worker from the integration layer.
 - Pigeon 29.1.1 interface contract is checked in under pigeon/; CI generates matching Dart and Kotlin APIs from the same pinned package version and analyzes/compiles both sides.
 - Generated Dart API is written to `pigeon/lib/src/aureon_storage_api.g.dart`; generated Kotlin API is written into the Android storage module under `com.aureon.storage.generated`.
 - `AureonStorageHostApiImpl` implements the generated Kotlin host contract and connects transfer lookup/pause/resume calls to the Room repository. The generated Kotlin API compiles against Flutter’s Android embedding (`flutter.jar`).
@@ -18,7 +18,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 
 - Source URI and provider upload-session references are represented as encrypted-envelope byte arrays in the schema; the byte arrays in this spike are test fixtures, not production ciphertext.
 - No method deletes a local source file. This prototype only computes whether a cleanup offer is eligible.
-- No actual provider transfer, Android Keystore wrapping, production WorkManager scheduling, SAF picker or Flutter UI is implemented yet. Pigeon generation is exercised in CI; the generated source files are created during the build.
+- No actual provider transfer Worker, Android Keystore wrapping, SAF picker or Flutter UI is implemented yet. The scheduler and WorkManager persistence path are integration-tested, but provider-aware Worker execution is still open. Pigeon generation is exercised in CI; the generated source files are created during the build.
 - The recovery planner is deterministic scaffolding; it does not yet query a real provider session or schedule actual WorkManager execution. A database close/reopen test is not a full Android process-death/reboot/OEM test.
 
 ## Build
