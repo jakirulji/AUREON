@@ -463,10 +463,16 @@ class AureonMetadataStore {
   }
 
   List<int> _randomBytes(int count) => List<int>.generate(count, (_) => _random.nextInt(256));
-  List<int> _decode(String value, int length) {
+  List<int> _decode(String value, [int? length]) {
     final bytes = base64Url.decode(base64Url.normalize(value));
-    if (bytes.length != length) throw const FormatException('Invalid local metadata field length.');
+    if (length != null && bytes.length != length) throw const FormatException('Invalid local metadata field length.');
     return bytes;
   }
 
+}
+
+String _requiredString(Map<String, Object?> map, String key) {
+  final value = map[key];
+  if (value is! String || value.isEmpty) throw FormatException('Missing or invalid $key.');
+  return value;
 }
