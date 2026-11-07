@@ -283,6 +283,8 @@ File names, folder names, MIME type, sizes and folder hierarchy can be sensitive
 
 ## 7. API contract (initial draft)
 
+**Machine-readable contract:** [OpenAPI v1 draft](./openapi/v1.yaml). The YAML file is the evolving API schema; this section explains the architectural intent and constraints. The server URL is a placeholder until hosting is selected.
+
 Base path: `/api/v1`. JSON over HTTPS. Use OpenAPI as the contract source. All authenticated requests are bound to the user and device; clients cannot choose another user's IDs.
 
 ### 7.1 Identity and devices
