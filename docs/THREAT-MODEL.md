@@ -7,8 +7,8 @@
 ## 1. Security objectives
 
 1. AUREON backend operators and database readers cannot decrypt E2E file content.
-2. In the zero-cost-first mode, provider refresh credentials are stored only as client-encrypted envelopes; the backend cannot decrypt them.
-3. The vault recovery key remains user-held and is never transmitted to the backend. A future separately consented KMS-backed mode requires a new threat review.
+2. Provider refresh credentials are stored as encrypted envelopes in D1. A narrowly scoped Cloudflare Worker credential-broker can decrypt them after authorization; this is not zero-knowledge storage.
+3. The Worker Secret is the wrapping root for the provider credential vault; it is not an HSM/KMS key. Recovery requires verified Firebase identity plus step-up policy, cooldown and audit. E2E file-content keys remain client-held.
 4. Provider access tokens are short-lived, least-scope and delivered only to the authenticated native provider adapter when direct provider API access requires them.
 5. One compromised provider account does not expose other provider accounts or Master Account sessions.
 6. Local originals and the only verified remote copy are never silently deleted.
@@ -23,7 +23,7 @@
 | Passkey private keys | Critical | Remain in authenticator/platform; never uploaded |
 | Recovery-code verifier | Critical | Salted/hashed storage, single-use, rotation, audit |
 | AUREON session refresh token | Critical | Opaque random value, hashed server-side, rotation/reuse detection, device binding |
-| Provider refresh token | Critical | User consent, KMS envelope encryption, broker-only decrypt, rotation and revocation |
+| Provider refresh token | Critical | AES-256-GCM envelope encryption in D1; Worker Secret-derived wrapping key; broker-only decrypt; rotation and revocation |
 | Provider access token | Critical | Short lifetime, in-memory only, no logs/UI/disk |
 | E2E content keys and recovery secret | Critical | Client-controlled; never enter backend or provider credential vault |
 | Plaintext file content | Critical | Client process/staging only; encrypted before cloud upload |
@@ -39,8 +39,8 @@
 2. Flutter presentation layer.
 3. Kotlin native domain/provider adapter and Room database.
 4. AUREON public API and identity service.
-5. Isolated credential-broker workload and managed KMS/HSM.
-6. PostgreSQL and backup systems.
+5. Cloudflare Worker runtime and Worker Secret management boundary.
+6. Cloudflare D1 and export/backup systems.
 7. Provider OAuth authorization servers.
 8. Provider file APIs and cloud storage.
 9. External networks and system browser.
@@ -74,16 +74,16 @@ A public repository, CI runner, issue tracker, analytics service and support wor
 
 ## 5. Required isolation model
 
-A normal API process must not have KMS decrypt permission for provider refresh credentials. The production credential broker must be a separately deployed workload with a distinct cloud workload identity and a narrowly scoped KMS policy.
+The production Worker must isolate credential-broker code paths from ordinary API handlers. Cloudflare Worker Secrets are available to the deployed Worker runtime and are not an independent HSM boundary; a compromised Worker deployment can potentially use the wrapping root key. Use least privilege, deployment review, strict route separation, rate limits and audit.
 
 The broker must:
 - accept only authenticated internal requests tied to a user, provider account and approved operation;
-- re-check account ownership, explicit vault consent, provider status and granted scopes;
+- re-check Firebase identity, verified email where required, account ownership, explicit vault consent, provider status and granted scopes;
 - serialize refresh operations and enforce credential-version compare-and-swap;
 - return refresh credentials only to provider SDK/HTTP code inside the broker;
 - return only a short-lived, scope-limited access token to the authenticated native adapter when direct client-to-provider transfer is required;
 - emit an audit event without token contents;
-- fail closed on KMS, policy or audit failure.
+- fail closed on secret availability, policy or audit failure.
 
 This isolated broker is a deliberately small security boundary; the rest of the backend can remain a modular monolith. If the broker cannot be deployed with separate identity and audit controls, do not enable server-side refresh-token vaulting.
 
@@ -102,13 +102,13 @@ This isolated broker is a deliberately small security boundary; the rest of the 
 
 - OAuth state/PKCE replay, redirect mismatch, code reuse and cross-device binding tests.
 - Cross-user/cross-provider database isolation tests.
-- KMS deny/failure, broker identity and audit-failure fail-closed tests.
+- Worker Secret unavailable/rotated, broker authorization and audit-failure fail-closed tests.
 - Credential refresh concurrency, lease expiry, stale commit and provider token-rotation tests against PostgreSQL.
 - Access-token redaction tests across logs, traces, exceptions and crash paths.
 - E2E encryption/decryption test vectors across Android and Windows; independent cryptographic review.
 - Malicious archive/path/MIME/metadata tests.
 - Upload ambiguity, duplicate reconciliation, network loss, process death, quota, auth expiry and original-preservation tests.
-- Backup restore, key rotation, account revocation and incident-response tabletop exercises.
+- D1 export/restore, Worker Secret offline recovery and rotation, account revocation and incident-response tabletop exercises.
 
 ## 8. Residual risks and explicit limitations
 
@@ -122,10 +122,10 @@ This isolated broker is a deliberately small security boundary; the rest of the 
 
 ## 9. Zero-cost-first provider credential vault
 
-The accepted current design is [ADR-0005](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md): the client encrypts provider refresh credentials with AES-256-GCM, per-account data keys and a user-held random recovery key. The backend stores ciphertext only and has no decrypt capability.
+The accepted direction is [ADR-0005](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md): provider credentials are AES-256-GCM encrypted in D1, with a per-vault DEK wrapped by a key derived from a Cloudflare Worker Secret. The Worker credential-broker can decrypt after recovery/operation policy checks. This is not zero-knowledge storage and is not HSM-backed.
 
-- A database dump or API-process compromise must not reveal provider refresh tokens.
-- New-device restore requires the user to enter the recovery key once; loss of that key requires provider relinking.
+- A D1 dump alone must not reveal provider refresh tokens. A compromised Worker runtime/deployment with access to the Worker Secret can potentially decrypt them.
+- New-device recovery uses verified Firebase identity, step-up policy, cooldown and audit; email-only recovery is a weaker fallback. Loss of the Worker Secret and its offline emergency copy can require provider relinking.
 - Android Keystore and Windows OS-protected storage protect the locally unlocked vault.
-- Do not add a shared server-side environment master key as a substitute for managed KMS.
-- The previous isolated KMS credential-broker design is deferred until a paid, owner-approved managed KMS/HSM deployment and independent review exist.
+- Do not describe Worker Secrets as KMS/HSM. Protect the Worker account, secret provisioning and deployment pipeline as critical trust boundaries.
+- Independent security review is mandatory before enabling production server-assisted credential recovery.
