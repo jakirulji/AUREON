@@ -149,3 +149,15 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - Provider file bytes remain direct device-to-provider transfers; backend/database/KMS quotas must not cap file payload throughput. If metadata API/database is unavailable, persist jobs locally and resume metadata sync later.
 - Bangladesh/VPN reliability cannot be guaranteed by any host. The design avoids backend file relay and requires real ISP/VPN route testing, resumable sessions, network-change recovery and provider Retry-After/backoff handling.
 - No APK/EXE artifacts were generated or uploaded.
+
+
+## Cloudflare/Firebase no-card platform decision (2026-11-08)
+
+- Owner approved moving away from OCI signup because the available DBBL Nexus card cannot satisfy OCI's international payment-card verification.
+- New platform direction: Firebase Authentication Spark (Email/Password + email verification; no SMS), Cloudflare Workers API, Cloudflare D1 metadata/encrypted-envelope store, and the initial `workers.dev` hostname (no purchased custom domain).
+- Provider credential records will use AES-256-GCM envelopes with a per-vault DEK wrapped by a key derived from a Cloudflare Worker Secret. This is server-assisted recovery, **not HSM/KMS and not zero-knowledge**; a compromised Worker deployment/account may be able to decrypt credential vaults.
+- Recovery must validate Firebase identity and verified email, enforce ownership, rate limits, one-time challenge, cooldown, notifications, audit and device/session revocation. Passkey or trusted-device step-up is preferred. Email-only recovery is a weaker fallback.
+- E2E file-content keys remain client-controlled and separate; email recovery cannot decrypt file contents. File bytes remain direct device-to-provider transfers.
+- Critical migration: the existing Ktor/PostgreSQL backend cannot run unchanged on Cloudflare Workers/D1. A TypeScript Worker API and D1 schema/migration/test suite must be built and validated before client cutover. Keep the existing backend prototype until parity and security tests pass.
+- Worker Secret is not an HSM; maintain a protected offline emergency copy and versioned rotation/restore drills. Loss of both the Worker Secret and its emergency copy can make provider credentials unrecoverable.
+- No cloud resource has been provisioned, no billing upgrade has been enabled, and no production deployment has occurred. This documentation decision is not implementation or deployment evidence.
