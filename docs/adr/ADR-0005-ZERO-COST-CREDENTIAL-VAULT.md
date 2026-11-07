@@ -1,65 +1,62 @@
-# ADR-0005 — Zero-cost-first credential vault and provider transfer
+# ADR-0005 — Zero-cost credential vault with server-assisted recovery
 
-**Status:** Accepted engineering default for the no-paid-services phase  
+**Status:** Accepted owner direction for the personal, zero-cost-first phase; implementation and security review pending  
 **Date:** 2026-11-08
 
 ## Context
 
-The owner requires a security-first design with no mandatory paid service. Managed KMS is not generally free: Google Cloud KMS's always-free cryptographic allowance applies only to keys created using Autokey, while ordinary software-protected key versions are billable. Free compute/database tiers also have hard limits, suspension behavior, and possible network/egress charges.
+The owner cannot use OCI signup because the available DBBL Nexus card is not an international Visa/Mastercard payment card. A no-payment-card onboarding path is required. The owner also wants to recover the provider credential vault on a new device after losing the user recovery key, using verified email as part of the recovery process.
 
-A backend-held master key in an environment variable, database, GitHub Actions secret, or Cloudflare Worker secret is not an equivalent replacement for managed KMS/HSM. It creates a concentrated decryption capability and weakens the credential-vault threat boundary.
+The previous client-only design protected provider refresh credentials from the backend, but made recovery impossible if every copy of the user recovery key was lost. The newly accepted direction deliberately trades some server-side confidentiality for recoverability.
 
 ## Decision
 
-For the zero-cost-first phase, AUREON will use a **client-encrypted provider credential vault**. The backend stores and synchronizes opaque ciphertext only; it never receives the vault recovery key and cannot decrypt provider refresh credentials.
+For the personal zero-cost-first deployment candidate:
 
-1. On first vault setup, the client generates a cryptographically random 256-bit recovery key. Show it once with checksum/verification and require the user to store it offline. Never transmit or log it.
-2. Derive purpose-separated wrapping keys using HKDF-SHA-256 from the random recovery key and a per-vault random salt. Do not use a human password directly as an encryption key.
-3. Generate independent random per-account data-encryption keys. Encrypt each provider refresh-token record with AES-256-GCM using a fresh 96-bit nonce and authenticated metadata (vault ID, provider, account ID, credential version, schema version). Wrap each per-account key with the vault wrapping key.
-4. Store only ciphertext, wrapped per-account key, nonce, salt, algorithm/schema version and non-secret account metadata on the server. Never store the recovery key or plaintext refresh/access token.
-5. After Master Account sign-in on a new device, restore account inventory and encrypted vault blobs. Ask for the recovery key once to unlock the vault on that device. Store only a locally protected copy using Android Keystore or Windows DPAPI/CNG-backed protection.
-6. Refresh provider credentials in the native client/provider adapter. Keep access tokens memory-only. Persist rotated refresh-token ciphertext using compare-and-swap credential versions; reconcile concurrent device updates and provider rotation before retrying.
-7. If the recovery key is lost, AUREON cannot decrypt the vault. The user must relink affected provider accounts. Do not add a hidden server recovery key or support override.
-8. Keep E2E file-content keys in a separate client-controlled hierarchy. Provider OAuth credentials and file-content keys must never share a wrapping key or recovery secret.
-9. Do not expose production restore, Trash mutation or destructive provider operations until authenticated provider execution, ownership checks, receipts and recovery behavior are implemented and tested.
+- Firebase Authentication Spark is the Master Account identity provider, using email/password and verified email. SMS is out of scope. No custom domain is required for the initial flow.
+- Cloudflare Workers is the API and narrowly scoped credential-vault recovery runtime.
+- Cloudflare D1 stores account metadata, provider inventory and encrypted credential-vault envelopes. It stores no plaintext provider refresh tokens or wrapping keys.
+- A Cloudflare Worker Secret holds a high-entropy credential-vault wrapping root key. This is **not KMS/HSM**, is not an independently isolated hardware key, and is accessible to the deployed Worker runtime. A Worker compromise or malicious deployment with access to the secret can expose all credential vaults protected by that key.
+- The Worker may unwrap a user's credential-vault data-encryption key only after authenticating the Firebase identity, checking verified email, enforcing the recovery policy and writing an audit event. The normal API surface must not expose a generic decrypt endpoint.
+- Email verification initiates recovery; it is not proof against compromise of the user's email account. Require recent reauthentication, notify existing trusted devices/email, impose a recovery cooldown, and use a passkey or trusted device as an additional factor when available. Any email-only fallback must be explicitly disclosed as a weaker recovery path and rate-limited.
+- Keep the existing random user recovery key as an optional offline emergency factor/backup where feasible, but losing it must not be the sole reason recovery fails under the approved server-assisted path.
+- E2E file-content keys remain in a separate client-controlled hierarchy. They are never wrapped by the Worker Secret, sent to Workers, stored in D1 in plaintext, or recoverable through email-only credential-vault recovery.
+- Provider refresh tokens remain encrypted at rest in D1. The Worker decrypts only inside the provider credential-broker path, refreshes provider credentials, and returns only a short-lived, least-scope access token to the authenticated native adapter when direct client-to-provider transfer requires it. Access tokens are memory-only and never logged.
+- File bytes continue to flow directly between device and provider APIs; they must not pass through Workers or D1 in the normal transfer path.
 
-## Cryptographic and implementation requirements
+## Envelope and recovery requirements
 
-- Use vetted platform/library implementations; never implement AES, HKDF, secure random generation or key comparison manually.
-- Use AES-256-GCM with unique random nonce per key; reject nonce reuse and malformed/authentication-failed records.
-- Use constant-time verification where applicable; clear sensitive buffers as far as the platform permits.
-- Bind provider/account/version metadata as AEAD additional authenticated data to prevent ciphertext swapping between accounts.
-- Add versioned envelopes and migration tests before changing algorithms or metadata.
-- Never put tokens, recovery keys, decrypted envelopes or upload-session bearer URLs in logs, analytics, crash reports, clipboard history or support bundles.
-- A missing/invalid recovery key, corrupt ciphertext, failed authentication or unsupported schema must fail closed. Preserve encrypted blobs and local source files.
-- Apply rate limits, account ownership checks, device revocation, and optimistic concurrency on vault update APIs.
-- Do not claim the backend credential vault is protected by KMS in this phase: it is client-side encryption with a user-held recovery secret.
+1. Generate a random per-vault data-encryption key (DEK) and encrypt provider credential records with AES-256-GCM, fresh random 96-bit nonce per key, and authenticated metadata binding vault ID, owner UID, provider account ID, credential version and schema version.
+2. Wrap the per-vault DEK with a key-encryption key derived from the Worker Secret using HKDF-SHA-256 with a unique random per-vault salt and a domain-separation label. Store only the wrapped DEK, salt, nonce, key version ID and ciphertext in D1.
+3. Keep the Worker Secret out of source control, D1, GitHub Actions, client apps, logs and analytics. Provision it only through Cloudflare's secret-management interface. Maintain an owner-controlled offline emergency copy under a separate secure storage procedure; never put it in the public repository or chat.
+4. Version the wrapping key. Rotation must support decrypting old envelopes during a controlled migration; never delete the old secret/version until all records are rewrapped and recovery tests pass.
+5. The Worker must validate Firebase ID tokens (signature, issuer, audience, expiry), require verified email for recovery, derive owner identity from the verified token (never a client-supplied UID), enforce per-user/account authorization and rate limits, and fail closed if audit persistence fails.
+6. Recovery must have a short-lived one-time challenge, recent reauthentication, notifications, cooldown, revocation of lost devices/sessions, and audit trail. Do not send decrypted refresh tokens or DEKs to UI code.
+7. Keep local device copies protected by Android Keystore or Windows DPAPI/CNG. A device with an already unlocked local vault should continue to work during a temporary Worker outage, subject to provider token expiry/revocation.
+8. If the Worker Secret is lost, deleted, or unavailable and no valid offline emergency copy exists, affected provider credentials may be unrecoverable and must be relinked. D1 backups alone cannot replace the wrapping key.
+9. Use vetted crypto libraries/platform APIs; never implement AES, HKDF or secure random manually. Add cross-platform test vectors and independent security review before production use.
 
-## Consequences and trade-offs
+## Security and availability consequences
 
 **Benefits**
-- No KMS bill or server-side master decryption key is required.
-- A database dump alone does not reveal provider refresh tokens.
-- Provider file bytes remain direct client-to-provider; API host bandwidth and region do not constrain file upload throughput.
-- The design works with a replaceable backend/database and does not lock AUREON into a KMS vendor.
+- No payment card or paid KMS is required to begin the proposed Firebase Spark + Cloudflare Free deployment.
+- The owner can recover provider credential access on a new device without relying exclusively on the user-held recovery key.
+- Database dumps contain encrypted credential envelopes, not plaintext refresh tokens.
+- Provider file bytes remain direct device-to-provider transfers, independent of Workers/D1 payload bandwidth.
 
-**Costs / limitations**
-- A new device requires the recovery key once after Master Account login.
-- Losing the recovery key means relinking provider accounts; there is intentionally no server-side recovery bypass.
-- A compromised/unlocked endpoint can access provider credentials while the vault is unlocked.
-- Cross-device concurrent refresh-token rotation needs careful conflict reconciliation.
-- This design is not a substitute for an independent cryptographic review.
+**Costs and limitations**
+- This is not zero-knowledge provider credential storage: the Worker runtime has a narrowly intended but real ability to decrypt provider credentials.
+- Worker Secret is not an HSM/KMS and does not provide hardware-backed key isolation or independent cryptographic authorization.
+- A compromised Worker deployment, Cloudflare account or secret-management control plane can compromise the provider credential vault. Minimize Worker permissions, protect account MFA, review deployments and keep immutable audit records where possible.
+- Firebase email verification alone is vulnerable if the email account is compromised. Cooldown and notification reduce risk but do not eliminate it.
+- Cloudflare Free quotas, service availability and D1 limits can pause metadata/recovery operations. Local jobs and known-good files must remain safe while the control plane is unavailable.
+- D1 is not PostgreSQL. Existing Ktor/PostgreSQL backend code and SQL migrations cannot be assumed to run unchanged on Workers/D1.
+- No free-tier service guarantees permanent $0 operation, unlimited usage, or uninterrupted availability.
 
-## Future migration
+## Migration and production gates
 
-If the owner later approves a paid managed KMS/HSM service, AUREON may add an isolated credential broker and offer a separately consented server-assisted vault mode. It must not silently migrate or weaken the client-encrypted vault. The file-content E2E key hierarchy remains client-controlled.
-
-## Acceptance tests
-
-- Backend/database inspection proves no recovery key or plaintext provider token is persisted.
-- Wrong key, modified ciphertext, nonce/tag corruption, account-ID swap and schema downgrade all fail closed.
-- Android and Windows produce mutually decryptable versioned test vectors.
-- New device restores encrypted inventory and unlocks only after recovery-key entry.
-- Concurrent refresh updates cannot overwrite a newer credential version.
-- Provider auth failure pauses only the affected account and never deletes local originals.
-- Logs, traces and crash paths are tested for token/key redaction.
+- Build a TypeScript Worker API and D1 schema/migrations; preserve the existing public API semantics where practical.
+- Port and test Master Account session validation, provider inventory, vault envelope storage, audit, credential broker and Trash coordination before switching clients.
+- Verify Firebase token validation, account ownership isolation, recovery cooldown, secret rotation, Worker secret loss drill, D1 backup/export and restore procedure.
+- Do not enable production credential recovery until independent security review and end-to-end Android/Windows tests pass.
+- No paid plan, paid domain, billing upgrade, or other charge without explicit owner approval.
