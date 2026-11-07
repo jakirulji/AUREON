@@ -4,7 +4,8 @@ import 'dart:io';
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:test/test.dart';
 
-void main() {\n
+void main() {
+
   group('TransferStateMachine', () {
     test('enforces the forward transfer lifecycle', () {
       expect(TransferStateMachine.canTransition(TransferState.queued, TransferState.preparing), isTrue);
