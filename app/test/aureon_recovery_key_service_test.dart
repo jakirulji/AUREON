@@ -45,6 +45,24 @@ void main() {
     await expectLater(
       service.importEncryptedKeyFile(
         bytes: bytes,
+        passphrase: 'a-long-independent-recovery-passphrase',
+        expectedVaultId: 'wrong-vault-id',
+      ),
+      throwsFormatException,
+    );
+    final tampered = List<int>.from(bytes);
+    tampered[tampered.length - 3] = tampered[tampered.length - 3] == 48 ? 49 : 48;
+    await expectLater(
+      service.importEncryptedKeyFile(
+        bytes: tampered,
+        passphrase: 'a-long-independent-recovery-passphrase',
+        expectedVaultId: set.vaultId,
+      ),
+      throwsA(anything),
+    );
+    await expectLater(
+      service.importEncryptedKeyFile(
+        bytes: bytes,
         passphrase: 'a-different-wrong-passphrase',
         expectedVaultId: set.vaultId,
       ),
