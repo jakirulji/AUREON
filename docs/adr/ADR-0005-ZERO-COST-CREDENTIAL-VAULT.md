@@ -23,6 +23,10 @@ The earlier single Worker-Secret-wrapped design was too Cloudflare-dependent. A 
 - E2E file-content keys remain in a separate client-controlled hierarchy. Neither credential-vault recovery path may decrypt E2E file content.
 - File bytes continue to flow directly between device and provider APIs; they must not pass through Workers or D1 in the normal transfer path.
 
+## Manual key file portability
+
+ADR-0007 defines two owner-facing Manual Recovery Key export formats: a plaintext `.txt` file with explicit high-risk warnings, and a password-encrypted, cross-platform `.key` container. The `.key` file uses Argon2id-derived encryption and AES-256-GCM authenticated encryption; its passphrase is separate from the AUREON account password, stays on-device, and is never uploaded. Importing the `.key` file recovers only the Manual Recovery Key. A separate current encrypted Vault Recovery Bundle or cached encrypted vault snapshot is still required to open the credential vault. See ADR-0007 for format, threat model and verification requirements.
+
 ## Manual recovery bundle and Cloudflare independence
 
 - Provide an encrypted, portable Vault Recovery Bundle export/import. It contains the encrypted credential-vault records, both wrapped-DEK envelopes, salts/nonces, algorithm and schema versions, key-version identifiers, and non-secret account/provider identifiers required to interpret the bundle.
