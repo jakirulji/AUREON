@@ -73,12 +73,17 @@ class ManualKeyEnvelope {
     if (json['kdf'] != 'HKDF-SHA-256' || json['cipher'] != 'AES-256-GCM') {
       throw const FormatException('Unsupported manual recovery envelope algorithm.');
     }
+    final salt = _requiredString(json, 'salt');
+    final nonce = _requiredString(json, 'nonce');
+    final cipherText = _requiredString(json, 'cipherText');
+    final mac = _requiredString(json, 'mac');
+    _decodeBase64(salt, expectedLength: 32);
+    _decodeBase64(nonce, expectedLength: 12);
+    _decodeBase64(cipherText, expectedLength: 32);
+    _decodeBase64(mac, expectedLength: 16);
     return ManualKeyEnvelope(
       keyId: _requiredString(json, 'keyId'),
-      salt: _requiredString(json, 'salt'),
-      nonce: _requiredString(json, 'nonce'),
-      cipherText: _requiredString(json, 'cipherText'),
-      mac: _requiredString(json, 'mac'),
+      salt: salt, nonce: nonce, cipherText: cipherText, mac: mac,
     );
   }
 }
@@ -102,7 +107,9 @@ class VaultRecoveryBundle {
   /// Opaque server-generated envelope; null until the Cloudflare broker exists.
   final Map<String, Object?>? cloudflareEnvelope;
 
-  Map<String, Object?> toJson() => {
+  Map<String, Object?> toJson() {
+    _validateBundle();
+    return {
     'format': 'AUREON-VAULT-RECOVERY-BUNDLE',
     'formatVersion': 1,
     'vaultId': vaultId,
@@ -112,6 +119,16 @@ class VaultRecoveryBundle {
     'manualKeyEnvelopes': manualKeyEnvelopes.map((e) => e.toJson()).toList(),
     'cloudflareEnvelope': cloudflareEnvelope,
   };
+  }
+
+  void _validateBundle() {
+    if (vaultId.trim().isEmpty || generation < 1 || manualKeyEnvelopes.length != 5 ||
+        manualKeyEnvelopes.map((entry) => entry.keyId).toSet().length != 5) {
+      throw const FormatException('Vault Recovery Bundle requires a vault ID, positive generation and five unique manual envelopes.');
+    }
+    for (final record in encryptedCredentialRecords) { _rejectPlaintextSecrets(record); }
+    if (cloudflareEnvelope != null) _rejectPlaintextSecrets(cloudflareEnvelope);
+  }
 
   factory VaultRecoveryBundle.fromJson(Map<String, Object?> json) {
     if (json['format'] != 'AUREON-VAULT-RECOVERY-BUNDLE' || json['formatVersion'] != 1) {
@@ -139,7 +156,7 @@ class VaultRecoveryBundle {
         ? (json['cloudflareEnvelope'] as Map).cast<String, Object?>()
         : null;
     if (cloudflare != null) _rejectPlaintextSecrets(cloudflare);
-    return VaultRecoveryBundle(
+    final bundle = VaultRecoveryBundle(
       vaultId: _requiredString(json, 'vaultId'),
       generation: _requiredInt(json, 'generation'),
       createdAtEpochMs: _requiredInt(json, 'createdAtEpochMs'),
@@ -147,6 +164,8 @@ class VaultRecoveryBundle {
       manualKeyEnvelopes: parsedEnvelopes,
       cloudflareEnvelope: cloudflare,
     );
+    bundle._validateBundle();
+    return bundle;
   }
 }
 
@@ -404,7 +423,7 @@ void _rejectPlaintextSecrets(Object? value) {
   };
   if (value is Map) {
     for (final entry in value.entries) {
-      if (entry.key is String && forbidden.contains((entry.key as String).toLowerCase())) {
+      if (entry.key is String && forbidden.contains((entry.key as String).toLowerCase().replaceAll(RegExp(r'[^a-z]'), ''))) {
         throw const FormatException('Plaintext credentials or key material are forbidden in a recovery bundle.');
       }
       _rejectPlaintextSecrets(entry.value);
