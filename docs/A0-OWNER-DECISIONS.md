@@ -45,7 +45,7 @@ No paid cloud resources should be provisioned without explicit approval.
 
 ## 5. Android support baseline
 
-**Recommendation:** minimum API 26, target API 37 for the first public Android 17 release, Room 2.8.5, WorkManager 2.12.0, Pigeon 29.1.1. These are engineering candidate pins; an Android build/prototype and release-time SDK policy check are still required.
+**Recommendation:** minimum API 26, prototype compile/target API 36, Room 2.8.5, WorkManager 2.12.0, Pigeon 29.1.1. Raise target API to 37 when the stable SDK package is published and release policy/device validation supports it. These are engineering candidate pins; Android build/prototype and release-time SDK policy checks remain required.
 
 **Owner decision:** no immediate decision required unless broader support for older Android versions is a product priority.
 
