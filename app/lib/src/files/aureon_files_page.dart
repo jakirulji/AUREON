@@ -280,7 +280,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   }
   List<AureonLocalEntry> get _visibleEntries {
     final q = _searchController.text.trim().toLowerCase();
-    final rows = _entries.where((e) => e.name != '.AUREON Trash' && (_showHidden || !e.isHidden) &&
+    final rows = _entries.where((e) => e.name != '.AUREON Trash (AUREON)' && (_showHidden || !e.isHidden) &&
       (q.isEmpty || e.name.toLowerCase().contains(q))).toList();
     rows.sort((a, b) {
       if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
@@ -435,7 +435,7 @@ class _AureonTrashPageState extends State<AureonTrashPage> {
       if (folderId == null) {
         final roots = await widget.files.listChildren(root: widget.root, parentId: widget.root.rootDocumentId);
         for (final entry in roots) {
-          if (entry.name == '.AUREON Trash' && entry.isDirectory) {
+          if (entry.name == '.AUREON Trash (AUREON)' && entry.isDirectory) {
             folderId = entry.id;
             await prefs.setString('aureon.trash.folder.$_rootKey', folderId);
             break;
