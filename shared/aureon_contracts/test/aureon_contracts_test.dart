@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:test/test.dart';
 
@@ -74,15 +77,7 @@ void main() {
     expect(checkpoint.toJson()['state'], 'waitingForAuth');
     expect(checkpoint.toJson()['totalBytes'], isNull);
   });
-}
 
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:aureon_contracts/aureon_contracts.dart';
-import 'package:test/test.dart';
-
-void main() {
   test('shared cross-platform fixture matches Dart contract serialization', () {
     final fixture = jsonDecode(
       File('../contract-fixtures/contract-v1.json').readAsStringSync(),
@@ -102,7 +97,7 @@ void main() {
     );
     expect(identity.toJson(), fixture['fileIdentity']);
 
-    final capability = ProviderCapabilities(
+    final capabilities = ProviderCapabilities(
       resumableUpload: true,
       resumableDownload: true,
       rangeDownload: true,
@@ -116,7 +111,7 @@ void main() {
       minimumChunkBytes: 262144,
       maximumChunkBytes: 8388608,
     );
-    expect(capability.toJson(), fixture['providerCapabilities']);
+    expect(capabilities.toJson(), fixture['providerCapabilities']);
 
     final checkpoint = TransferCheckpoint(
       operationId: 'operation-fixture-001',

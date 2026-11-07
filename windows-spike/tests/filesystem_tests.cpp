@@ -1,9 +1,16 @@
 #include "aureon/filesystem.hpp"
 
-#include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <string>
+
+namespace {
+bool require(bool condition, const char* message) {
+    if (!condition) std::cerr << "FAIL: " << message << '\n';
+    return condition;
+}
+}
 
 int main() {
     namespace fs = std::filesystem;
@@ -25,20 +32,25 @@ int main() {
         file << "hidden";
     }
 
+    bool ok = true;
     const auto all = aureon::filesystem::enumerate(root);
-    assert(all.size() == 3);
-    assert(all.front().is_directory);
-    assert(all.front().name == L"Nested Folder");
+    ok &= require(all.size() == 3, "enumerates all three entries");
+    ok &= require(!all.empty() && all.front().is_directory,
+                  "directories sort before files");
+    ok &= require(!all.empty() && all.front().name == L"Nested Folder",
+                  "preserves directory name");
 
     const auto visible = aureon::filesystem::enumerate(
         root, aureon::filesystem::EnumerateOptions{false, false});
-    assert(visible.size() == 2);
+    ok &= require(visible.size() == 2, "hidden entries can be excluded");
 
     const auto nested = aureon::filesystem::enumerate(root / "Nested Folder");
-    assert(nested.size() == 1);
-    assert(nested.front().name == L"nested.bin");
-    assert(nested.front().size_bytes == 5);
+    ok &= require(nested.size() == 1, "enumerates nested directory");
+    ok &= require(!nested.empty() && nested.front().name == L"nested.bin",
+                  "preserves nested file name");
+    ok &= require(!nested.empty() && nested.front().size_bytes == 5,
+                  "reads file size");
 
     fs::remove_all(root, ec);
-    return 0;
+    return ok ? 0 : 1;
 }
