@@ -75,7 +75,7 @@ CREATE TABLE provider_oauth_transactions (
         REFERENCES provider_accounts(user_id, id) ON DELETE RESTRICT,
     UNIQUE (state_sha256),
     CHECK (expires_at > created_at),
-    CHECK ((status IN ('completed', 'cancelled', 'failed', 'expired')) = (consumed_at IS NOT NULL)),
+    CHECK ((status = 'pending') = (consumed_at IS NULL)),
     CHECK (status <> 'completed' OR completed_provider_account_id IS NOT NULL),
     CHECK (callback_mode <> 'backend_https' OR pkce_verifier_envelope IS NOT NULL)
 );
