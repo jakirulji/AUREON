@@ -145,3 +145,39 @@ Review normalized schema, retention and encrypted metadata before changing V001.
 - [Google Photos APIs — Authorization scopes](https://developers.google.com/photos/overview/authorization)
 - [IETF RFC 9700 — OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700.html)
 - [Android Developers — Android Keystore](https://developer.android.com/privacy-and-security/keystore)
+
+
+## 11. Disaster recovery when every recovery key is lost
+
+The owner requires a last-resort recovery path that does not depend on retaining any of the five Manual Recovery Keys or the encrypted `.key` export. If all manual keys are lost and Cloudflare-assisted credential-vault recovery is unavailable or intentionally not used, the user must still be able to reconnect provider accounts through each provider's official OAuth authorization flow and rebuild the AUREON file view without moving or deleting existing cloud content.
+
+### Re-link and rebuild flow
+
+1. The user signs into the AUREON Master Account, or creates a replacement AUREON account and explicitly claims/relinks provider accounts where ownership can be verified.
+2. The user selects **Reconnect cloud accounts** and authorizes each Google Drive, OneDrive, Dropbox or other provider using its official OAuth flow. AUREON never asks for provider passwords or bypasses MFA.
+3. AUREON identifies each provider account using the provider's stable subject/account ID and verifies the granted scopes. A matching provider identity can be associated with the user's new AUREON account only after successful provider authorization; email/display-name similarity alone is not sufficient.
+4. AUREON performs a complete, paginated, metadata-first inventory scan, preserving provider object IDs, real parent IDs, folder hierarchy, shared/shortcut/trash states and provider versions. It resumes safely after interruption and reconciles changes since the previous scan.
+5. AUREON rebuilds the unified file browser and derived categories from provider truth. Existing provider files remain where they are; re-link/import is read-only by default and must never duplicate, rename, move or delete provider originals.
+6. AUREON restores prior AUREON-specific organization from the independent encrypted metadata backup described below. If no such backup exists, it reconstructs what it can from provider metadata and clearly identifies user-created organization that could not be recovered.
+
+### Independent AUREON metadata backup
+
+- Keep the AUREON organization/catalog backup logically and cryptographically separate from provider OAuth credentials, the five Manual Recovery Keys, the .key export and the provider credential-vault DEK.
+- Back up the minimum metadata needed to reproduce the prior experience: stable provider account identity mappings; provider object IDs and parent relationships; AUREON virtual collections; user-created tags; favorites; pinned/recent views where opted in; custom sort/group settings; sync and offline policies; transfer/job checkpoints; and metadata for AUREON-managed aliases or virtual organization.
+- Provider-native names, paths, hierarchy, sizes, MIME types, modified timestamps, trash status and permissions must be re-read from the provider where possible rather than trusted as stale backup facts.
+- Keep a versioned, integrity-protected metadata snapshot in an independent backup location and cache an encrypted copy on authorized devices. Cloudflare D1 alone is not an independent backup if Cloudflare is unavailable.
+- For sensitive metadata, use client-side authenticated encryption with a separate metadata key hierarchy. Do not reuse the provider credential-vault DEK, any Manual Recovery Key, the .key passphrase or E2E file-content keys. Define a recovery policy that permits restoring this organization backup after provider re-link without exposing provider credentials.
+- Keep snapshots and an append-only change journal or equivalent versioned deltas so the last known organization can be reconstructed. Expose backup freshness, last successful snapshot, and any unsynced changes in Settings.
+- Do not store device-specific filesystem handles, SAF tree URIs, Windows paths, local absolute paths or OS permission grants as portable metadata. Each device must reselect its local folder and regrant OS permissions.
+- Metadata restore is a merge, not blind overwrite: match by stable provider account subject + provider object ID; detect deleted/replaced objects, duplicate identities, conflicts and stale versions; preserve provider truth and offer conflict resolution where needed.
+- If the independent metadata backup is also lost, AUREON can still re-index provider files and rebuild original provider folder hierarchy, but cannot guarantee restoration of AUREON-only tags, favorites, virtual collections, custom organization or settings that existed only in the lost backup.
+
+### Acceptance criteria
+
+- Delete all five manual recovery keys and make the .key export unavailable in a test account; ensure official provider re-link still works.
+- Reconnect a provider account and rebuild the complete file index from provider APIs without moving, renaming, duplicating or deleting existing cloud files.
+- Restore a metadata snapshot on a clean Android or Windows device and reproduce AUREON-only organization against stable provider object IDs.
+- Test missing, stale, corrupted and conflicting metadata snapshots; never silently replace newer provider state.
+- Verify that no OAuth credential, recovery key, DEK, device-local path or OS permission grant appears in the metadata backup.
+- Verify device-local folder bookmarks require fresh per-device permission grants after restore.
+- When metadata backup is absent, show a precise recovery limitation while still offering provider re-link and re-index.
