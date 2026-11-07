@@ -30,6 +30,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Set up Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Export Flutter SDK path
+        shell: bash
+        run: |
+          FLUTTER_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v flutter)")")")"
+          echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> "$GITHUB_ENV"
+          flutter --version
+          flutter precache --android
       - name: Accept Android SDK licenses and install API 36
         shell: bash
         run: |
@@ -45,9 +57,23 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.13"
+      - name: Generate and analyze Pigeon APIs
+        working-directory: android-spike/pigeon
+        run: |
+          flutter pub get
+          mkdir -p lib/src
+          mkdir -p ../storage/src/main/kotlin/com/aureon/storage/generated
+          dart run pigeon --input aureon_storage_api.dart \
+            --dart_out lib/src/aureon_storage_api.g.dart \
+            --kotlin_out ../storage/src/main/kotlin/com/aureon/storage/generated/AureonStorageApi.g.kt \
+            --kotlin_package com.aureon.storage.generated
+          flutter analyze --no-pub
       - name: Run Room persistence tests
         working-directory: android-spike
         run: gradle --no-daemon --stacktrace --info :storage:testDebugUnitTest
+      - name: Compile generated Kotlin bridge
+        working-directory: android-spike
+        run: gradle --no-daemon :storage:compileDebugKotlin
       - name: Assemble Android storage module
         working-directory: android-spike
         run: gradle --no-daemon :storage:assembleDebug
