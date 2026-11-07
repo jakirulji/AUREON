@@ -19,6 +19,9 @@ jobs:
   android-storage:
     name: Compile and test Room storage spike
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,10 +30,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install Android 17 SDK
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      - name: Accept Android SDK licenses and install API 37
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -mindepth 2 -maxdepth 2 -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" --install "platforms;android-37" "build-tools;36.0.0" "platform-tools"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
