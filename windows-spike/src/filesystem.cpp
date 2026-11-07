@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <bcrypt.h>
+#include <cfapi.h>
 #include <shlobj.h>
 #include <shobjidl.h>
 
@@ -328,6 +329,57 @@ OperationResult move_to_recycle_bin(const std::filesystem::path& source) {
     if (entry_exists(source)) return failure(OperationError::recycle_bin_unavailable);
 
     return OperationResult{true, OperationError::none, {}, {}};
+}
+
+OperationResult register_sync_root(const std::filesystem::path& sync_root) {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(sync_root, ec) || ec) {
+        return failure(OperationError::destination_invalid);
+    }
+    const auto normalized = std::filesystem::canonical(sync_root, ec);
+    if (ec) return failure(map_error(ec));
+
+    static const GUID provider_id =
+        {0x8b42a731, 0x5d16, 0x4c2a, {0x91, 0x5f, 0x2d, 0x78, 0x44, 0x3a, 0x10, 0x6c}};
+    const std::wstring root_identity = L"AUREON:" + normalized.native();
+
+    CF_SYNC_REGISTRATION registration{};
+    registration.StructSize = sizeof(registration);
+    registration.ProviderName = L"AUREON";
+    registration.ProviderVersion = L"0.1";
+    registration.SyncRootIdentity = root_identity.data();
+    registration.SyncRootIdentityLength =
+        static_cast<DWORD>(root_identity.size() * sizeof(wchar_t));
+    registration.FileIdentity = nullptr;
+    registration.FileIdentityLength = 0;
+    registration.ProviderId = provider_id;
+
+    CF_SYNC_POLICIES policies{};
+    policies.StructSize = sizeof(policies);
+    policies.Hydration.Primary = CF_HYDRATION_POLICY_FULL;
+    policies.Hydration.Modifier = CF_HYDRATION_POLICY_MODIFIER_NONE;
+    policies.Population.Primary = CF_POPULATION_POLICY_PARTIAL;
+    policies.Population.Modifier = CF_POPULATION_POLICY_MODIFIER_NONE;
+
+    const HRESULT hr = CfRegisterSyncRoot(
+        normalized.c_str(), &registration, &policies, CF_REGISTER_FLAG_NONE);
+    if (FAILED(hr)) return failure(OperationError::sync_root_registration_failed);
+
+    return OperationResult{true, OperationError::none, normalized, {}};
+}
+
+OperationResult unregister_sync_root(const std::filesystem::path& sync_root) {
+    std::error_code ec;
+    const auto normalized = std::filesystem::canonical(sync_root, ec);
+    if (ec || !std::filesystem::is_directory(normalized, ec) || ec) {
+        return failure(OperationError::destination_invalid);
+    }
+
+    const HRESULT hr = CfUnregisterSyncRoot(normalized.c_str());
+    if (FAILED(hr)) {
+        return failure(OperationError::sync_root_unregistration_failed);
+    }
+    return OperationResult{true, OperationError::none, normalized, {}};
 }
 
 }  // namespace aureon::filesystem

@@ -92,6 +92,18 @@ int main() {
             aureon::filesystem::OperationError::source_missing,
         "recycle operation rejects a missing source without touching the shell");
 
+    if (std::getenv("AUREON_RUN_CLOUDFILES_INTEGRATION") != nullptr) {
+        const auto sync_root = root / "AUREON Cloud Root";
+        fs::create_directories(sync_root);
+        const auto registration = aureon::filesystem::register_sync_root(sync_root);
+        ok &= require(registration.success, "registers an AUREON Cloud Files sync root");
+        if (registration.success) {
+            const auto unregistration =
+                aureon::filesystem::unregister_sync_root(sync_root);
+            ok &= require(unregistration.success, "unregisters the AUREON Cloud Files sync root");
+        }
+    }
+
     if (std::getenv("AUREON_RUN_RECYCLE_BIN_INTEGRATION") != nullptr) {
         const auto disposable = root / "disposable-recycle-test.txt";
         {

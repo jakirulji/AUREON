@@ -31,4 +31,5 @@ jobs:
       - name: Run native filesystem tests
         env:
           AUREON_RUN_RECYCLE_BIN_INTEGRATION: "1"
+          AUREON_RUN_CLOUDFILES_INTEGRATION: "1"
         run: ctest --test-dir windows-spike/build -C Release --output-on-failure

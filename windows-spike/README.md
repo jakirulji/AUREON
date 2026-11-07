@@ -13,11 +13,12 @@ This is an A0 native foundation, not a complete file manager and not a Cloud Fil
 - A source that changes while being copied causes the temporary destination to be discarded; the original is never deleted.
 - Windows Shell `IFileOperation` adapter explicitly requests `FOFX_RECYCLEONDELETE`. If the recycle operation fails, the adapter returns an error and never falls back to permanent deletion.
 - Windows CI includes a disposable-file recycle-bin integration check on the ephemeral hosted runner.
+- Cloud Files API sync-root registration uses a stable AUREON provider GUID, per-root identity, full hydration and partial namespace population policies; CI registers and unregisters a disposable empty directory.
 
 ## Deliberately not included yet
 
 - ACL/security descriptor editing and full Windows error-code mapping.
-- Cloud Files API sync-root registration, hydration or dehydration.
+- Cloud Files API connection callbacks, placeholder creation, directory population, hydration/dehydration data transfer, pinning and Explorer status integration. Sync-root registration alone does not make files available on demand.
 - Shell extensions, Explorer replacement or default-app hijacking.
 
 Keep Windows Explorer available. Next native work should add a disposable-user-profile Cloud Files API integration harness and shell-compatible status/hydration behavior.

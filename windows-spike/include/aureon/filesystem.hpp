@@ -32,6 +32,8 @@ enum class OperationError {
     hash_unavailable,
     recycle_bin_unavailable,
     operation_aborted,
+    sync_root_registration_failed,
+    sync_root_unregistration_failed,
     io_error,
 };
 
@@ -57,5 +59,10 @@ OperationResult copy_file_safely(const std::filesystem::path& source,
 // Uses the Windows shell's undo-capable recycle operation. If recycling fails,
 // the function reports failure and never falls back to permanent deletion.
 OperationResult move_to_recycle_bin(const std::filesystem::path& source);
+
+// Registers an existing directory as an AUREON Cloud Files sync root.
+// Registration alone does not provide hydration; a connected callback provider is still required.
+OperationResult register_sync_root(const std::filesystem::path& sync_root);
+OperationResult unregister_sync_root(const std::filesystem::path& sync_root);
 
 }  // namespace aureon::filesystem

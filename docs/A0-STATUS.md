@@ -36,7 +36,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 - Dart `TransferStateMachine` validates transfer lifecycle transitions and requires positive remote-verification evidence before entering `verified`; tests cover normal progression, auth recovery and terminal states.
 - Android workflow **Run #38** (run ID `42376380553`) completed successfully. Pigeon generation and Dart analysis, shared contract tests, Room persistence tests, generated Kotlin bridge compilation and Android storage module assembly all passed. [View Run #38](https://github.com/jakirulji/AUREON/actions/runs/42376380553).
 - Run #37 was the preceding failed attempt caused by test-source syntax; Run #38 tested the corrected commit. This does not prove live FlutterEngine-to-Dart communication or device runtime behavior.
-- Windows C++20 directory enumeration passed CMake/CTest CI run #42375617817. Safe no-overwrite rename/move/copy plus path-traversal checks passed Windows CI run #42377088269. CNG SHA-256 source-stability and destination-integrity verification passed Windows CI run #42377313897. A Shell IFileOperation recycle-bin adapter now explicitly requests recycle-on-delete and has a disposable-file integration test queued for CI. Cloud Files API integration remains open.
+- Windows C++20 directory enumeration passed CMake/CTest CI run #42375617817. Safe no-overwrite rename/move/copy plus path-traversal checks passed Windows CI run #42377088269. CNG SHA-256 source-stability and destination-integrity verification passed Windows CI run #42377313897. A Shell IFileOperation recycle-bin adapter explicitly requests recycle-on-delete and passed its disposable-file integration test in Windows CI run #42377449840. A Cloud Files API sync-root register/unregister adapter and disposable-directory integration test are now added; CI validation is pending. Hydration callbacks, placeholder population and pinning remain open.
 
 ## 2. Remaining A0 gates
 
@@ -62,7 +62,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 2. Preserve the validated V001/V002 baseline; future schema changes must use new ordered migrations and regression tests.
 3. Extend the backend OAuth exchange path with provider-specific validation and callback transaction binding; keep credentials out of logs and UI.
 4. Validate the Android post-reopen recovery planner, then complete FlutterEngine↔Dart round-trip integration, provider-session reconciliation, process-death/reboot tests and SAF tests.
-5. Validate the Shell recycle-bin integration test, then add a disposable-user-profile Cloud Files API sync-root/hydration integration harness.
+5. Validate Cloud Files API sync-root registration/unregistration in CI, then implement callback connection, placeholder population/hydration and Explorer status integration.
 6. Resolve Master Account auth/recovery, OAuth scopes/callback, KMS/hosting/cost, privacy/legal and E2E recovery decisions with the owner.
 7. Obtain independent security review of the credential broker, credential vault and E2E key recovery; then conduct the A0 exit review. Do not start A1 before this review.
 
