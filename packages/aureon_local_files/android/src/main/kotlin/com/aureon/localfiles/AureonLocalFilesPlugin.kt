@@ -4,8 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.provider.OpenableColumns
-import android.database.Cursor
 import android.provider.DocumentsContract.Document
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -67,7 +65,6 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
         }
@@ -95,7 +92,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         }
         try {
             val granted = data.flags and
-                (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
             activityBinding?.activity?.contentResolver?.takePersistableUriPermission(uri, granted)
             val documentId = DocumentsContract.getTreeDocumentId(uri)
             val name = queryDisplayName(uri) ?: "Selected folder"
@@ -158,7 +155,6 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                             "isHidden" to false,
                             "sizeBytes" to if (isDirectory || cursor.isNull(sizeCol)) null else cursor.getLong(sizeCol),
                             "modifiedEpochMs" to if (cursor.isNull(modifiedCol)) null else cursor.getLong(modifiedCol),
-                            "canWrite" to (flags >= 0 && (cursor.getInt(flags) and Document.FLAG_SUPPORTS_WRITE) != 0)
                         )
                     )
                 }
