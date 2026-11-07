@@ -55,9 +55,9 @@ A public repository, CI runner, issue tracker, analytics service and support wor
 | T-02 | Recovery-code theft or social engineering | Account takeover | High-entropy single-use codes, hashed verifiers, step-up checks, notification and delayed recovery option |
 | T-03 | OAuth login CSRF or account-link substitution | Attacker links their cloud account to victim's AUREON account | Random state, PKCE S256, exact redirect allowlist, initiating user/device binding, one-time transaction, verify provider subject |
 | T-04 | OAuth authorization code/verifier leaked in logs | Provider account compromise | TLS, short TTL, one-time code exchange, no request-body/query logging, secret redaction |
-| T-05 | Database dump exposes provider refresh tokens | Long-term provider account compromise | KMS-wrapped envelopes; database alone cannot decrypt; key versioning and audit |
-| T-06 | Ordinary API service or insider abuses KMS decrypt | Bulk provider account compromise | Separate credential-broker deployment/workload identity; broker-only KMS decrypt; allowlisted operations; per-user/account authorization; audit/alerting |
-| T-07 | KMS outage or IAM denial causes unsafe fallback | Plaintext secret exposure | Fail closed; pause only affected account; never fall back to static local key or plaintext |
+| T-05 | D1 dump exposes provider refresh tokens | Long-term provider account compromise | AES-GCM envelopes; D1 alone has no wrapping secret; key versioning and audit |
+| T-06 | Compromised Worker deployment or insider abuses Worker Secret | Bulk provider account compromise | Isolated broker code path, least privilege, reviewed deployments, one-time challenges, per-user/account authorization, audit/alerting; acknowledge Worker runtime can access secret |
+| T-07 | Worker Secret unavailable or misconfigured | Credential recovery/refresh outage | Fail closed; pause affected account; preserve local unlocked sessions where safe; never fall back to plaintext |
 | T-08 | Refresh race overwrites a newer rotated token | Account disconnect or token loss | Per-account lease, compare-and-swap credential version, stale-worker rejection, provider refresh fault tests |
 | T-09 | Access token leaks through Flutter state, crash log or disk | Temporary provider data access | Deliver only to native adapter, memory-only, no logs/analytics/UI; short expiry |
 | T-10 | Backend compromise attempts to decrypt E2E files | User file confidentiality loss | Content keys never sent to backend; encrypt client-side; independent E2E key hierarchy |
@@ -68,9 +68,9 @@ A public repository, CI runner, issue tracker, analytics service and support wor
 | T-15 | Upload failure incorrectly triggers local deletion | Permanent data loss | Original-preservation state machine; verify remote object and key metadata; explicit opt-in and OS permission |
 | T-16 | Cross-user or cross-provider account ID substitution | Data disclosure or mutation | Composite ownership FKs, owner scoping in every query, negative integration tests |
 | T-17 | Malicious provider response or compromised provider account | Wrong metadata or unexpected file state | Schema validation, provider account isolation, no automatic destructive action |
-| T-18 | Abuse of inventory scan/KMS/transfer APIs | Cost spike or denial of service | Per-user quotas, page/concurrency bounds, backoff, budget alerts, KMS operation caps |
+| T-18 | Abuse of inventory scan/recovery/transfer APIs | Resource exhaustion or account takeover | Per-user quotas, page/concurrency bounds, backoff, recovery rate limits and cooldown |
 | T-19 | Logs, traces, crash reports or support bundle contain secrets | Broad secondary exposure | Structured allowlist logging, redaction tests, no request bodies/query secrets, retention controls |
-| T-20 | Backup theft or restore to insecure environment | Persistent data and key exposure | Encrypted backups, restricted restore identities, restore drills, KMS region/key controls and audit |
+| T-20 | D1 backup theft or restore without wrapping secret | Credential exposure or failed recovery | Encrypted exports, restricted access, restore drills, offline Worker Secret emergency copy and audit |
 
 ## 5. Required isolation model
 
@@ -89,7 +89,7 @@ This isolated broker is a deliberately small security boundary; the rest of the 
 
 ## 6. Security invariants
 
-- No plaintext provider refresh token, OAuth code, PKCE verifier, E2E content key, recovery secret or KMS key material in source control, logs, telemetry, crash reports or ordinary database columns.
+- No plaintext provider refresh token, OAuth code, PKCE verifier, E2E content key, recovery secret or Worker Secret material in source control, logs, telemetry, crash reports or ordinary database columns.
 - No provider refresh token returned to Flutter or Android clients.
 - No E2E content key or plaintext file content sent to the backend in the normal direct-transfer path.
 - No account/provider identity derived from client-supplied user IDs without server ownership verification.
