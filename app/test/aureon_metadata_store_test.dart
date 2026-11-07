@@ -49,6 +49,10 @@ void main() {
     expect(snapshot.rootFolders.single.folders.single.name, 'Design');
     expect(snapshot.rootFolders.single.folders.single.files.single.reference.stableKey, reference.stableKey);
     expect(snapshot.rootFolders.single.folders.single.files.single.order, 0);
+    final catalog = File('${root.path}${Platform.pathSeparator}AUREON${Platform.pathSeparator}metadata${Platform.pathSeparator}catalog-1.aureon');
+    final persisted = await catalog.readAsString();
+    expect(persisted, isNot(contains('mockup.fig')));
+    expect(persisted, isNot(contains('Projects')));
   });
 
   test('folder move rejects cycles and delete only removes AUREON metadata', () async {
@@ -70,7 +74,6 @@ void main() {
   });
 
   test('duplicate sibling names are rejected but names may repeat in other branches', () async {
-    final store = AureonMetadataStore();
     await store.createFolder('Projects');
     var snapshot = await store.load();
     final projects = snapshot.rootFolders.single;
