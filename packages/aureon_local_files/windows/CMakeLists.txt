@@ -9,4 +9,5 @@ set_target_properties(aureon_local_files_plugin PROPERTIES
   CXX_VISIBILITY_PRESET hidden
 )
 target_compile_features(aureon_local_files_plugin PUBLIC cxx_std_17)
+target_include_directories(aureon_local_files_plugin PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(aureon_local_files_plugin PRIVATE flutter flutter_wrapper_plugin ole32 shell32)

@@ -132,8 +132,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 Document.COLUMN_DISPLAY_NAME,
                 Document.COLUMN_MIME_TYPE,
                 Document.COLUMN_SIZE,
-                Document.COLUMN_LAST_MODIFIED,
-                Document.COLUMN_FLAGS
+                Document.COLUMN_LAST_MODIFIED
             )
             val entries = mutableListOf<Map<String, Any?>>()
             resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
@@ -145,7 +144,6 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 while (cursor.moveToNext()) {
                     val mime = cursor.getString(mimeCol)
                     val isDirectory = mime == Document.MIME_TYPE_DIR
-                    val flags = cursor.getColumnIndex(Document.COLUMN_FLAGS)
                     val id = cursor.getString(idCol)
                     entries.add(
                         mapOf(
