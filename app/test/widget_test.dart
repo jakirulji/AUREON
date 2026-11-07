@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:aureon/main.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
+import 'package:aureon/src/files/aureon_operation_history.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -266,6 +267,29 @@ void main() {
       'sourceParentId': 'trash-root', 'targetParentId': 'original-parent',
     });
     expect(find.text('Trash is empty'), findsOneWidget);
+  });
+
+  testWidgets('Operation history page displays local records', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      AureonOperationHistory.storageKey: jsonEncode([
+        {
+          'id': 'history-1',
+          'kind': 'copy',
+          'itemName': 'notes.txt',
+          'sourceLocation': 'Documents',
+          'destinationLocation': 'Documents / notes-copy.txt',
+          'succeeded': true,
+          'occurredAtMs': 1700000000000,
+          'errorCode': null,
+        },
+      ]),
+    });
+    await tester.pumpWidget(const MaterialApp(home: AureonOperationHistoryPage()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Copy • notes.txt'), findsOneWidget);
+    expect(find.textContaining('Success'), findsOneWidget);
+    expect(find.textContaining('Documents / notes-copy.txt'), findsOneWidget);
   });
 
   testWidgets('AUREON dashboard still renders', (tester) async {
