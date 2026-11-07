@@ -289,7 +289,7 @@ class AureonRecoveryKeyService {
     final keys = List<ManualRecoveryKey>.generate(keyCount, (index) {
       final raw = _randomBytes(keyBytes);
       return ManualRecoveryKey(
-        id: 'manual-${generation}-${index + 1}-${_hex(_randomBytes(6))}',
+        id: 'manual-$generation-${index + 1}-${_hex(_randomBytes(6))}',
         value: _hex(raw),
       );
     });
