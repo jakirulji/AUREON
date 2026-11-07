@@ -245,6 +245,7 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
+      if (call.method == 'listSystemTrash') return <Map<String, Object?>>[];
       if (call.method == 'listChildren') {
         return (call.arguments as Map)['parentId'] == 'trash-root'
           ? [{'id': 'trashed-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}]
