@@ -22,7 +22,7 @@ void main(){
    return null;
   });
   await tester.pumpWidget(const MaterialApp(home:AureonFilesPage()));
-  await tester.tap(find.text('Choose folder'));await tester.pumpAndSettle();
+  await tester.tap(find.byType(OutlinedButton));await tester.pumpAndSettle();
   expect(find.text('Documents'),findsOneWidget);
   expect(find.text('Projects'),findsOneWidget);
   expect(find.text('notes.txt'),findsOneWidget);
