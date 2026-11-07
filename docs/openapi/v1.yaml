@@ -1,0 +1,1252 @@
+openapi: 3.1.0
+info:
+  title: AUREON Control Plane API
+  version: 0.1.0
+  summary: Initial contract for AUREON identity, devices, provider accounts, file catalog, sync, and transfer coordination.
+  description: |
+    Draft contract for the AUREON Android-first product.
+    File bytes are transferred directly between the client and provider APIs
+    where supported. This API is a control plane; it does not expose a generic
+    file-content proxy. Provider quotas remain independent and must not be
+    pooled or bypassed.
+    This specification is not a claim that the API has been implemented.
+servers:
+  - url: https://api.example.invalid/api/v1
+    description: Placeholder only; production host has not been selected.
+tags:
+  - name: Identity
+  - name: Devices
+  - name: Providers
+  - name: Provider Accounts
+  - name: Files
+  - name: Sync
+  - name: Transfers
+security:
+  - bearerAuth: []
+    deviceId: []
+paths:
+  /auth/register:
+    post:
+      tags: [Identity]
+      operationId: registerAccount
+      summary: Create a Master Account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created; authentication method setup may still be required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/session:
+    post:
+      tags: [Identity]
+      operationId: createSession
+      summary: Create an authenticated session
+      description: Authentication challenge details depend on the selected passkey/password design and are intentionally not locked in this draft.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/session/refresh:
+    post:
+      tags: [Identity]
+      operationId: refreshSession
+      summary: Refresh an authenticated session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshSessionRequest'
+      responses:
+        '200':
+          description: Session refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/session:
+    delete:
+      tags: [Identity]
+      operationId: revokeCurrentSession
+      summary: Revoke the current session
+      responses:
+        '204':
+          description: Session revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentUser
+      summary: Get the authenticated Master Account profile
+      responses:
+        '200':
+          description: Current account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /devices:
+    get:
+      tags: [Devices]
+      operationId: listDevices
+      summary: List devices linked to the current account
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Device page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevicePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /devices/register:
+    post:
+      tags: [Devices]
+      operationId: registerDevice
+      summary: Register this installation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '201':
+          description: Device registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /devices/{deviceId}:
+    delete:
+      tags: [Devices]
+      operationId: revokeDevice
+      summary: Revoke a linked device
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '204':
+          description: Device revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /providers:
+    get:
+      tags: [Providers]
+      operationId: listProviders
+      summary: List supported provider integrations and capabilities
+      responses:
+        '200':
+          description: Provider catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Provider'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /provider-accounts/{provider}/oauth/start:
+    post:
+      tags: [Provider Accounts]
+      operationId: startProviderOAuth
+      summary: Start a provider authorization transaction
+      description: |
+        The exact redirect and callback mechanics must be finalized per provider.
+        The implementation must use official OAuth flows, PKCE where applicable,
+        least-privilege scopes, state validation and registered redirect URIs.
+        Never accept provider passwords or OTPs.
+      parameters:
+        - $ref: '#/components/parameters/Provider'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthStartRequest'
+      responses:
+        '200':
+          description: Authorization transaction created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthStartResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /provider-accounts/{provider}/oauth/callback:
+    post:
+      tags: [Provider Accounts]
+      operationId: completeProviderOAuth
+      summary: Complete a provider authorization transaction
+      description: |
+        Draft callback contract. Code exchange location, PKCE verifier custody,
+        and native deep-link handling must be selected after provider-specific
+        OAuth review. The state value must be single-use, bound to the initiating
+        user/device and expire quickly. Do not log authorization codes.
+      parameters:
+        - $ref: '#/components/parameters/Provider'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthCallbackRequest'
+      responses:
+        '200':
+          description: Provider account linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /provider-accounts:
+    get:
+      tags: [Provider Accounts]
+      operationId: listProviderAccounts
+      summary: List linked provider accounts
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Linked account page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccountPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /provider-accounts/{accountId}:
+    get:
+      tags: [Provider Accounts]
+      operationId: getProviderAccount
+      summary: Get a linked provider account
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Provider account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Provider Accounts]
+      operationId: disconnectProviderAccount
+      summary: Disconnect a provider account
+      description: Disconnecting authorization must not silently delete remote files or local originals.
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '204':
+          description: Provider account disconnected.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /provider-accounts/{accountId}/refresh-status:
+    post:
+      tags: [Provider Accounts]
+      operationId: refreshProviderAccountStatus
+      summary: Check provider authorization status
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Current authorization status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccountStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /files:
+    get:
+      tags: [Files]
+      operationId: listFiles
+      summary: List logical files in the AUREON catalog
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: parentId
+          in: query
+          required: false
+          schema:
+            type: [string, 'null']
+        - name: updatedSince
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: File page. Sensitive metadata may be returned as encrypted envelopes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /files/{fileId}:
+    get:
+      tags: [Files]
+      operationId: getFile
+      summary: Get a logical file record
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: File record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Files]
+      operationId: updateFileMetadata
+      summary: Update versioned file metadata
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFileRequest'
+      responses:
+        '200':
+          description: Updated file record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+    delete:
+      tags: [Files]
+      operationId: tombstoneFile
+      summary: Tombstone a logical file record
+      description: This endpoint does not itself delete the remote provider object or local source. Remote deletion requires a separate explicit, verified workflow and policy review.
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Tombstone accepted for synchronization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedOperation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /sync/changes:
+    get:
+      tags: [Sync]
+      operationId: getSyncChanges
+      summary: Read changes after a sync cursor
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Change page and next cursor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncChanges'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /sync/ack:
+    post:
+      tags: [Sync]
+      operationId: acknowledgeSync
+      summary: Acknowledge a successfully applied sync cursor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncAckRequest'
+      responses:
+        '204':
+          description: Cursor acknowledged.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /transfers/intent:
+    post:
+      tags: [Transfers]
+      operationId: createTransferIntent
+      summary: Register a transfer operation
+      description: The client transfers file bytes directly to/from provider APIs where supported. The operationId must be generated and persisted locally before network side effects.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferIntentRequest'
+      responses:
+        '201':
+          description: Transfer intent registered or existing idempotent result returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /transfers/{jobId}/checkpoint:
+    post:
+      tags: [Transfers]
+      operationId: checkpointTransfer
+      summary: Store a minimal transfer checkpoint
+      description: Do not send provider session secrets, OAuth tokens, encryption keys, file bytes or sensitive paths in checkpoint payloads.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferCheckpointRequest'
+      responses:
+        '200':
+          description: Checkpoint stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /transfers/{jobId}/complete:
+    post:
+      tags: [Transfers]
+      operationId: completeTransfer
+      summary: Submit remote object and verification result
+      description: Completion is accepted only after client-side verification. Server records the evidence; it cannot independently assert provider bytes unless a provider verification integration exists.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferCompleteRequest'
+      responses:
+        '200':
+          description: Transfer completion reconciled and recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /transfers/{jobId}/reconcile:
+    post:
+      tags: [Transfers]
+      operationId: reconcileTransfer
+      summary: Reconcile an ambiguous transfer outcome
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconcileTransferRequest'
+      responses:
+        '200':
+          description: Current reconciled state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /transfers/{jobId}/cancel:
+    post:
+      tags: [Transfers]
+      operationId: cancelTransfer
+      summary: Request transfer cancellation
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '202':
+          description: Cancellation requested; provider session cleanup may be asynchronous.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedOperation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    deviceId:
+      type: apiKey
+      in: header
+      name: X-AUREON-Device-Id
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 2048
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Provider:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [google_drive, onedrive, dropbox]
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Stable client-generated key for one logical mutation; persist it before network side effects.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Previously observed resource ETag/version for optimistic concurrency.
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Missing, invalid or expired authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Resource not found or not visible to this account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: State or idempotency conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    PreconditionFailed:
+      description: ETag/version precondition failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    RateLimited:
+      description: Rate limit exceeded. Respect Retry-After when present.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Suggested delay in seconds.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [loginIdentifier]
+      properties:
+        loginIdentifier:
+          type: string
+          minLength: 3
+          maxLength: 320
+          description: Normalized email or other identifier after the identity model is finalized.
+    AccountCreated:
+      type: object
+      required: [userId, status, createdAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending_verification, active]
+        createdAt:
+          type: string
+          format: date-time
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [challengeType, challenge]
+      properties:
+        challengeType:
+          type: string
+          enum: [passkey_assertion, password_proof, email_code]
+        challenge:
+          type: object
+          additionalProperties: true
+          description: Opaque challenge payload defined by the selected authentication protocol.
+    RefreshSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          writeOnly: true
+    SessionResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresAt, user]
+      properties:
+        accessToken:
+          type: string
+          writeOnly: true
+        refreshToken:
+          type: string
+          writeOnly: true
+        tokenType:
+          type: string
+          const: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/CurrentUser'
+    CurrentUser:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: [string, 'null']
+          maxLength: 120
+        status:
+          type: string
+          enum: [active, pending_verification, restricted]
+        createdAt:
+          type: string
+          format: date-time
+    RegisterDeviceRequest:
+      type: object
+      additionalProperties: false
+      required: [devicePublicKey, platform, appVersion]
+      properties:
+        devicePublicKey:
+          type: string
+          description: Encoded public key only; never submit the private key.
+        platform:
+          type: string
+          enum: [android, windows]
+        appVersion:
+          type: string
+          maxLength: 64
+        deviceLabel:
+          type: [string, 'null']
+          maxLength: 100
+        osVersion:
+          type: [string, 'null']
+          maxLength: 64
+    Device:
+      type: object
+      required: [id, platform, status, registeredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [android, windows]
+        deviceLabel:
+          type: [string, 'null']
+        appVersion:
+          type: string
+        status:
+          type: string
+          enum: [active, revoked]
+        registeredAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: [string, 'null']
+          format: date-time
+    DevicePage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Device'
+    Provider:
+      type: object
+      required: [id, displayName, connectionSupported, capabilities]
+      properties:
+        id:
+          type: string
+          enum: [google_drive, onedrive, dropbox]
+        displayName:
+          type: string
+        connectionSupported:
+          type: boolean
+        capabilities:
+          $ref: '#/components/schemas/ProviderCapabilities'
+    ProviderCapabilities:
+      type: object
+      required: [resumableUpload, rangeDownload, remoteChecksum]
+      properties:
+        resumableUpload:
+          type: boolean
+        rangeDownload:
+          type: boolean
+        remoteChecksum:
+          type: string
+          enum: [sha256, provider_hash, etag_only, unavailable]
+        maxUploadBytes:
+          type: [integer, 'null']
+          format: int64
+        notes:
+          type: array
+          items:
+            type: string
+    OAuthStartRequest:
+      type: object
+      additionalProperties: false
+      required: [scopes, redirectUri, codeChallenge, codeChallengeMethod]
+      properties:
+        scopes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+        redirectUri:
+          type: string
+          format: uri
+        codeChallenge:
+          type: string
+          minLength: 43
+          maxLength: 128
+        codeChallengeMethod:
+          type: string
+          const: S256
+    OAuthStartResponse:
+      type: object
+      required: [transactionId, authorizationUrl, expiresAt]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        authorizationUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    OAuthCallbackRequest:
+      type: object
+      additionalProperties: false
+      required: [code, state, transactionId]
+      properties:
+        code:
+          type: string
+          writeOnly: true
+        state:
+          type: string
+          writeOnly: true
+        transactionId:
+          type: string
+          format: uuid
+    ProviderAccount:
+      type: object
+      required: [id, provider, displayLabel, status, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [google_drive, onedrive, dropbox]
+        displayLabel:
+          type: string
+          maxLength: 160
+        maskedAccountIdentifier:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [connected, reauth_required, disconnected, restricted]
+        linkedAt:
+          type: string
+          format: date-time
+        capabilities:
+          $ref: '#/components/schemas/ProviderCapabilities'
+    ProviderAccountPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProviderAccount'
+    ProviderAccountStatus:
+      type: object
+      required: [accountId, status, checkedAt]
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [connected, reauth_required, disconnected, restricted]
+        checkedAt:
+          type: string
+          format: date-time
+        actionRequired:
+          type: [string, 'null']
+    FileRecord:
+      type: object
+      required: [id, version, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        parentId:
+          type: [string, 'null']
+          format: uuid
+        metadataEnvelope:
+          type: [string, 'null']
+          description: Base64-encoded, versioned encrypted metadata envelope where metadata privacy is enabled.
+        version:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [active, tombstoned, conflict, unavailable]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        etag:
+          type: string
+    FilePage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/FileRecord'
+    CreateFileRequest:
+      type: object
+      additionalProperties: false
+      required: [operationId, metadataEnvelope]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        parentId:
+          type: [string, 'null']
+          format: uuid
+        metadataEnvelope:
+          type: string
+          minLength: 1
+    UpdateFileRequest:
+      type: object
+      additionalProperties: false
+      required: [metadataEnvelope]
+      properties:
+        metadataEnvelope:
+          type: string
+          minLength: 1
+    AcceptedOperation:
+      type: object
+      required: [operationId, status, acceptedAt]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted, queued]
+        acceptedAt:
+          type: string
+          format: date-time
+    SyncChange:
+      type: object
+      required: [sequence, entityType, entityId, changeType, changedAt]
+      properties:
+        sequence:
+          type: integer
+          format: int64
+        entityType:
+          type: string
+          enum: [file, provider_account, device, setting]
+        entityId:
+          type: string
+        changeType:
+          type: string
+          enum: [created, updated, tombstoned, revoked]
+        payload:
+          type: [object, 'null']
+          additionalProperties: true
+          description: Encrypted envelope or explicitly approved non-sensitive metadata only.
+        changedAt:
+          type: string
+          format: date-time
+    SyncChanges:
+      type: object
+      required: [items, nextCursor, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncChange'
+        nextCursor:
+          type: string
+        hasMore:
+          type: boolean
+    SyncAckRequest:
+      type: object
+      additionalProperties: false
+      required: [cursor]
+      properties:
+        cursor:
+          type: string
+          maxLength: 2048
+    TransferIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [operationId, direction, providerAccountId, expectedSize, contentFingerprint, encryptionFormatVersion]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum: [upload, download]
+        fileId:
+          type: [string, 'null']
+          format: uuid
+        fileVersionId:
+          type: [string, 'null']
+          format: uuid
+        providerAccountId:
+          type: string
+          format: uuid
+        expectedSize:
+          type: integer
+          format: int64
+          minimum: 0
+        contentFingerprint:
+          type: string
+          pattern: '^[a-fA-F0-9]{64}$'
+          description: SHA-256 fingerprint of the exact transfer representation; ciphertext when E2E encryption is enabled.
+        encryptionFormatVersion:
+          type: integer
+          minimum: 0
+        targetPolicy:
+          type: string
+          enum: [canonical_location, user_selected]
+          default: canonical_location
+    TransferCheckpointRequest:
+      type: object
+      additionalProperties: false
+      required: [state, acknowledgedBytes, attempt]
+      properties:
+        state:
+          type: string
+          enum: [queued, preparing, transferring, paused, retry_wait, verifying, action_required]
+        acknowledgedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        attempt:
+          type: integer
+          minimum: 0
+        providerSessionExpiresAt:
+          type: [string, 'null']
+          format: date-time
+        safeErrorCode:
+          type: [string, 'null']
+          maxLength: 80
+    TransferCompleteRequest:
+      type: object
+      additionalProperties: false
+      required: [operationId, providerObjectId, observedSize, verification]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        providerObjectId:
+          type: string
+          maxLength: 1024
+        providerVersion:
+          type: [string, 'null']
+          maxLength: 512
+        observedSize:
+          type: integer
+          format: int64
+          minimum: 0
+        observedFingerprint:
+          type: [string, 'null']
+          pattern: '^[a-fA-F0-9]{64}$'
+        verification:
+          $ref: '#/components/schemas/VerificationEvidence'
+    VerificationEvidence:
+      type: object
+      required: [status, method, verifiedAt]
+      properties:
+        status:
+          type: string
+          enum: [passed, failed, partial]
+        method:
+          type: string
+          enum: [provider_sha256, client_readback_sha256, provider_checksum, size_only, unavailable]
+        verifiedAt:
+          type: string
+          format: date-time
+        detailsCode:
+          type: [string, 'null']
+          maxLength: 80
+    ReconcileTransferRequest:
+      type: object
+      additionalProperties: false
+      required: [operationId, reason]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [response_lost, timeout, process_restarted, session_expired, duplicate_suspected, user_requested]
+    TransferJob:
+      type: object
+      required: [id, operationId, direction, state, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        operationId:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum: [upload, download]
+        fileId:
+          type: [string, 'null']
+          format: uuid
+        providerAccountId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum: [registered, queued, transferring, verifying, completed, paused, action_required, failed, cancelled, reconciliation_required]
+        acknowledgedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        expectedSize:
+          type: integer
+          format: int64
+          minimum: 0
+        verification:
+          oneOf:
+            - $ref: '#/components/schemas/VerificationEvidence'
+            - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Page:
+      type: object
+      properties:
+        nextCursor:
+          type: [string, 'null']
+        hasMore:
+          type: boolean
+          default: false
+    ApiError:
+      type: object
+      required: [code, message, retryable, correlationId]
+      properties:
+        code:
+          type: string
+          maxLength: 80
+        message:
+          type: string
+          maxLength: 500
+        retryable:
+          type: boolean
+        correlationId:
+          type: string
+          format: uuid
+        retryAfterSeconds:
+          type: [integer, 'null']
+          minimum: 0
+        details:
+          type: [object, 'null']
+          additionalProperties: true
