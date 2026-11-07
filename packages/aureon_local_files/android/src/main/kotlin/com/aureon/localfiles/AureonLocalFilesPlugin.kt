@@ -150,7 +150,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                             "id" to id,
                             "name" to (cursor.getString(nameCol) ?: "Unnamed"),
                             "isDirectory" to isDirectory,
-                            "isHidden" to false,
+                            "isHidden" to (cursor.getString(nameCol)?.startsWith(".") == true),
                             "sizeBytes" to if (isDirectory || cursor.isNull(sizeCol)) null else cursor.getLong(sizeCol),
                             "modifiedEpochMs" to if (cursor.isNull(modifiedCol)) null else cursor.getLong(modifiedCol),
                         )

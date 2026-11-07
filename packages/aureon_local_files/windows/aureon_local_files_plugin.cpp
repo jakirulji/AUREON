@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
 #include <filesystem>
 #include <string>
 #include <system_error>
@@ -125,12 +126,22 @@ void ListChildren(const EncodableMap* args,
     std::string id;
     const auto child = it->path().u8string();
     id.assign(reinterpret_cast<const char*>(child.data()), child.size());
+    const DWORD attributes = GetFileAttributesW(it->path().c_str());
+    const bool hidden = attributes != INVALID_FILE_ATTRIBUTES &&
+        (attributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)) != 0;
     EncodableMap map{
       {EncodableValue("id"), EncodableValue(id)},
       {EncodableValue("name"), EncodableValue(name)},
       {EncodableValue("isDirectory"), EncodableValue(directory)},
-      {EncodableValue("isHidden"), EncodableValue(false)}
+      {EncodableValue("isHidden"), EncodableValue(hidden)}
     };
+    const auto modified = it->last_write_time(ec);
+    if (!ec) {
+      const auto system_time = decltype(modified)::clock::to_sys(modified);
+      const auto epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch()).count();
+      map.emplace(EncodableValue("modifiedEpochMs"), EncodableValue(static_cast<int64_t>(epoch_ms)));
+    }
+    ec.clear();
     if (!directory && std::filesystem::is_regular_file(status)) {
       const auto size = it->file_size(ec);
       if (!ec) map.emplace(EncodableValue("sizeBytes"), EncodableValue(static_cast<int64_t>(size)));
