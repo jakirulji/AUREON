@@ -52,7 +52,6 @@ void main() {
   });
 
   test('folder move rejects cycles and delete only removes AUREON metadata', () async {
-    final store = AureonMetadataStore();
     await store.createFolder('Root');
     var snapshot = await store.load();
     final root = snapshot.rootFolders.single;
