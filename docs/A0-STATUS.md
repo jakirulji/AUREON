@@ -7,14 +7,19 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 ## 1. Work completed in the repository
 
+- [ADR-0002 Master Account Auth & Recovery](./adr/ADR-0002-MASTER-ACCOUNT-AUTH-RECOVERY.md) — passkey-first and recovery-code recommendation; owner approval pending.
+- [ADR-0003 Android Local Data Boundary](./adr/ADR-0003-ANDROID-LOCAL-DATA-BOUNDARY.md) — Room/Pigeon recommendation; Android prototype pending.
+- [ADR-0004 KMS, Hosting & Operations](./adr/ADR-0004-KMS-HOSTING-OPERATIONS.md) — managed KMS/HSM boundary; vendor and region intentionally undecided.
+- [A1 First Vertical-Slice Backlog](./A1-FIRST-VERTICAL-SLICE-BACKLOG.md) — drafted; starts only after A0 exit review.
+
 | Area | Artifact | Current evidence |
 |---|---|---|
 | Product requirements | [AUREON Plan](./AUREON-PLAN.md) | Product scope and safety rules recorded |
 | Architecture | [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) | Modular-monolith target and trust boundaries documented |
-| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Kotlin 2.4.21 + Ktor 3.6.1 spike scaffold committed; CI result pending |
+| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Kotlin 2.4.21 + Ktor 3.6.1 scaffold committed; first compile error diagnosed and fixed; next CI run pending |
 | Data model | [DATA-MODEL](./DATA-MODEL.md) | V001/V002 entities and ownership invariants documented |
 | Database schema | [V001](./migrations/V001__initial_schema.sql), [V002](./migrations/V002__vault-and-provider-inventory.sql) | Additive SQL drafts committed |
-| Database tests | [V001 smoke](../tests/database/V001_schema_smoke.sql), [V002 smoke](../tests/database/V002_vault_inventory_smoke.sql) | Constraint and isolation tests authored; execution not yet confirmed |
+| Database tests | [V001 smoke](../tests/database/V001_schema_smoke.sql), [V002 smoke](../tests/database/V002_vault_inventory_smoke.sql) | Both smoke-test suites passed in GitHub Actions run #42370296201 on PostgreSQL 18 |
 | API | [OpenAPI v1](./openapi/v1.yaml) | OAuth vault, short-lived native access-token broker, provider inventory and album contracts added; structural review found no duplicate paths/operation IDs and no unresolved component references |
 | OAuth | [Provider OAuth Matrix](./PROVIDER-OAUTH-MATRIX.md), [Android OAuth lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) | Backend refresh-token vault target, native access-token boundary, consent and refresh concurrency documented |
 | Existing cloud content | [Cloud Restore and Legacy Import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) | Drive hierarchy, metadata-first inventory, virtual categories and Photos album constraints documented |
@@ -25,9 +30,9 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 
 | Gate | Status | Required evidence to close |
 |---|---|---|
-| OpenAPI formal validation | Pending | GitHub Actions run with OpenAPI validator conclusion = success |
-| PostgreSQL V001 + V002 | Pending | CI run applies both migrations and both smoke tests pass on PostgreSQL 16 |
-| Ktor architecture spike | In progress | Reproducible app, auth/device boundary, DB migrations, fake KMS, refresh concurrency, outbox and container tests |
+| OpenAPI formal validation | **Passed** | GitHub Actions run #42370296201, validator step succeeded |
+| PostgreSQL V001 + V002 | **Passed** | GitHub Actions run #42370296201: both migrations and both smoke tests succeeded on PostgreSQL 18 |
+| Ktor architecture spike | In progress | Liveness + deny-all auth seam + tests scaffolded. CI found missing Ktor install import; fixed in commit 1bfa7aa. Re-run pending; DB, fake KMS, refresh concurrency, outbox and container tests remain |
 | Master Account auth/recovery | Provisional ADR | Passkey-first + offline recovery codes recommended; password fallback and email recovery policy require owner approval |
 | KMS/HSM | Open | Select vendor/region, workload identity, envelope format, rotation/destruction, audit and incident response |
 | Provider OAuth | Open | Select first provider callback mode, exact OAuth scopes, verification/assessment path and explicit consent UX |
@@ -41,7 +46,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 ## 3. Immediate execution order
 
 1. Observe and resolve the OpenAPI/PostgreSQL CI run. Do not mark validation complete without the actual run and job evidence.
-2. Review V001/V002 against PostgreSQL 16 behavior. If CI exposes an issue, add a new migration or amend V002 only while it remains unapplied; never rewrite V001.
+2. Review V001/V002 against PostgreSQL 18 behavior. If CI exposes an issue, add a new migration or amend V002 only while it remains unapplied; never rewrite V001.
 3. Diagnose the Ktor CI test failure and extend the spike with PostgreSQL/Flyway, fake KMS boundary, refresh-rotation concurrency and outbox tests.
 4. Decide Master Account authentication/recovery, KMS deployment and first-provider OAuth scope/callback mode.
 5. Conduct security review of credential vault and E2E key recovery.
