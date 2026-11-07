@@ -265,8 +265,8 @@ Decisions required before implementation:
 - Added V002 PostgreSQL draft for OAuth transactions, provider inventory cursors, real parent hierarchy, provider items and provider-native albums.
 - Added metadata-first inventory API contracts and virtual category views; provider originals remain untouched.
 - Clarified that Google Photos albums are not Drive folders and are represented only where provider APIs expose them.
-- Added PostgreSQL 16 CI migration/smoke-test steps; execution result remains unverified.
-- Recommended Kotlin/JVM + Ktor 3.6.x modular monolith provisionally, pending a reproducible architecture spike.
+- Added PostgreSQL 18 CI migration/smoke-test steps; execution result remains unverified.
+- Recommended Kotlin/JVM + Ktor 3.6.1 modular monolith provisionally, pending a reproducible architecture spike.
 
 ## 16. Transfer Engine and Performance Architecture
 
