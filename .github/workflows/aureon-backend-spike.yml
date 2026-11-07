@@ -19,6 +19,20 @@ jobs:
   backend-tests:
     name: Build and test Ktor spike
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: aureon
+          POSTGRES_PASSWORD: aureon_ci_only
+          POSTGRES_DB: aureon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aureon -d aureon_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,8 +45,24 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.9.0"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Apply schema and database smoke tests
+        env:
+          PGPASSWORD: aureon_ci_only
+        run: |
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f docs/migrations/V001__initial_schema.sql
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f docs/migrations/V002__vault-and-provider-inventory.sql
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f tests/database/V001_schema_smoke.sql
+          psql -h localhost -U aureon -d aureon_test -v ON_ERROR_STOP=1 -f tests/database/V002_vault_inventory_smoke.sql
       - name: Run backend tests
         working-directory: backend
+        env:
+          AUREON_TEST_DATABASE_URL: jdbc:postgresql://localhost:5432/aureon_test
+          AUREON_TEST_DATABASE_USER: aureon
+          AUREON_TEST_DATABASE_PASSWORD: aureon_ci_only
         run: gradle --no-daemon :server:test
       - name: Build backend
         working-directory: backend
