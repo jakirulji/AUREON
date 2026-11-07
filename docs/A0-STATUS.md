@@ -23,15 +23,15 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 |---|---|---|
 | Product requirements | [AUREON Plan](./AUREON-PLAN.md) | Product scope and safety rules recorded |
 | Architecture | [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) | Modular-monolith target and trust boundaries documented |
-| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Ktor 3.6.1 / Kotlin 2.4.21 / JDK 21, HikariCP/JDBC to PostgreSQL 18, OAuth PKCE/redirect, auth, fake-KMS and refresh-lease model tests passed in CI run #42370744363 |
+| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Ktor 3.6.1 / Kotlin 2.4.21 / JDK 21, HikariCP 7.1.0/JDBC to PostgreSQL 18, OAuth PKCE/redirect, auth, fake-KMS and refresh-lease model tests passed in CI run #42370801815 |
 | Data model | [DATA-MODEL](./DATA-MODEL.md) | V001/V002 entities and ownership invariants documented |
 | Database schema | [V001](./migrations/V001__initial_schema.sql), [V002](./migrations/V002__vault-and-provider-inventory.sql) | Additive SQL drafts committed |
 | Database tests | [V001 smoke](../tests/database/V001_schema_smoke.sql), [V002 smoke](../tests/database/V002_vault_inventory_smoke.sql) | Both smoke-test suites passed in GitHub Actions run #42370296201 on PostgreSQL 18 |
-| API | [OpenAPI v1](./openapi/v1.yaml) | OAuth vault, short-lived native access-token broker, provider inventory and album contracts added; formal OpenAPI validator passed in GitHub Actions run #42370296201 |
+| API | [OpenAPI v1](./openapi/v1.yaml) | OAuth vault, short-lived native access-token broker, provider inventory and album contracts added; formal OpenAPI validator passed in GitHub Actions run #42370799202 |
 | OAuth | [Provider OAuth Matrix](./PROVIDER-OAUTH-MATRIX.md), [Android OAuth lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) | Backend refresh-token vault target, native access-token boundary, consent and refresh concurrency documented |
 | Existing cloud content | [Cloud Restore and Legacy Import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) | Drive hierarchy, metadata-first inventory, virtual categories and Photos album constraints documented |
 | E2E encryption | [E2E Encryption and Recovery](./E2E-ENCRYPTION-AND-RECOVERY-DESIGN.md) | Proposal exists; independent crypto review and test vectors remain |
-| CI | [Contract checks workflow](../.github/workflows/aureon-contract-checks.yml) | Run #42370296201 passed: OpenAPI formal validation and PostgreSQL 18 V001+V002 migration plus both smoke tests. Backend run #42370500985 passed build and tests. Dependabot enabled for Gradle and Actions updates. |
+| CI | [Contract checks workflow](../.github/workflows/aureon-contract-checks.yml) | Contract run #42370799202 passed OpenAPI formal validation and PostgreSQL 18 V001+V002 migration/smoke tests. Backend run #42370801815 passed PostgreSQL service startup, migrations, both SQL smoke tests, HikariCP/JDBC integration, OAuth/PKCE, KMS fail-closed, refresh-lease model, HTTP tests and build. Dependabot enabled for Gradle and Actions updates. |
 
 ## 2. Remaining A0 gates
 
@@ -39,7 +39,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 |---|---|---|
 | OpenAPI formal validation | **Passed** | GitHub Actions run #42370296201, validator step succeeded |
 | PostgreSQL V001 + V002 | **Passed** | GitHub Actions run #42370296201: both migrations and both smoke tests succeeded on PostgreSQL 18 |
-| Ktor architecture spike | Partially validated | Ktor HTTP/auth, PKCE/state/redirect primitives, HikariCP/JDBC connection to PostgreSQL 18, KMS fail-closed/key-zeroization and in-memory refresh-lease concurrency tests passed in run #42370744363. Real provider code exchange, PostgreSQL transactional refresh-lease repository, production KMS adapter, outbox and container tests remain |
+| Ktor architecture spike | Partially validated | Ktor HTTP/auth, PKCE/state/redirect primitives, HikariCP 7.1.0/JDBC connection to PostgreSQL 18, KMS fail-closed/key-zeroization and in-memory refresh-lease concurrency tests passed in run #42370801815. Real provider code exchange, PostgreSQL transactional refresh-lease repository, production KMS adapter, outbox and container tests remain |
 | Master Account auth/recovery | Provisional ADR | Passkey-first + offline recovery codes recommended; password fallback and email recovery policy require owner approval |
 | KMS/HSM | Architecture specified; deployment open | Separate credential-broker workload identity and KMS-only decrypt boundary specified; vendor/region, production IAM, rotation/destruction and independent review remain |
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
