@@ -41,7 +41,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | KMS/HSM | Architecture specified; deployment open | Separate credential-broker workload identity and KMS-only decrypt boundary specified; vendor/region, production IAM, rotation/destruction and independent review remain |
 | Provider OAuth | Recommended path; approval open | Google Drive first; backend HTTPS callback recommended. Full-library read (`drive.readonly` + `drive.file`) vs full edit (`drive`) needs scope approval and Google verification/assessment planning |
 | E2E encryption | Open | Protocol proposal exists; approve recovery design, cross-platform test vectors and independent cryptographic review |
-| Android platform | Provisional ADR | Minimum API 26 / target API 37 recommended; release-time SDK policy and OEM matrix still require validation |
+| Android platform | Provisional ADR | Minimum API 26 / prototype target API 36; raise to 37 when stable SDK is available; release-time SDK policy and OEM matrix still require validation |
 | Local data layer | Recommended ADR | Room owned by Kotlin + Pigeon typed Flutter boundary; Room/WorkManager/process-death prototype remains |
 | Hosting and operations | Open ADR | Managed KMS/HSM and managed PostgreSQL required; provider, region, domain, email, backup policy and budget need owner decisions |
 | Privacy and legal | Baseline drafted; approval open | Data inventory, consent, retention and subprocessor framework documented; jurisdiction, actual retention, public privacy policy and legal review remain |
