@@ -30,6 +30,7 @@ class AureonTrashMoveResult {
   final String trashFolderId;
   final String originalParentId;
   final int trashedAt;
+  final String mode;
 }
 
 class AureonLocalEntry {
@@ -40,6 +41,7 @@ class AureonLocalEntry {
     required this.isHidden,
     this.sizeBytes,
     this.modifiedEpochMs,
+    this.isSystemTrash = false,
   });
 
   final String id;
@@ -48,6 +50,7 @@ class AureonLocalEntry {
   final bool isHidden;
   final int? sizeBytes;
   final int? modifiedEpochMs;
+  final bool isSystemTrash;
 
   factory AureonLocalEntry.fromMap(Map<Object?, Object?> map) {
     final id = map['id'];
@@ -65,6 +68,7 @@ class AureonLocalEntry {
       modifiedEpochMs: map['modifiedEpochMs'] is int
           ? map['modifiedEpochMs'] as int
           : null,
+      isSystemTrash: map['isSystemTrash'] == true,
     );
   }
 }
@@ -114,12 +118,34 @@ class AureonLocalFiles {
     final trashFolderId = value['trashFolderId'];
     final originalParentId = value['originalParentId'];
     final trashedAt = value['trashedAt'];
+    final mode = value['mode'] is String ? value['mode'] as String : 'managed';
     if (id is! String || name is! String || trashFolderId is! String ||
         originalParentId is! String || trashedAt is! int) {
       throw const FormatException('Native Trash returned incomplete restore information.');
     }
     return AureonTrashMoveResult(id: id, name: name, trashFolderId: trashFolderId,
-      originalParentId: originalParentId, trashedAt: trashedAt);
+      originalParentId: originalParentId, trashedAt: trashedAt, mode: mode);
+  }
+
+  Future<List<AureonLocalEntry>> listSystemTrash({required AureonLocalRoot root}) async {
+    final value = await _channel.invokeMethod<Object?>('listSystemTrash', <String, Object?>{'rootId': root.rootId});
+    if (value is! List) throw const FormatException('Native Trash listing returned an invalid response.');
+    return value.map((row) {
+      if (row is! Map) throw const FormatException('Native Trash contains an invalid entry.');
+      return AureonLocalEntry.fromMap(row);
+    }).toList(growable: false);
+  }
+
+  Future<void> restoreSystemTrashEntry({required AureonLocalRoot root, required String entryId}) async {
+    await _channel.invokeMethod<void>('restoreSystemTrashEntry', <String, Object?>{
+      'rootId': root.rootId, 'entryId': entryId,
+    });
+  }
+
+  Future<void> deleteSystemTrashEntry({required AureonLocalRoot root, required String entryId}) async {
+    await _channel.invokeMethod<void>('deleteSystemTrashEntry', <String, Object?>{
+      'rootId': root.rootId, 'entryId': entryId,
+    });
   }
 
   Future<void> deleteTrashEntry({required AureonLocalRoot root, required String entryId, required String trashFolderId}) async {
