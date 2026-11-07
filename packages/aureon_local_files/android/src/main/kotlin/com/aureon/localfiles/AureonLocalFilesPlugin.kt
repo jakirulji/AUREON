@@ -59,6 +59,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "copyFile" -> copyFile(call, result)
             "moveEntry" -> moveEntry(call, result)
             "moveToTrash" -> moveToTrash(call, result)
+            "deleteTrashEntry" -> deleteTrashEntry(call, result)
             "createFolder" -> createFolder(call, result)
             else -> result.notImplemented()
         }
@@ -286,8 +287,102 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             result.error("invalid_arguments", "The selected item and parent folder are required.", null)
             return
         }
-        // SAF has no portable recoverable-trash contract. Never substitute deleteDocument().
-        result.error("unsupported", "This Android document provider does not expose a recoverable Trash operation. Nothing was deleted.", null)
+        val resolver = activityBinding?.activity?.contentResolver
+        if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
+        Thread {
+            try {
+                val tree = Uri.parse(root)
+                val rootId = DocumentsContract.getTreeDocumentId(tree)
+                val rootDoc = DocumentsContract.buildDocumentUriUsingTree(tree, rootId)
+                val source = DocumentsContract.buildDocumentUriUsingTree(tree, entryId)
+                val parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId)
+                if (!DocumentsContract.isChildDocument(resolver, rootDoc, source) ||
+                    (parentId != rootId && !DocumentsContract.isChildDocument(resolver, rootDoc, parent))) {
+                    throw SecurityException("The selected item or parent is outside the selected folder.")
+                }
+                var name: String? = null
+                var mime: String? = null
+                resolver.query(source, arrayOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE),
+                    null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) { name = cursor.getString(0); mime = cursor.getString(1) }
+                } ?: throw IllegalStateException("The selected item cannot be inspected.")
+                val displayName = name ?: throw IllegalStateException("The selected item has no name.")
+                if (displayName == ".AUREON Trash") throw IllegalArgumentException("The Trash folder itself cannot be moved to Trash.")
+                val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootId)
+                var trashId: String? = null
+                resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE),
+                    null, null, null)?.use { cursor ->
+                    val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+                    val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+                    val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
+                    while (cursor.moveToNext()) {
+                        if (cursor.getString(nameCol) == ".AUREON Trash" &&
+                            cursor.getString(mimeCol) == Document.MIME_TYPE_DIR) trashId = cursor.getString(idCol)
+                    }
+                } ?: throw IllegalStateException("The selected folder cannot be listed.")
+                if (trashId == null) {
+                    val created = DocumentsContract.createDocument(resolver, rootDoc, Document.MIME_TYPE_DIR, ".AUREON Trash")
+                        ?: throw UnsupportedOperationException("This provider cannot create AUREON's Trash folder.")
+                    trashId = DocumentsContract.getDocumentId(created)
+                }
+                if (entryId == trashId) throw IllegalArgumentException("The Trash folder itself cannot be moved.")
+                val trashFolder = DocumentsContract.buildDocumentUriUsingTree(tree, trashId!!)
+                resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, trashId!!),
+                    arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    val col = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+                    while (cursor.moveToNext()) if (cursor.getString(col).equals(displayName, ignoreCase = true))
+                        throw FileAlreadyExistsException("An item with that name is already in Trash.")
+                } ?: throw IllegalStateException("AUREON Trash cannot be listed.")
+                val moved = DocumentsContract.moveDocument(resolver, source, parent, trashFolder)
+                    ?: throw UnsupportedOperationException("This provider cannot move items into AUREON Trash. Nothing was deleted.")
+                val movedId = DocumentsContract.getDocumentId(moved)
+                Handler(Looper.getMainLooper()).post {
+                    result.success(mapOf("id" to movedId, "name" to displayName, "trashFolderId" to trashId,
+                        "originalParentId" to parentId, "isDirectory" to (mime == Document.MIME_TYPE_DIR),
+                        "trashedAt" to System.currentTimeMillis()))
+                }
+            } catch (error: Exception) {
+                val code = when (error) {
+                    is SecurityException -> "permission_denied"
+                    is FileAlreadyExistsException -> "conflict"
+                    is UnsupportedOperationException -> "unsupported"
+                    is IllegalArgumentException -> "invalid_item"
+                    else -> "trash_failed"
+                }
+                Handler(Looper.getMainLooper()).post {
+                    result.error(code, error.message ?: "Could not move this item to Trash. The original was not intentionally deleted.", null)
+                }
+            }
+        }.start()
+    }
+
+    private fun deleteTrashEntry(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val entryId = call.argument<String>("entryId")
+        val trashFolderId = call.argument<String>("trashFolderId")
+        if (root.isNullOrBlank() || entryId.isNullOrBlank() || trashFolderId.isNullOrBlank()) {
+            result.error("invalid_arguments", "Trash item identity is incomplete.", null)
+            return
+        }
+        try {
+            val resolver = activityBinding?.activity?.contentResolver
+                ?: throw IllegalStateException("The Android activity is unavailable.")
+            val tree = Uri.parse(root)
+            val rootId = DocumentsContract.getTreeDocumentId(tree)
+            val rootDoc = DocumentsContract.buildDocumentUriUsingTree(tree, rootId)
+            val item = DocumentsContract.buildDocumentUriUsingTree(tree, entryId)
+            val trash = DocumentsContract.buildDocumentUriUsingTree(tree, trashFolderId)
+            if (!DocumentsContract.isChildDocument(resolver, rootDoc, trash) ||
+                !DocumentsContract.isChildDocument(resolver, trash, item)) {
+                throw SecurityException("The item is not inside AUREON Trash.")
+            }
+            if (!DocumentsContract.deleteDocument(resolver, item)) {
+                throw IllegalStateException("The provider did not confirm permanent deletion.")
+            }
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("permanent_delete_failed", error.message ?: "Permanent deletion failed.", null)
+        }
     }
 
     private fun renameEntry(call: MethodCall, result: MethodChannel.Result) {
