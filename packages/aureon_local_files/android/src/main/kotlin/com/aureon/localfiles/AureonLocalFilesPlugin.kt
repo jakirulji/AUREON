@@ -1,0 +1,182 @@
+package com.aureon.localfiles
+
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
+import android.database.Cursor
+import android.provider.DocumentsContract.Document
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
+
+/** Read-only SAF folder access. No broad storage permission is requested. */
+class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
+    MethodChannel.MethodCallHandler, PluginRegistry.ActivityResultListener {
+    private lateinit var channel: MethodChannel
+    private var activityBinding: ActivityPluginBinding? = null
+    private var pendingPicker: MethodChannel.Result? = null
+
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel = MethodChannel(binding.binaryMessenger, "aureon/local_files")
+        channel.setMethodCallHandler(this)
+    }
+
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+        pendingPicker?.error("detached", "Plugin detached while folder picker was open.", null)
+        pendingPicker = null
+    }
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activityBinding = binding
+        binding.addActivityResultListener(this)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() = detachActivity()
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) =
+        onAttachedToActivity(binding)
+    override fun onDetachedFromActivity() = detachActivity()
+
+    private fun detachActivity() {
+        activityBinding?.removeActivityResultListener(this)
+        activityBinding = null
+    }
+
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "pickRoot" -> pickRoot(result)
+            "listChildren" -> listChildren(call, result)
+            else -> result.notImplemented()
+        }
+    }
+
+    private fun pickRoot(result: MethodChannel.Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.error("no_activity", "AUREON needs an active screen to open the folder picker.", null)
+            return
+        }
+        if (pendingPicker != null) {
+            result.error("picker_busy", "A folder picker request is already active.", null)
+            return
+        }
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+        }
+        pendingPicker = result
+        try {
+            activity.startActivityForResult(intent, PICK_ROOT_REQUEST)
+        } catch (error: Exception) {
+            pendingPicker = null
+            result.error("picker_failed", error.message ?: "Unable to open the system folder picker.", null)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != PICK_ROOT_REQUEST) return false
+        val result = pendingPicker ?: return true
+        pendingPicker = null
+        if (resultCode != Activity.RESULT_OK) {
+            result.success(null)
+            return true
+        }
+        val uri = data?.data
+        if (uri == null) {
+            result.error("invalid_selection", "The system picker returned no folder.", null)
+            return true
+        }
+        try {
+            val granted = data.flags and
+                (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            activityBinding?.activity?.contentResolver?.takePersistableUriPermission(uri, granted)
+            val documentId = DocumentsContract.getTreeDocumentId(uri)
+            val name = queryDisplayName(uri) ?: "Selected folder"
+            result.success(mapOf("rootId" to uri.toString(), "displayName" to name, "rootDocumentId" to documentId))
+        } catch (error: Exception) {
+            result.error("permission_failed", error.message ?: "Could not retain folder access.", null)
+        }
+        return true
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        val resolver = activityBinding?.activity?.contentResolver ?: return null
+        val documentUri = DocumentsContract.buildDocumentUriUsingTree(
+            uri, DocumentsContract.getTreeDocumentId(uri)
+        )
+        return resolver.query(documentUri, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }
+
+    private fun listChildren(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val parentId = call.argument<String>("parentId")
+        if (root.isNullOrBlank() || parentId.isNullOrBlank()) {
+            result.error("invalid_arguments", "rootId and parentId are required.", null)
+            return
+        }
+        try {
+            val treeUri = Uri.parse(root)
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
+            val resolver = activityBinding?.activity?.contentResolver
+            if (resolver == null) {
+                result.error("no_activity", "The Android activity is unavailable.", null)
+                return
+            }
+            val projection = arrayOf(
+                Document.COLUMN_DOCUMENT_ID,
+                Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_MIME_TYPE,
+                Document.COLUMN_SIZE,
+                Document.COLUMN_LAST_MODIFIED,
+                Document.COLUMN_FLAGS
+            )
+            val entries = mutableListOf<Map<String, Any?>>()
+            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
+                val sizeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_SIZE)
+                val modifiedCol = cursor.getColumnIndexOrThrow(Document.COLUMN_LAST_MODIFIED)
+                while (cursor.moveToNext()) {
+                    val mime = cursor.getString(mimeCol)
+                    val isDirectory = mime == Document.MIME_TYPE_DIR
+                    val flags = cursor.getColumnIndex(Document.COLUMN_FLAGS)
+                    val id = cursor.getString(idCol)
+                    entries.add(
+                        mapOf(
+                            "id" to id,
+                            "name" to (cursor.getString(nameCol) ?: "Unnamed"),
+                            "isDirectory" to isDirectory,
+                            "isHidden" to false,
+                            "sizeBytes" to if (isDirectory || cursor.isNull(sizeCol)) null else cursor.getLong(sizeCol),
+                            "modifiedEpochMs" to if (cursor.isNull(modifiedCol)) null else cursor.getLong(modifiedCol),
+                            "canWrite" to (flags >= 0 && (cursor.getInt(flags) and Document.FLAG_SUPPORTS_WRITE) != 0)
+                        )
+                    )
+                }
+            } ?: run {
+                result.error("listing_unavailable", "The selected folder could not be listed by its document provider.", null)
+                return
+            }
+            entries.sortWith(compareByDescending<Map<String, Any?>> { it["isDirectory"] == true }
+                .thenBy { (it["name"] as String).lowercase() })
+            result.success(entries)
+        } catch (error: SecurityException) {
+            result.error("permission_denied", "Folder access was revoked. Select the folder again.", null)
+        } catch (error: Exception) {
+            result.error("listing_failed", error.message ?: "Unable to list this folder.", null)
+        }
+    }
+
+    companion object {
+        private const val PICK_ROOT_REQUEST = 0xA0E0
+    }
+}
