@@ -55,7 +55,7 @@ void main() {
     await files.openFile(root: const AureonLocalRoot(rootId: 'root-uri', displayName: 'Docs', rootDocumentId: 'root-doc'), fileId: 'child-document');
   });
 
-  test('malformed native entry is rejected',
+  test('malformed native entry is rejected', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async => [
       {'id': 'x', 'name': 'broken'},
