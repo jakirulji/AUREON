@@ -1,4 +1,5 @@
 import 'package:aureon/src/files/aureon_files_page.dart';
+import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
 
@@ -79,7 +80,9 @@ class _AureonHomeState extends State<AureonHome> {
       ? const AureonFilesPage()
       : selected == 2
           ? const AureonVirtualFoldersPage()
-          : SingleChildScrollView(
+          : selected == 4
+              ? const AureonBackupPage()
+              : SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(wide ? 34 : 20, 22, wide ? 34 : 20, 28),
     child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1180),
