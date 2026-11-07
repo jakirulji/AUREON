@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:aureon_local_files/aureon_local_files.dart';
@@ -92,6 +93,24 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     } catch (error) { _fail(error.toString()); }
   }
 
+  void _recordHistory({
+    required String kind,
+    required String itemName,
+    required String sourceLocation,
+    String? destinationLocation,
+    required bool succeeded,
+    String? errorCode,
+  }) {
+    unawaited(AureonOperationHistory.record(
+      kind: kind,
+      itemName: itemName,
+      sourceLocation: sourceLocation,
+      destinationLocation: destinationLocation,
+      succeeded: succeeded,
+      errorCode: errorCode,
+    ));
+  }
+
   Future<void> _createFolder() async {
     final root = _root;
     if (root == null || _levels.isEmpty) return;
@@ -100,7 +119,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       await _files.createFolder(root: root, parentId: _levels.last.id, name: name.trim());
       await _load();
-      await AureonOperationHistory.record(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
+      _recordHistory(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), destinationLocation: '${_levels.map((x) => x.name).join(' / ')} / ${name.trim()}', succeeded: true);
     } on PlatformException catch (error) {
       await AureonOperationHistory.record(kind: 'create_folder', itemName: name.trim(), sourceLocation: _levels.map((x) => x.name).join(' / '), succeeded: false, errorCode: error.code);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
