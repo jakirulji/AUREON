@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [37])
+@Config(sdk = [36])
 class TransferPersistenceTest {
     private lateinit var context: Context
     private lateinit var databaseName: String
