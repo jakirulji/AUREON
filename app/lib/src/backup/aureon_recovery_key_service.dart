@@ -216,7 +216,7 @@ class AureonRecoveryKeyService {
   Future<ManualRecoveryKeySet> importEncryptedKeyFile({
     required List<int> bytes,
     required String passphrase,
-    required String expectedVaultId,
+    String? expectedVaultId,
   }) async {
     _validatePassphrase(passphrase);
     if (bytes.isEmpty || bytes.length > 1024 * 1024) {
@@ -240,7 +240,9 @@ class AureonRecoveryKeyService {
       throw const FormatException('Unsupported or unsafe recovery key parameters.');
     }
     final vaultId = _requiredString(header, 'vaultId');
-    if (vaultId != expectedVaultId) throw const FormatException('This recovery key belongs to a different vault.');
+    if (expectedVaultId != null && vaultId != expectedVaultId) {
+      throw const FormatException('This recovery key belongs to a different vault.');
+    }
     final salt = _decodeBase64(_requiredString(header, 'salt'), expectedLength: 16);
     final nonce = _decodeBase64(_requiredString(header, 'nonce'), expectedLength: 12);
     final cipherText = _decodeBase64(_requiredString(root, 'cipherText'));
