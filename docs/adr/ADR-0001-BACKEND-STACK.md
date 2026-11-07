@@ -25,14 +25,14 @@ Ktor's server Authentication plugin supports bearer/JWT and custom authenticatio
 
 ## Recommendation
 
-Use **Kotlin/JVM + Ktor 3.6.x** as the provisional backend stack, deployed as a modular monolith.
+Use **Kotlin 2.4.21 / JVM 21 + Ktor 3.6.1** as the provisional backend stack, deployed as a modular monolith.
 
 Initial supporting choices:
 
-- **Runtime:** JDK 21 LTS baseline. Pin exact JDK, Kotlin, Gradle and Ktor patch versions in CI after the spike.
+- **Runtime:** JDK 21 LTS baseline. Pin JDK 21, Kotlin 2.4.21, Gradle 9.9.0 and Ktor 3.6.1 in CI for this spike; re-evaluate patch updates through dependency review.
 - **HTTP/API:** Ktor Server, typed request/response models, kotlinx.serialization, explicit validation and centralized error mapping.
 - **Authentication:** Ktor Authentication plugin for AUREON session bearer verification and device binding. Master Account authentication is separate from provider OAuth.
-- **Database:** PostgreSQL 16 for the initial control plane; this matches the current CI service target.
+- **Database:** PostgreSQL 18 for the initial control plane; this matches the current CI service target.
 - **Database access:** HikariCP + JDBC with explicit SQL repositories for the first implementation. Keep blocking JDBC work off Ktor event-loop threads using a bounded IO execution boundary.
 - **Migrations:** Flyway or an equivalent ordered migration runner. Preserve V001 and apply V002 additively; never mutate an already-applied migration.
 - **Background work:** database-backed outbox/lease worker in the same deployable initially. Do not add a message broker until measured need exists.
