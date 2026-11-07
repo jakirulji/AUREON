@@ -89,6 +89,13 @@ void main() {
     expect(moved.originalParentId, 'folder-id');
   });
 
+  test('Windows Recycle Bin success is accepted as a platform result', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async => true);
+    const root = AureonLocalRoot(rootId: 'C:/AUREON', displayName: 'AUREON', rootDocumentId: 'C:/AUREON');
+    final moved = await files.moveToTrash(root: root, entryId: 'C:/AUREON/notes.txt', parentId: 'C:/AUREON');
+    expect(moved.mode, 'windows');
+  });
+
   test('permanent Trash deletion sends scoped identities', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       expect(call.method, 'deleteTrashEntry');
