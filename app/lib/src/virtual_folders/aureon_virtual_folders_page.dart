@@ -80,7 +80,7 @@ class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
           title: Text('Add cloud file to ${folder.name}'),
           content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             DropdownButtonFormField<ProviderKind>(
-              value: provider,
+              initialValue: provider,
               decoration: const InputDecoration(labelText: 'Provider'),
               items: ProviderKind.values.map((value) => DropdownMenuItem(value: value, child: Text(_providerName(value)))).toList(),
               onChanged: (value) => setDialogState(() => provider = value ?? provider),
