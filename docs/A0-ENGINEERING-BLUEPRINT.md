@@ -211,6 +211,8 @@ Each installation receives a random device ID and a device-bound key pair genera
 
 ## 5. Provider OAuth and credential vault
 
+**Provider scope research:** [Provider OAuth and Permission Matrix](./PROVIDER-OAUTH-MATRIX.md). The matrix is a research-backed proposal; exact scopes remain conditional on the final feature boundary and provider review.
+
 ### 5.1 OAuth rules
 
 - Use official provider authorization flows and least-privilege scopes.
