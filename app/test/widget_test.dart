@@ -234,6 +234,37 @@ void main() {
     });
   });
 
+
+  testWidgets('AUREON Trash restores an item to its recorded parent', (tester) async {
+    const root = AureonLocalRoot(rootId: 'root-trash-test', displayName: 'Home', rootDocumentId: 'root-doc');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('aureon.trash.folder.${root.rootId.hashCode}', 'trash-root');
+    await prefs.setString('aureon.trash.meta.${root.rootId.hashCode}.trashed-1',
+      jsonEncode({'originalParentId': 'original-parent', 'originalName': 'notes.txt', 'trashedAt': 1700000000000}));
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'listChildren') {
+        return (call.arguments as Map)['parentId'] == 'trash-root'
+          ? [{'id': 'trashed-1', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 10}]
+          : <Map<String, Object?>>[];
+      }
+      if (call.method == 'moveEntry') return 'restored-1';
+      return null;
+    });
+    await tester.pumpWidget(MaterialApp(home: AureonTrashPage(root: root, files: AureonLocalFiles())));
+    await tester.pumpAndSettle();
+    expect(find.text('notes.txt'), findsOneWidget);
+    await tester.tap(find.byTooltip('Restore'));
+    await tester.pumpAndSettle();
+    final restore = calls.firstWhere((call) => call.method == 'moveEntry');
+    expect(restore.arguments, {
+      'rootId': 'root-trash-test', 'entryId': 'trashed-1',
+      'sourceParentId': 'trash-root', 'targetParentId': 'original-parent',
+    });
+    expect(find.text('Trash is empty'), findsOneWidget);
+  });
+
   testWidgets('AUREON dashboard still renders', (tester) async {
     await tester.pumpWidget(const AureonApp());
     expect(find.text('AUREON'), findsOneWidget);
