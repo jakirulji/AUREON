@@ -20,7 +20,7 @@ This is an A0 proof-of-concept for the Kotlin-owned local storage boundary. It i
 
 ## Build
 
-Requires JDK 21, Android SDK API 37 and Gradle 9.9.0+.
+Requires JDK 21, Android SDK API 37 and Gradle 8.13.1+.
 
 ```bash
 cd android-spike
