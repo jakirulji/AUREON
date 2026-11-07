@@ -1,14 +1,32 @@
+import 'dart:io';
+
 import 'package:aureon/src/backup/aureon_metadata_store.dart';
 import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeKeyStore implements AureonMetadataKeyStore {
+  String? value;
+  @override
+  Future<String?> readKey() async => value;
+  @override
+  Future<void> writeKey(String next) async { value = next; }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  late Directory root;
+  late _FakeKeyStore keyStore;
+  late AureonMetadataStore store;
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('aureon-metadata-test-');
+    keyStore = _FakeKeyStore();
+    store = AureonMetadataStore(rootDirectory: root, keyStore: keyStore);
+  });
+  tearDown(() async {
+    if (await root.exists()) await root.delete(recursive: true);
+  });
 
   test('nested AUREON folders persist with stable order and provider references', () async {
-    final store = AureonMetadataStore();
     await store.createFolder('Projects');
     var snapshot = await store.load();
     final projects = snapshot.rootFolders.single;
@@ -25,7 +43,7 @@ void main() {
       providerParentId: 'native-folder-id',
     );
     await store.addFileToFolder(design.id, reference);
-    snapshot = await store.load();
+    snapshot = await AureonMetadataStore(rootDirectory: root, keyStore: keyStore).load();
 
     expect(snapshot.rootFolders.single.name, 'Projects');
     expect(snapshot.rootFolders.single.folders.single.name, 'Design');
