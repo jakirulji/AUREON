@@ -1,74 +1,88 @@
-# AUREON — deployment plan and owner actions
+# AUREON — zero-cost-first deployment and owner actions
 
-**Status:** Planning only. No cloud resources have been purchased or provisioned.
-**Decision rule:** Do not create paid resources until the owner approves the vendor, region, monthly cap and billing owner.
+**Status:** No cloud resources have been purchased or provisioned. This document is an implementation plan, not evidence of a live deployment.  
+**Cost policy:** No paid service, billing upgrade, paid domain, paid storage or paid KMS may be enabled without explicit owner approval.
 
-## 1. What AUREON will need for a real multi-device service
+## 1. Chosen zero-cost-first security model
 
-| Component | Purpose | Required before |
-|---|---|---|
-| HTTPS API runtime | Master Account sessions, device registration, account inventory, sync APIs and transfer coordination | Private end-to-end test |
-| Managed PostgreSQL | Users, devices, sessions, provider-account metadata, sync cursors and job state | Persistent hosted test |
-| Managed KMS/HSM | Envelope encryption for provider refresh credentials and key rotation | Any production provider-token storage |
-| Secret manager + workload identity | Keep DB credentials, OAuth client secrets and service credentials out of GitHub/source code | Any hosted environment |
-| Object storage (optional initially) | AUREON-owned encrypted backups/objects, if/when product scope requires it | Only before AUREON-owned object storage |
-| Domain + TLS | Stable API and OAuth callback URLs | Provider OAuth production testing |
-| Monitoring, backups and alerts | Detect outages, failed jobs, credential refresh failures and restore database after incident | Any persistent hosted environment |
+See [ADR-0005 — Zero-cost-first credential vault](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md).
 
-AUREON should not proxy every Drive byte through the API by default. Prefer direct client-to-provider transfer where provider APIs and the security design allow it. This keeps backend bandwidth costs down.
+- Provider refresh credentials are encrypted on the client using a user-held random recovery key. The backend stores opaque ciphertext only and cannot decrypt it.
+- A new device restores encrypted provider inventory after Master Account login and asks for the recovery key once to unlock the vault.
+- Android Keystore and Windows OS-protected storage protect the locally unlocked vault key.
+- E2E file-content keys remain separate from provider OAuth credential keys.
+- No KMS, HSM or server-side plaintext credential vault is required for this phase.
+- If the recovery key is lost, affected cloud accounts must be linked again. There is no hidden server recovery bypass.
 
-## 2. Recommended deployment shape
+This is the deliberate zero-cost trade-off. Do not describe this mode as a KMS-backed vault.
 
-Use a small managed container/API runtime, managed PostgreSQL, managed KMS and secret manager. Keep the provider credential broker in a separate workload with its own workload identity and least-privilege access to the vault/KMS.
+## 2. Transfer and network architecture
 
-**Initial vendor shortlist:**
-- Google Cloud: Cloud Run + Cloud SQL for PostgreSQL + Cloud KMS + Secret Manager. Natural fit for the first Google Drive integration, but confirm regional availability and total monthly minimums first.
-- AWS: ECS/Fargate or App Runner + RDS PostgreSQL + KMS + Secrets Manager. Strong alternative if pricing/region/operational fit is better.
-- Azure: Container Apps + Azure Database for PostgreSQL + Key Vault. Viable if Windows/Azure ecosystem becomes the main operational preference.
+**File bytes must not pass through AUREON's backend by default.**
 
-Do not choose a provider solely because its API has a free tier. Database, KMS, backups, egress, logging and minimum instance settings can create ongoing charges.
+- Android/Windows native provider adapters upload/download directly to each provider's official API.
+- Use provider-native resumable sessions (Google Drive resumable upload, Microsoft Graph upload sessions, Dropbox upload sessions).
+- Persist session IDs/URLs as secrets in OS-protected local storage; redact them from logs.
+- Resume after process death, network switch, VPN switch, temporary DNS failure and provider throttling.
+- Use bounded retries with exponential backoff and jitter; honor Retry-After and reconcile ambiguous outcomes before retrying.
+- Keep local originals on every failure. No cleanup unless remote verification succeeds, explicit cleanup opt-in exists and OS permission is granted.
+- Never route file bytes through Cloud Run, Cloudflare Workers, Neon or an AUREON relay in the normal path.
 
-## 3. Region and availability
+AUREON cannot guarantee that every ISP, VPN endpoint or provider edge will always be reachable. It can avoid adding its own file-relay bottleneck and make transfers recoverable across network changes. Do not promise VPN bypass or geographic censorship circumvention.
 
-Benchmark Singapore first for Bangladesh latency, then compare the actual supported regions and prices. Do not assume every service (especially managed PostgreSQL and KMS) is available in the same region. Keep the database and API close together to avoid cross-region latency and data-transfer charges. Region selection must also account for privacy/legal obligations and backup location.
+## 3. Candidate free-tier services and honest limits
 
-## 4. Cost-control strategy
+| Component | Candidate | What it is suitable for | Hard limitation / policy |
+|---|---|---|---|
+| API runtime | Google Cloud Run | Low-volume Ktor metadata/session API staging | Free compute/request allowance is region/usage dependent; outbound internet data transfer can be billed. Singapore is Tier 2 pricing. Requires billing setup. No automatic deployment until owner provisions a project. |
+| Database | Neon Free PostgreSQL | Development/staging metadata and test data | 100 CU-hours/project/month, 1 GB/project, 5 GB public network transfer/project/month; compute suspends at quota. Never make direct uploads depend on it. |
+| Edge/DNS | Cloudflare Free, optional | DNS, basic edge protection and static assets if a domain is already owned | Does not make Ktor run on Workers. Do not proxy provider file bytes. D1 has hard free read/write limits and is not a drop-in PostgreSQL replacement. |
+| Secret Manager | None required for provider tokens in zero-cost mode | Keep only non-user operational secrets out of source control if a host is later approved | Never put user refresh tokens or vault recovery keys in GitHub Actions secrets or a shared deployment secret. |
+| KMS/HSM | Deferred | Optional future server-assisted vault mode | Not generally free. Do not create or depend on a KMS key in the zero-cost phase. |
 
-- Start with a development/staging environment, not production-sized capacity.
-- Use scale-to-zero API compute where suitable; database costs may remain while provisioned.
-- Set budget alerts before enabling paid resources. Alerts are not hard spending caps.
-- Limit log retention and avoid logging file names, tokens or personal content.
-- Use encrypted automated database backups and test restoration.
-- Avoid a self-managed VPS for the production credential vault: it shifts patching, key protection, database backup and incident response onto the project owner.
-- Do not purchase object storage until AUREON-owned backup/object-storage functionality actually requires it.
+Free-tier limits are not service-level guarantees. Neon can suspend compute after quota exhaustion; Cloud Run networking, logs and other usage can incur charges. Budget alerts are not hard spending caps. Therefore this plan does not claim that a hosted backend can be guaranteed to cost exactly $0 under all traffic.
 
-No reliable monthly figure is committed here. Pricing depends on region, database size/availability, backup retention, KMS operations, logs, traffic and support tier; calculate a live estimate after the owner sets a monthly cap.
+## 4. Region and Bangladesh/VPN behavior
 
-## 5. Owner decisions needed before provisioning
+- Benchmark API latency from Bangladesh to Cloud Run Singapore and Mumbai before selecting a region. Do not assume one is always faster across every ISP/VPN.
+- Keep API and database in the same nearby region where available to avoid cross-region database latency and transfer costs.
+- Provider file transfers connect directly to Google/Microsoft/Dropbox endpoints from the user's current network. Backend region does not carry file bytes.
+- Implement DNS/TLS error classification, connection timeouts, resumable upload/download, exponential backoff, Retry-After, and pause/resume after network changes.
+- A VPN can change the route and provider's perceived region; AUREON must not hard-code a VPN exit location or promise that a provider will accept every VPN endpoint.
+- No region, DNS provider or CDN can guarantee reachability from every Bangladesh ISP or VPN. Validate with the owner's actual ISP and VPNs before release.
+- Do not deploy multi-region failover in the free phase; it introduces additional cost and operational complexity.
 
-The owner needs to provide/approve only these decisions:
-1. Cloud billing owner: who can create and pay for the cloud account? Use an account controlled by the project owner, with MFA and recovery methods.
-2. Preferred vendor: Google Cloud is the first candidate; AWS is the fallback. The owner may choose another provider.
-3. Region: Singapore is the first latency candidate, subject to service availability and privacy/legal review.
-4. Monthly budget cap in USD (or BDT) for development initially, and a separate production cap later.
-5. Whether the owner approves a backend-held, encrypted provider refresh-token vault for the explicit purpose of reconnecting linked Drive accounts across devices. This is separate from AUREON's end-to-end file-content encryption.
-6. A domain name, only when OAuth callback and stable API endpoint work begins. Do not buy a domain yet unless the owner already has one.
+## 5. Deployment gate — no provisioning yet
 
-Never send passwords, OTP seeds, recovery codes, OAuth client secrets, refresh tokens, private keys or billing credentials in chat or commit them to GitHub. Use the cloud provider's secure console/secret manager and grant the minimum required access.
+The repository currently has a Ktor/PostgreSQL runtime prototype and CI tests, not a hosted production service. A safe deployment still requires:
+1. A cloud account controlled by the owner and explicit approval for the provider/region.
+2. A spending cap and billing alerts, acknowledging that alerts are not hard caps.
+3. Neon account/project and a private PostgreSQL connection string supplied only through the host's secure secret facility.
+4. A Cloud Run project/service identity using GitHub OIDC Workload Identity Federation (no downloaded service-account JSON key).
+5. A public HTTPS API endpoint and OAuth callback design.
+6. Controlled V001–V004 migrations and backup/restore tests.
+7. Real staging tests from Bangladesh networks and at least one VPN route.
+8. Security review of Master Account sessions, provider OAuth, client-side vault recovery and account isolation.
 
-## 6. What the owner does NOT need to do now
+Do not provision resources or create billing charges until the owner completes those account-side actions and approves the exact region and spend ceiling. Do not request passwords, OTP seeds, recovery codes, provider refresh tokens or cloud private keys in chat.
 
-- Do not buy a VPS, database, KMS plan, domain or object-storage package yet.
-- Do not create Google OAuth production credentials until the OAuth scope and consent design is finalized.
-- Do not share Google account passwords or authenticator codes with the developer.
-- Do not install interim APK/EXE builds; the project policy is to produce distributable packages only at the final packaging stage.
+## 6. What is not production-ready
 
-## 7. Engineering gates before production
+- Master Account passkey registration/recovery and complete session issuance/rotation.
+- Android/Windows client-side credential vault implementation and cross-platform cryptographic test vectors.
+- Production provider OAuth app verification and full Drive scope approval.
+- Live direct provider transfer and VPN/ISP network matrix.
+- Hosted API/database deployment, automated backups and restore drill.
+- Server-side provider Trash coordinator and backend-confirmed provider receipts.
+- Independent cryptographic, privacy and penetration testing.
 
-1. Complete Master Account sign-in, recovery, device registration and session issuance/rotation.
-2. Implement the isolated credential broker with managed KMS/HSM and provider refresh-token rotation.
-3. Move provider Trash, restore and purge operations behind a backend coordinator. The server must execute the provider mutation, verify provider state and record its own receipt; a client-supplied reference is not proof.
-4. Wire the app to the real authenticated API and account inventory; keep device-local SAF/Windows Recycle Bin Trash separate.
-5. Complete Google OAuth verification/scope review, privacy notice, retention/backup policy and independent security review.
-6. Deploy staging, run real Google Drive end-to-end tests, then approve production.
-7. Only after the complete product slice passes: create final APK and Windows package, test on the Redmi device and Windows laptop, and publish release outputs. Interim CI runs must not upload APK/EXE artifacts.
+Do not enable production destructive Trash/restore/purge actions until the backend executes provider mutations and verifies the result itself.
+
+## 7. Cost and data-safety guardrails
+
+- No paid plan upgrades, KMS/HSM creation, VPS, domain purchase or object-storage package without explicit owner approval.
+- If a free API/database quota is exhausted, metadata sync or account inventory may pause; queue locally and resume later. Do not lose transfer checkpoints or local originals.
+- Drive upload/download must continue to use provider APIs directly when the provider account and local client remain authorized, independent of AUREON database quota.
+- Do not use multiple provider accounts to pool quotas or bypass provider limits.
+- Do not automatically delete local originals or remote objects.
+- CI must never upload interim APK/EXE artifacts; final packages are produced once the agreed feature scope is complete.
