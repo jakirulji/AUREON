@@ -24,18 +24,18 @@ Clients send only the opaque AUREON session bearer token. The backend computes S
 
 The raw bearer token is never stored in PostgreSQL. Session issuance, rotation, passkey authentication and device registration are separate auth workflows and are not yet implemented as a complete product flow.
 
-## Provider credential broker boundary
+## Provider credential vault — zero-cost-first decision
 
-ProviderAccessTokenBroker is intentionally fail-closed. The production implementation must live in a separately isolated workload and:
+The zero-cost-first design is defined in [ADR-0005](./adr/ADR-0005-ZERO-COST-CREDENTIAL-VAULT.md).
 
-1. Resolve the user's explicitly consented provider account and required scopes.
-2. Acquire a refresh lease using the PostgreSQL compare-and-swap repository.
-3. Decrypt the refresh envelope only through managed KMS/HSM workload identity.
-4. Refresh/rotate the provider token and persist only a newly encrypted envelope.
-5. Pass a short-lived access token into a scoped callback; never return or log refresh tokens.
-6. Mark only the affected account reauth_required when provider policy demands a new consent/MFA challenge.
+- Provider refresh-token records are encrypted on the client with AES-256-GCM and per-account data keys wrapped under a user-held random recovery key.
+- The backend stores ciphertext and non-secret account metadata only. It does not receive the recovery key and cannot decrypt provider credentials.
+- New devices restore encrypted account inventory after Master Account login and require the recovery key once to unlock the vault.
+- Android Keystore and Windows OS-protected storage protect the locally unlocked key.
+- Provider refresh happens in the native client adapter; short-lived access tokens remain memory-only.
+- Losing the recovery key means affected provider accounts must be linked again. There is no hidden server recovery key.
 
-No provider credential broker implementation, KMS vendor binding, refresh-token exchange, or hosted service is configured in this repository yet.
+The existing ProviderAccessTokenBroker interface remains fail-closed and is not a production credential broker. Do not wire it to a plaintext/environment master key. A future KMS-backed server-assisted vault requires a separately approved paid deployment and a new security review.
 
 ## Trash sync safety gate
 
