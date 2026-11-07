@@ -38,7 +38,7 @@ The bundle is versioned, account/vault-bound, integrity-checked and protected ag
 - Cloudflare uses a different high-entropy Worker Secret and independent salt/domain-separation label to wrap the same DEK into a separate envelope.
 - Use unique nonces and authenticated metadata; use vetted cryptographic libraries/platform APIs.
 - The manual key never enters Worker APIs, logs, telemetry, analytics, crash reports or support bundles.
-- Cloudflare recovery validates Firebase token signature/issuer/audience/expiry and verified email, derives owner UID from the token, applies rate limits, one-time challenge, step-up, cooldown, notification, device/session revocation and audit.
+- Cloudflare recovery validates Firebase token signature/issuer/audience/expiry and verified email, derives owner UID from the token, applies rate limits, one-time challenge, step-up, cooldown, notification, device/session revocation and audit. The client generates an ephemeral device public key; after policy approval the Worker re-wraps the DEK to that device public key and returns only the device-bound envelope, never a plaintext DEK in an API response.
 - Email-only recovery is a weaker fallback; prefer passkey or trusted-device step-up.
 - Keep E2E file-content keys in a separate client-controlled hierarchy. Neither recovery path can decrypt file content.
 
