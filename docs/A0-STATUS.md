@@ -11,7 +11,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 |---|---|---|
 | Product requirements | [AUREON Plan](./AUREON-PLAN.md) | Product scope and safety rules recorded |
 | Architecture | [A0 Engineering Blueprint](./A0-ENGINEERING-BLUEPRINT.md) | Modular-monolith target and trust boundaries documented |
-| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Kotlin/Ktor recommended provisionally; spike still required |
+| Backend stack | [ADR-0001](./adr/ADR-0001-BACKEND-STACK.md) | Kotlin 2.4.21 + Ktor 3.6.1 spike scaffold committed; CI result pending |
 | Data model | [DATA-MODEL](./DATA-MODEL.md) | V001/V002 entities and ownership invariants documented |
 | Database schema | [V001](./migrations/V001__initial_schema.sql), [V002](./migrations/V002__vault-and-provider-inventory.sql) | Additive SQL drafts committed |
 | Database tests | [V001 smoke](../tests/database/V001_schema_smoke.sql), [V002 smoke](../tests/database/V002_vault_inventory_smoke.sql) | Constraint and isolation tests authored; execution not yet confirmed |
@@ -19,7 +19,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 | OAuth | [Provider OAuth Matrix](./PROVIDER-OAUTH-MATRIX.md), [Android OAuth lifecycle](./ANDROID-NATIVE-OAUTH-AND-CREDENTIAL-LIFECYCLE.md) | Backend refresh-token vault target, native access-token boundary, consent and refresh concurrency documented |
 | Existing cloud content | [Cloud Restore and Legacy Import](./CLOUD-ACCOUNT-RESTORE-AND-LEGACY-IMPORT.md) | Drive hierarchy, metadata-first inventory, virtual categories and Photos album constraints documented |
 | E2E encryption | [E2E Encryption and Recovery](./E2E-ENCRYPTION-AND-RECOVERY-DESIGN.md) | Proposal exists; independent crypto review and test vectors remain |
-| CI | [Contract checks workflow](../.github/workflows/aureon-contract-checks.yml) | Workflow configured to validate OpenAPI and apply V001+V002 on PostgreSQL 16; successful run has not been observed |
+| CI | [Contract checks workflow](../.github/workflows/aureon-contract-checks.yml) | Workflow configured to validate OpenAPI and apply V001+V002 on PostgreSQL 18; successful run has not been observed |
 
 ## 2. Remaining A0 gates
 
@@ -27,7 +27,7 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 |---|---|---|
 | OpenAPI formal validation | Pending | GitHub Actions run with OpenAPI validator conclusion = success |
 | PostgreSQL V001 + V002 | Pending | CI run applies both migrations and both smoke tests pass on PostgreSQL 16 |
-| Ktor architecture spike | Pending | Reproducible app, auth/device boundary, DB migrations, fake KMS, refresh concurrency, outbox and container tests |
+| Ktor architecture spike | In progress | Reproducible app, auth/device boundary, DB migrations, fake KMS, refresh concurrency, outbox and container tests |
 | Master Account auth/recovery | Open | Choose passkey-first/password/email recovery and document account recovery threat model |
 | KMS/HSM | Open | Select vendor/region, workload identity, envelope format, rotation/destruction, audit and incident response |
 | Provider OAuth | Open | Select first provider callback mode, exact OAuth scopes, verification/assessment path and explicit consent UX |
