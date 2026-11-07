@@ -55,14 +55,17 @@ class _AureonHomeState extends State<AureonHome> {
       const Padding(padding: EdgeInsets.only(left: 40, top: 6), child: Text('YOUR DIGITAL UNIVERSE', style: TextStyle(fontSize: 9, letterSpacing: 1.2, color: Color(0xFF8492AA)))),
       const SizedBox(height: 34),
       for (var i = 0; i < labels.length; i++)
-        ListTile(
-          dense: true,
-          selected: selected == i,
-          selectedTileColor: const Color(0xFF18352F),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          leading: Icon(icons[i], color: selected == i ? const Color(0xFF64E6C2) : const Color(0xFF9AA8BD)),
-          title: Text(labels[i], style: TextStyle(fontSize: 13, color: selected == i ? const Color(0xFF64E6C2) : const Color(0xFFCBD4E2))),
-          onTap: () => setState(() => selected = i),
+        Material(
+          color: Colors.transparent,
+          child: ListTile(
+            dense: true,
+            selected: selected == i,
+            selectedTileColor: const Color(0xFF18352F),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            leading: Icon(icons[i], color: selected == i ? const Color(0xFF64E6C2) : const Color(0xFF9AA8BD)),
+            title: Text(labels[i], style: TextStyle(fontSize: 13, color: selected == i ? const Color(0xFF64E6C2) : const Color(0xFFCBD4E2))),
+            onTap: () => setState(() => selected = i),
+          ),
         ),
       const Spacer(),
       const Divider(color: Color(0xFF26334A)),
