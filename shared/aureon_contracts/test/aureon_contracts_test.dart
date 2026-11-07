@@ -169,7 +169,7 @@ void main() {
     expect(evidence.eligible, cleanup['eligible']);
     expect(evidence.eligible, isFalse);
   });
-}
+
 
   group('AUREON virtual folders', () {
     ProviderFileReference makeFile(String account, String item) => ProviderFileReference(
@@ -209,3 +209,4 @@ void main() {
       expect(restored.items.single.stableKey, folder.items.single.stableKey);
     });
   });
+}
