@@ -36,7 +36,7 @@ Use **Room 2.8.5 as the authoritative Android local persistence layer**, owned b
 ## Proposed support baseline
 
 - **Minimum Android API:** 26 (Android 8.0) provisionally. This avoids carrying legacy platform branches into the first release while retaining a broad Android device base. Revisit only with usage and security evidence.
-- **Target API:** 37 for the first public Android 17 release, subject to stable SDK availability and Google Play policy at submission time. CI must build against the selected stable SDK; target SDK is re-evaluated before each release.
+- **Compile/target API for the current prototype:** 36, because the Android 17/API 37 SDK package is not currently available from the CI SDK repository. For the public release, raise compileSdk/targetSdk to 37 only when the stable SDK package is published and release policy/device validation supports it; otherwise ship on the latest stable target required by Google Play.
 - **Background execution:** no promise of uninterrupted background transfers on every OEM. WorkManager/foreground execution is best-effort within Android and OEM restrictions; UI must make pause/retry states explicit.
 - **Windows:** later phase, with Flutter desktop UI and a native C++ Cloud Files API adapter. Do not force Android storage abstractions onto Windows.
 
