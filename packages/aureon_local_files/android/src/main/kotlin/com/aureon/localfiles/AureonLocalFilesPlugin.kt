@@ -12,7 +12,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 
-/** Read-only SAF folder access. No broad storage permission is requested. */
+/** User-authorized SAF folder access. No broad storage permission is requested. */
 class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     MethodChannel.MethodCallHandler, PluginRegistry.ActivityResultListener {
     private lateinit var channel: MethodChannel
@@ -50,6 +50,8 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "pickRoot" -> pickRoot(result)
             "listChildren" -> listChildren(call, result)
             "openFile" -> openFile(call, result)
+            "renameEntry" -> renameEntry(call, result)
+            "createFolder" -> createFolder(call, result)
             else -> result.notImplemented()
         }
     }
@@ -66,6 +68,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
         }
@@ -92,8 +95,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             return true
         }
         try {
-            val granted = data.flags and
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            val granted = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             activityBinding?.activity?.contentResolver?.takePersistableUriPermission(uri, granted)
             val documentId = DocumentsContract.getTreeDocumentId(uri)
             val name = queryDisplayName(uri) ?: "Selected folder"
@@ -111,6 +113,50 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         )
         return resolver.query(documentUri, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }
+
+    private fun renameEntry(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val entryId = call.argument<String>("entryId")
+        val newName = call.argument<String>("newName")?.trim()
+        if (root.isNullOrBlank() || entryId.isNullOrBlank() || newName.isNullOrBlank() ||
+            newName == "." || newName == ".." || newName.contains("/") || newName.contains("\\")) {
+            result.error("invalid_arguments", "A valid new name and entry identity are required.", null); return
+        }
+        try {
+            val resolver = activityBinding?.activity?.contentResolver
+            if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
+            val uri = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(root), entryId)
+            val renamed = DocumentsContract.renameDocument(resolver, uri, newName)
+            if (renamed == null) { result.error("unsupported", "This document provider does not support renaming.", null); return }
+            result.success(DocumentsContract.getDocumentId(renamed))
+        } catch (error: SecurityException) {
+            result.error("permission_denied", "Write access was revoked. Re-select the folder.", null)
+        } catch (error: Exception) {
+            result.error("rename_failed", error.message ?: "Unable to rename this item.", null)
+        }
+    }
+
+    private fun createFolder(call: MethodCall, result: MethodChannel.Result) {
+        val root = call.argument<String>("rootId")
+        val parentId = call.argument<String>("parentId")
+        val name = call.argument<String>("name")?.trim()
+        if (root.isNullOrBlank() || parentId.isNullOrBlank() || name.isNullOrBlank() ||
+            name == "." || name == ".." || name.contains("/") || name.contains("\\")) {
+            result.error("invalid_arguments", "A valid folder name and parent identity are required.", null); return
+        }
+        try {
+            val resolver = activityBinding?.activity?.contentResolver
+            if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
+            val parent = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(root), parentId)
+            val created = DocumentsContract.createDocument(resolver, parent, Document.MIME_TYPE_DIR, name)
+            if (created == null) { result.error("unsupported", "This document provider does not support creating folders.", null); return }
+            result.success(DocumentsContract.getDocumentId(created))
+        } catch (error: SecurityException) {
+            result.error("permission_denied", "Write access was revoked. Re-select the folder.", null)
+        } catch (error: Exception) {
+            result.error("create_failed", error.message ?: "Unable to create this folder.", null)
+        }
     }
 
     private fun openFile(call: MethodCall, result: MethodChannel.Result) {

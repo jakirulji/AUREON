@@ -116,6 +116,52 @@ void OpenFile(const EncodableMap* args,
   result->Success(EncodableValue(true));
 }
 
+
+bool IsWithinRoot(const std::filesystem::path& root, const std::filesystem::path& candidate) {
+  const auto relative = candidate.lexically_relative(root);
+  return !relative.empty() && !relative.is_absolute() &&
+      (*relative.begin() != std::filesystem::path("..") || relative.empty());
+}
+bool ValidLeafName(const std::string& name) {
+  return !name.empty() && name != "." && name != ".." &&
+      name.find('/') == std::string::npos && name.find('\\') == std::string::npos &&
+      name.find_first_of("<>:\"|?*") == std::string::npos &&
+      name.back() != '.' && name.back() != ' ';
+}
+void RenameEntry(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  const auto* root = GetString(args, "rootId");
+  const auto* entry = GetString(args, "entryId");
+  const auto* name = GetString(args, "newName");
+  if (!root || !entry || !name || !ValidLeafName(*name)) { result->Error("invalid_arguments", "A valid new name and entry identity are required."); return; }
+  std::error_code ec;
+  const auto base = std::filesystem::canonical(PathFromUtf8(*root), ec);
+  if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
+  const auto source = std::filesystem::canonical(PathFromUtf8(*entry), ec);
+  if (ec || !IsWithinRoot(base, source) || source == base) { result->Error("outside_root", "The requested item is not a child of the selected root."); return; }
+  const auto target = source.parent_path() / PathFromUtf8(*name);
+  if (std::filesystem::exists(target, ec) || ec) { result->Error("conflict", "An item with that name already exists. Nothing was overwritten."); return; }
+  std::filesystem::rename(source, target, ec);
+  if (ec) { result->Error("rename_failed", "The item could not be renamed."); return; }
+  const auto value = target.u8string();
+  result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
+}
+void CreateFolder(const EncodableMap* args, std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  const auto* root = GetString(args, "rootId");
+  const auto* parent = GetString(args, "parentId");
+  const auto* name = GetString(args, "name");
+  if (!root || !parent || !name || !ValidLeafName(*name)) { result->Error("invalid_arguments", "A valid folder name and parent identity are required."); return; }
+  std::error_code ec;
+  const auto base = std::filesystem::canonical(PathFromUtf8(*root), ec);
+  if (ec) { result->Error("invalid_root", "The selected root is unavailable."); return; }
+  const auto folder = std::filesystem::canonical(PathFromUtf8(*parent), ec);
+  if (ec || !IsWithinRoot(base, folder) || !std::filesystem::is_directory(folder, ec) || ec) { result->Error("outside_root", "The target folder is not inside the selected root."); return; }
+  const auto target = folder / PathFromUtf8(*name);
+  if (std::filesystem::exists(target, ec) || ec) { result->Error("conflict", "An item with that name already exists. Nothing was overwritten."); return; }
+  if (!std::filesystem::create_directory(target, ec) || ec) { result->Error("create_failed", "The new folder could not be created."); return; }
+  const auto value = target.u8string();
+  result->Success(EncodableValue(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
+}
+
 void ListChildren(const EncodableMap* args,
                   std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   const auto* root = GetString(args, "rootId");
@@ -219,6 +265,12 @@ void AureonLocalFilesPlugin::HandleMethodCall(
     const auto* args = std::get_if<EncodableMap>(call.arguments());
     ListChildren(args, std::move(result));
     return;
+  }
+  if (call.method_name() == "renameEntry") {
+    RenameEntry(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return;
+  }
+  if (call.method_name() == "createFolder") {
+    CreateFolder(std::get_if<EncodableMap>(call.arguments()), std::move(result)); return;
   }
   if (call.method_name() == "openFile") {
     const auto* args = std::get_if<EncodableMap>(call.arguments());

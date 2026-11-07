@@ -90,6 +90,47 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     } catch (error) { _fail(error.toString()); }
   }
 
+  Future<void> _createFolder() async {
+    final root = _root;
+    if (root == null || _levels.isEmpty) return;
+    final name = await _nameDialog('New folder', 'Folder name');
+    if (name == null || name.trim().isEmpty) return;
+    try {
+      await _files.createFolder(root: root, parentId: _levels.last.id, name: name.trim());
+      await _load();
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
+    }
+  }
+
+  Future<void> _rename(AureonLocalEntry entry) async {
+    final root = _root;
+    if (root == null) return;
+    final name = await _nameDialog('Rename', 'New name', initial: entry.name);
+    if (name == null || name.trim().isEmpty || name.trim() == entry.name) return;
+    try {
+      await _files.renameEntry(root: root, entryId: entry.id, newName: name.trim());
+      await _load();
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
+    }
+  }
+
+  Future<String?> _nameDialog(String title, String label, {String initial = ''}) async {
+    final controller = TextEditingController(text: initial);
+    final value = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: Text(title),
+      content: TextField(controller: controller, autofocus: true, decoration: InputDecoration(labelText: label),
+        onSubmitted: (value) => Navigator.of(context).pop(value)),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Save')),
+      ],
+    ));
+    controller.dispose();
+    return value;
+  }
+
   Future<void> _openFile(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null || entry.isDirectory) return;
@@ -162,9 +203,12 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
             icon: const Icon(Icons.create_new_folder_outlined), label: const Text('Choose folder')),
         ]),
         const SizedBox(height: 8),
-        const Text('Read-only browsing. AUREON will not change files in this folder.',
+        const Text('Local folder operations are explicit. AUREON never overwrites or deletes files automatically.',
           style: TextStyle(color: Color(0xFF9AA8BD), fontSize: 12)),
         if (_root != null) ...[
+          Align(alignment: Alignment.centerRight, child: TextButton.icon(
+            onPressed: _loading ? null : _createFolder,
+            icon: const Icon(Icons.create_new_folder_outlined), label: const Text('New folder'))),
           Row(children: [
             IconButton(onPressed: _levels.length > 1 && !_loading ? _up : null,
               icon: const Icon(Icons.arrow_upward), tooltip: 'Parent folder'),
@@ -217,7 +261,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   leading: Icon(e.isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined),
                   title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  trailing: Icon(e.isDirectory ? Icons.chevron_right : Icons.open_in_new, size: 18),
+                  trailing: PopupMenuButton<String>(
+                    tooltip: 'Item actions',
+                    onSelected: (action) { if (action == 'rename') _rename(e); },
+                    itemBuilder: (_) => const [PopupMenuItem(value: 'rename', child: Text('Rename'))],
+                  ),
                   onTap: e.isDirectory ? () => _open(e) : () => _openFile(e),
                 ));
               })),

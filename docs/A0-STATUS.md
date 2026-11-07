@@ -82,3 +82,11 @@ This file is the operational A0 checklist. A document existing in GitHub is not 
 ## 5. A0 completion rule
 
 A0 may be marked **COMPLETE** only when every required gate in section 2 has concrete evidence or an explicitly approved, documented deferral. Until then, the project remains in A0 and production implementation must not be represented as complete.
+
+
+## Local file operations — current increment
+- Added explicit create-folder and rename operations to the local file bridge and Files UI.
+- Android SAF folder selection now requests persistable read/write grants; provider-specific unsupported operations are reported without fallback or data loss.
+- Windows operations validate canonical paths remain inside the selected root, validate leaf names, and reject collisions before mutation.
+- No overwrite, delete, copy, move, recycle or automatic cleanup was introduced.
+- Dart bridge tests cover operation arguments and identities; Android/Windows CI must pass before considering this increment validated.
