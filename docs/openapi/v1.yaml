@@ -194,6 +194,45 @@ paths:
                       $ref: '#/components/schemas/Provider'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /oauth/callback/{provider}:
+    get:
+      tags: [Provider Accounts]
+      operationId: receiveBackendProviderOAuthCallback
+      summary: Receive provider redirect for backend HTTPS callback mode
+      description: |
+        Public provider redirect endpoint. The state hash locates a short-lived,
+        one-time transaction bound to the initiating user/device. The backend
+        validates state and exact redirect URI, exchanges the code with the stored
+        PKCE verifier, vaults the refresh credential as an encrypted envelope and
+        redirects to a safe AUREON completion link. No bearer session is accepted
+        on this endpoint; state validation is mandatory.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Provider'
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Provider authorization code; never log or persist.
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: One-time state value; server stores only its hash.
+      responses:
+        '303':
+          description: Redirect to a safe AUREON completion URI.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /provider-accounts/{provider}/oauth/start:
     post:
       tags: [Provider Accounts]
@@ -228,13 +267,14 @@ paths:
   /provider-accounts/{provider}/oauth/callback:
     post:
       tags: [Provider Accounts]
-      operationId: completeProviderOAuth
-      summary: Complete a provider authorization transaction
+      operationId: completeNativeProviderOAuth
+      summary: Complete a native-app provider authorization transaction
       description: |
-        Draft callback contract. Code exchange location, PKCE verifier custody,
-        and native deep-link handling must be selected after provider-specific
-        OAuth review. The state value must be single-use, bound to the initiating
-        user/device and expire quickly. Do not log authorization codes.
+        Used only when the registered provider flow redirects to the Android app.
+        The app posts the authorization code, state and PKCE verifier once over
+        authenticated TLS. The backend validates the one-time transaction, exchanges
+        the code and stores the refresh credential only as a KMS-wrapped encrypted
+        envelope. Never return provider tokens to the app or log request secrets.
       parameters:
         - $ref: '#/components/parameters/Provider'
       requestBody:
@@ -305,6 +345,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /provider-accounts/{accountId}/inventory/scan:
+    post:
+      tags: [Provider Inventory]
+      operationId: startProviderInventoryScan
+      summary: Start or resume provider metadata inventory
+      description: |
+        Starts a resumable metadata-only initial scan or incremental sync for the
+        linked account. The service uses the provider's official API and granted
+        scopes. It must preserve actual parent IDs and must not download, move,
+        rename or delete provider content.
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryScanRequest'
+      responses:
+        '202':
+          description: Inventory scan accepted or already in progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryScanOperation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /provider-accounts/{accountId}/inventory:
     get:
       tags: [Provider Inventory]
@@ -1077,6 +1147,27 @@ components:
           format: date-time
         actionRequired:
           type: [string, 'null']
+    InventoryScanRequest:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [initial_or_resume, incremental]
+    InventoryScanOperation:
+      type: object
+      required: [operationId, status, acceptedAt]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted, already_running, waiting_for_reauth, queued]
+        acceptedAt:
+          type: string
+          format: date-time
     ProviderInventoryItem:
       type: object
       required: [providerItemId, itemKind, metadataEnvelope, metadataFormatVersion, isTrashed, isOrphaned]
