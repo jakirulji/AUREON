@@ -23,7 +23,8 @@ data class HealthResponse(val status: String)
 data class SessionResponse(val authenticated: Boolean, val userId: String)
 
 fun Application.module(
-    sessionAuthenticator: SessionAuthenticator = RejectAllSessionAuthenticator
+    sessionAuthenticator: SessionAuthenticator = RejectAllSessionAuthenticator,
+    readinessProbe: ReadinessProbe = NotReadyProbe
 ) {
     install(ContentNegotiation) {
         json(
@@ -48,6 +49,14 @@ fun Application.module(
     routing {
         get("/health/live") {
             call.respond(HttpStatusCode.OK, HealthResponse("alive"))
+        }
+
+        get("/health/ready") {
+            if (readinessProbe.isReady()) {
+                call.respond(HttpStatusCode.OK, HealthResponse("ready"))
+            } else {
+                call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("not_ready"))
+            }
         }
 
         authenticate("aureon-session") {
