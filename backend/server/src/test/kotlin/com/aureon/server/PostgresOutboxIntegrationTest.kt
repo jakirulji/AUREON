@@ -74,7 +74,8 @@ class PostgresOutboxIntegrationTest {
             try {
                 val repository = PostgresOutboxRepository(pool)
                 val lease = assertNotNull(repository.claimBatch(1, 60).firstOrNull())
-                assertTrue(repository.reschedule(lease, Instant.now().minusSeconds(1), "TEMPORARY_FAILURE"))
+                assertTrue(repository.reschedule(lease, Instant.now().minusSeconds(60), "TEMPORARY_FAILURE"))
+                assertFalse(repository.complete(lease))
                 val retry = assertNotNull(repository.claimBatch(1, 60).firstOrNull())
                 assertEquals(2, retry.attemptCount)
                 assertTrue(repository.complete(retry))
