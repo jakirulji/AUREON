@@ -5,14 +5,16 @@ import 'aureon_virtual_folder_store.dart';
 import '../backup/aureon_folder_organizer_page.dart';
 
 class AureonVirtualFoldersPage extends StatefulWidget {
-  const AureonVirtualFoldersPage({super.key});
+  const AureonVirtualFoldersPage({super.key, this.store});
+
+  final AureonVirtualFolderStore? store;
 
   @override
   State<AureonVirtualFoldersPage> createState() => _AureonVirtualFoldersPageState();
 }
 
 class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
-  final _store = AureonVirtualFolderStore();
+  late final _store = widget.store ?? AureonVirtualFolderStore();
   List<AureonVirtualFolder> _folders = const [];
   bool _loading = true;
   String? _error;
