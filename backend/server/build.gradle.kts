@@ -21,8 +21,8 @@ dependencies {
     implementation("io.ktor:ktor-server-auth-jvm:3.6.1")
     implementation("ch.qos.logback:logback-classic:1.5.20")
     implementation("com.zaxxer:HikariCP:7.1.0")
-    runtimeOnly("org.postgresql:postgresql:42.7.8")
-    testImplementation("org.postgresql:postgresql:42.7.8")
+    runtimeOnly("org.postgresql:postgresql:42.7.14")
+    testImplementation("org.postgresql:postgresql:42.7.14")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm:3.6.1")
     testImplementation(kotlin("test"))
