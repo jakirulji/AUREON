@@ -340,11 +340,19 @@ class AureonCredentialVaultStore {
     if (dek == null) {
       throw StateError('This device has no unlocked vault DEK. Restore the vault first.');
     }
+    final current = await loadBundle();
+    if (current == null || current.vaultId != keySet.vaultId ||
+        current.generation != keySet.generation) {
+      dek.fillRange(0, dek.length, 0);
+      throw StateError('The active vault bundle and recovery key set do not match.');
+    }
     final bundle = await _crypto.createBundle(
       keySet: keySet,
       vaultDek: dek,
       credentialRecords: credentialRecords,
+      cloudflareEnvelope: current.cloudflareEnvelope,
     );
+    dek.fillRange(0, dek.length, 0);
     await _writeBundle(bundle);
     return bundle;
   }
