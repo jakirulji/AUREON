@@ -3,7 +3,9 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 interface Env {
   DB: D1Database;
   FIREBASE_PROJECT_ID: string;
-  AUREON_VAULT_ROOT_SECRET_V1?: string;\n  AUREON_VAULT_ROOT_SECRET_V2?: string;\n  AUREON_VAULT_ACTIVE_ROOT_VERSION: string;
+  AUREON_VAULT_ROOT_SECRET_V1?: string;
+  AUREON_VAULT_ROOT_SECRET_V2?: string;
+  AUREON_VAULT_ACTIVE_ROOT_VERSION: string;
 }
 interface FirebaseIdentity { uid: string; email: string; authTime: number }
 interface VaultSnapshot {
@@ -133,10 +135,19 @@ export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot 
     manualKeyEnvelopes: input.manualKeyEnvelopes as Array<Record<string, unknown>>,
     cloudflareEnvelope: input.cloudflareEnvelope as Record<string, unknown> };
 }
-async function deriveRootKey(env: Env, salt: Uint8Array, vaultId: string, generation: number): Promise<CryptoKey> {
-  const root = fromBase64Url(env.AUREON_VAULT_ROOT_SECRET);
+function activeRootVersion(env: Env): number {
+  const version = Number(env.AUREON_VAULT_ACTIVE_ROOT_VERSION);
+  if (!Number.isSafeInteger(version) || version < 1 || version > 2) throw new HttpError(503, "Vault recovery root-key version is not configured.");
+  return version;
+}
+async function deriveRootKey(env: Env, keyVersion: number, salt: Uint8Array, vaultId: string, generation: number): Promise<CryptoKey> {
+  if (keyVersion < 1 || keyVersion > 2) throw new HttpError(409, "Unsupported Cloudflare root-key version.");
+  const secret = keyVersion === 1 ? env.AUREON_VAULT_ROOT_SECRET_V1 : env.AUREON_VAULT_ROOT_SECRET_V2;
+  if (!secret) throw new HttpError(503, "Required historical vault recovery root key is unavailable.");
+  const root = fromBase64Url(secret);
   if (root.length !== 32) throw new HttpError(503, "Vault recovery service is not configured.");
-  const material = await crypto.subtle.importKey("raw", root, "HKDF", false, ["deriveKey"]); root.fill(0);
+  const material = await crypto.subtle.importKey("raw", root, "HKDF", false, ["deriveKey"]);
+  root.fill(0);
   return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt,
     info: new TextEncoder().encode(`AUREON|CREDENTIAL-VAULT|CLOUDFLARE-WRAP|v1|${vaultId}|${generation}`) },
     material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
