@@ -112,6 +112,18 @@ void main() {
     expect(auth.currentSession?.idToken, 'verified-id-token');
   });
 
+  test('reauthentication refreshes the same Firebase identity', () async {
+    transport.responses
+      ..add(signInResponse())
+      ..add(signInResponse(verified: true));
+    await auth.signIn(email: 'owner@example.com', password: 'initial-password');
+    final refreshed = await auth.reauthenticate(password: 'fresh-password');
+    expect(refreshed.user.localId, 'user-123');
+    expect(refreshed.user.emailVerified, isTrue);
+    expect(transport.calls.last.uri.path, '/v1/accounts:signInWithPassword');
+    expect(transport.calls.last.body['email'], 'owner@example.com');
+  });
+
   test('sign-out removes persisted refresh token and local session', () async {
     transport.responses.add(signInResponse());
     await auth.signIn(email: 'owner@example.com', password: 'correct horse');
