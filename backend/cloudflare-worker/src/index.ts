@@ -20,7 +20,8 @@ interface VaultSnapshot {
 }
 
 const FIREBASE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
-const MAX_BODY_BYTES = 900_000;\nconst MAX_SNAPSHOT_BYTES = 900_000;
+const MAX_BODY_BYTES = 900_000;
+const MAX_SNAPSHOT_BYTES = 900_000;
 const MAX_RECORDS = 256;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const RECOVERY_COOLDOWN_MS = 30 * 60 * 1000;
@@ -123,7 +124,10 @@ export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot 
     const mac = fromBase64Url(requiredString(item.mac, "record MAC", 64));
     if (nonce.length !== 12 || ciphertext.length < 1 || ciphertext.length > 1024 * 1024 || mac.length !== 16) throw new HttpError(400, "Credential record cryptographic fields are invalid.");
   }
-  if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_SNAPSHOT_BYTES) {\n    throw new HttpError(413, "Encrypted vault snapshot exceeds the safe D1 row limit.");\n  }\n  const keyIds = new Set<string>();
+  if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_SNAPSHOT_BYTES) {
+    throw new HttpError(413, "Encrypted vault snapshot exceeds the safe D1 row limit.");
+  }
+  const keyIds = new Set<string>();
   for (const envelope of input.manualKeyEnvelopes) {
     if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) throw new HttpError(400, "Invalid manual envelope.");
     const item = envelope as Record<string, unknown>; rejectPlaintextSecrets(item);
