@@ -47,6 +47,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _firebaseAuthDomain.dispose();
     _firebaseAppId.dispose();
     _workerUrl.dispose();
+    _registry.close();
     super.dispose();
   }
 
