@@ -186,6 +186,13 @@ class AureonFirebaseAuthService {
   /// separate secure-storage namespace, preventing cross-project token reuse.
   void configureProfile(AureonBackendProfile profile) {
     profile.validate();
+    final sameIdentity = _activeBackendProfile?.id == profile.id &&
+        _config.apiKey == profile.firebaseApiKey &&
+        _config.projectId == profile.firebaseProjectId;
+    if (sameIdentity) {
+      _activeBackendProfile = profile;
+      return;
+    }
     configure(AureonFirebaseAuthConfig.fromProfile(profile));
     _activeBackendProfile = profile;
   }
@@ -369,6 +376,8 @@ class AureonFirebaseAuthService {
 
   Future<AureonFirebaseSession> restoreSession() async {
     _requireConfiguration();
+    final existing = _session;
+    if (existing != null && !existing.isExpiring) return existing;
     final uid = await _secrets.read(_activeUidKey);
     if (uid == null || uid.isEmpty) throw StateError('No saved AUREON session exists.');
     final refresh = await _secrets.read(_refreshKey(uid));
