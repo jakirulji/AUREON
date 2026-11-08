@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile_cache.dart';
@@ -276,8 +277,17 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             OutlinedButton.icon(onPressed: _busy ? null : _registerBackend,
               icon: const Icon(Icons.qr_code_2), label: const Text('Create / register Discovery ID')),
           if (_profile != null)
-            _notice(Icons.devices_outlined, 'Discovery ID',
-              '${_profile!.discoveryId}\\nBackend profile version ${_profile!.profileVersion}. Save this locator for new devices.'),
+            Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('AUREON Discovery ID', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                SelectableText(_profile!.discoveryId, style: const TextStyle(fontSize: 12)),
+                Align(alignment: Alignment.centerRight, child: TextButton.icon(
+                  onPressed: () => Clipboard.setData(ClipboardData(text: _profile!.discoveryId)),
+                  icon: const Icon(Icons.copy), label: const Text('Copy ID'))),
+                Text('Backend profile version ${_profile!.profileVersion}. Keep this ID for new devices.',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
+              ]))),
           OutlinedButton.icon(
             onPressed: _busy
                 ? null
