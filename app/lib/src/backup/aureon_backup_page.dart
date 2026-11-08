@@ -5,6 +5,9 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../auth/aureon_firebase_auth_service.dart';
+import 'aureon_cloudflare_vault_client.dart';
+
 import '../virtual_folders/aureon_virtual_folder_store.dart';
 import 'aureon_metadata_backup.dart';
 import 'aureon_metadata_store.dart';
@@ -12,7 +15,9 @@ import 'aureon_recovery_key_service.dart';
 import 'aureon_credential_vault_store.dart';
 
 class AureonBackupPage extends StatefulWidget {
-  const AureonBackupPage({super.key});
+  const AureonBackupPage({super.key, this.auth});
+
+  final AureonFirebaseAuthService? auth;
 
   @override
   State<AureonBackupPage> createState() => _AureonBackupPageState();
@@ -24,6 +29,10 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   final _metadataStore = AureonMetadataStore();
   final _virtualFolders = AureonVirtualFolderStore();
   final _vaultStore = AureonCredentialVaultStore();
+  final _fallbackAuth = AureonFirebaseAuthService();
+  static const _cloudflareApiUrl = String.fromEnvironment('AUREON_CLOUDFLARE_API_URL');
+
+  AureonFirebaseAuthService get _auth => widget.auth ?? _fallbackAuth;
 
   ManualRecoveryKeySet? _keySet;
   VaultRecoveryBundle? _vaultBundle;
@@ -334,6 +343,104 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     }
   });
 
+  AureonCloudflareVaultClient _cloudflareClient() {
+    if (_cloudflareApiUrl.trim().isEmpty) {
+      throw StateError('Cloudflare API URL is not configured. Set AUREON_CLOUDFLARE_API_URL at build time.');
+    }
+    return AureonCloudflareVaultClient(baseUrl: _cloudflareApiUrl);
+  }
+
+  Future<void> _syncCloudflare() => _run(() async {
+    if (!_auth.isConfigured) throw StateError('Configure Firebase before cloud vault sync.');
+    final user = await _auth.reloadUser();
+    if (!user.emailVerified) {
+      throw StateError('Verify your AUREON account email before cloud vault sync.');
+    }
+    final bundle = await _vaultStore.syncWithCloudflare(
+      client: _cloudflareClient(),
+      idTokenProvider: () => _auth.getIdToken(),
+    );
+    if (mounted) {
+      setState(() {
+        _vaultBundle = bundle;
+        _status = 'Encrypted credential-vault snapshot synchronized to Cloudflare D1. Snapshot generation ${bundle.generation}; ${bundle.encryptedCredentialRecords.length} encrypted records. Provider file bytes and plaintext OAuth tokens were not uploaded.';
+      });
+    }
+  });
+
+  Future<String?> _askVaultId(String initialValue) async {
+    final controller = TextEditingController(text: initialValue);
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cloud recovery vault ID'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Vault ID from your Recovery Bundle'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Continue')),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<String?> _askAccountPassword() async {
+    final controller = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Recent account verification'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'AUREON account password'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text), child: const Text('Reauthenticate')),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _restoreCloudflare() => _run(() async {
+    if (!_auth.isConfigured) throw StateError('Configure Firebase before Cloudflare recovery.');
+    final user = await _auth.reloadUser();
+    if (!user.emailVerified) {
+      throw StateError('Verify your AUREON account email before cloud recovery.');
+    }
+    final password = await _askAccountPassword();
+    if (password == null) return;
+    await _auth.reauthenticate(password: password);
+    final known = _vaultBundle ?? await _vaultStore.loadPendingBundle() ?? await _vaultStore.loadBundle();
+    final vaultId = await _askVaultId(known?.vaultId ?? '');
+    if (vaultId == null || vaultId.isEmpty) return;
+    final records = await _vaultStore.restoreWithCloudflare(
+      vaultId: vaultId,
+      client: _cloudflareClient(),
+      idTokenProvider: () => _auth.getIdToken(),
+    );
+    final restored = await _vaultStore.loadBundle();
+    if (mounted) {
+      setState(() {
+        _vaultBundle = restored;
+        _status = 'Cloudflare-assisted recovery succeeded after recent password reauthentication. Restored ${records.length} encrypted credential records. The DEK was delivered only as a device-bound envelope and stored in platform secure storage.';
+      });
+    }
+  });
+
   Future<AureonMetadataSnapshot> _currentSnapshot() async {
     final previous = await _metadataStore.load();
     final folders = await _virtualFolders.load();
@@ -450,6 +557,36 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
             ),
           const SizedBox(height: 8),
           const Text('The TXT contains plaintext secrets. The .key file encrypts all five keys using Argon2id + AES-256-GCM. The separate .aureon-vault file contains encrypted credential records and wrapped-DEK envelopes, never plaintext keys or OAuth tokens. The local DEK is stored through platform secure storage. Provider OAuth/token refresh and Cloudflare recovery remain pending.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
+        ],
+      ),
+      const SizedBox(height: 14),
+      _section(
+        title: 'Cloudflare-assisted credential-vault recovery',
+        subtitle: 'Encrypted credential snapshot only. Cloudflare Worker wraps the vault DEK; recovery requires a verified Firebase account and recent password reauthentication.',
+        children: [
+          Text(
+            _cloudflareApiUrl.trim().isEmpty
+                ? 'Cloudflare API URL: not configured in this build.'
+                : 'Cloudflare API: $_cloudflareApiUrl',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF9AA8BD)),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _busy || _cloudflareApiUrl.trim().isEmpty ? null : _syncCloudflare,
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: const Text('Sync encrypted vault snapshot'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy || _cloudflareApiUrl.trim().isEmpty ? null : _restoreCloudflare,
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: const Text('Recover vault from Cloudflare'),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Cloudflare is not a substitute for the offline TXT/.key + portable Vault Bundle. Keep an independent bundle copy. The current D1 snapshot limit is 900 KB; provider file contents and E2E content keys never pass through this service.',
+            style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A)),
+          ),
         ],
       ),
       const SizedBox(height: 14),
