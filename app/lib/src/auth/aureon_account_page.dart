@@ -172,7 +172,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
         final user = await widget.auth.reloadUser();
-        if (_profile != null) {
+        if (_profile?.registered == true) {
           try {
             await _registry.verifyBinding(auth: widget.auth, profile: _profile!);
           } catch (_) {
@@ -246,6 +246,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   @override
   Widget build(BuildContext context) {
     final user = widget.auth.currentUser;
+    final needsBackendSetup = !widget.auth.isConfigured || (_profile == null &&
+        (widget.auth.config.authDomain.isEmpty || widget.auth.config.appId.isEmpty || _workerUrl.text.trim().isEmpty));
     return ListView(
       padding: const EdgeInsets.all(22),
       children: [
@@ -257,7 +259,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           style: TextStyle(color: Color(0xFF9AA8BD)),
         ),
         const SizedBox(height: 18),
-        if (!widget.auth.isConfigured) ...[
+        if (needsBackendSetup) ...[
           _notice(Icons.settings_suggest_outlined, 'Find your Master Account backend',
             'On a new device, enter the Discovery ID from a device where AUREON is already configured. The ID finds your public Firebase and Worker configuration; it is not a password.'),
           TextField(controller: _discoveryId, autocorrect: false, decoration: const InputDecoration(
