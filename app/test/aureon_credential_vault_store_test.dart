@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:aureon/src/backup/aureon_credential_vault_store.dart';
+import 'package:aureon/src/backup/aureon_cloudflare_vault_client.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:aureon/src/backup/aureon_recovery_key_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,6 +25,50 @@ class _MemoryDekStore implements AureonVaultDekStore {
   Future<void> write(String vaultId, int generation, List<int> dek) async {
     if (failWrites) throw StateError('Simulated secure-storage failure.');
     values[_id(vaultId, generation)] = dek.toList();
+  }
+}
+
+
+class _FakeCloudflareTransport implements AureonVaultHttpTransport {
+  Map<String, Object?>? snapshot;
+  int uploads = 0;
+
+  String _encode(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
+
+  @override
+  Future<Map<String, Object?>> send({
+    required String method,
+    required Uri uri,
+    required String idToken,
+    Map<String, Object?>? body,
+  }) async {
+    if (method == 'GET') {
+      final current = snapshot;
+      if (current == null) {
+        throw const AureonCloudflareApiException(404, 'Vault not found.');
+      }
+      final digest = await Sha256().hash(utf8.encode(jsonEncode(current)));
+      final hash = digest.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      return {'snapshot': current, 'snapshotSha256': hash};
+    }
+    if (method == 'POST') {
+      return {
+        'envelope': {
+          'formatVersion': 1,
+          'rootKeyVersion': 1,
+          'algorithm': 'HKDF-SHA-256/AES-256-GCM',
+          'salt': _encode(List<int>.filled(32, 1)),
+          'nonce': _encode(List<int>.filled(12, 2)),
+          'cipherText': _encode(List<int>.filled(48, 3)),
+        },
+      };
+    }
+    if (method == 'PUT') {
+      snapshot = Map<String, Object?>.from(body!);
+      uploads++;
+      return {'ok': true};
+    }
+    throw StateError('Unexpected HTTP method $method');
   }
 }
 
@@ -72,6 +118,47 @@ void main() {
     expect(restoredDek, isNotNull);
     expect(restoredDek, hasLength(32));
     expect(await target.loadBundle(), isNotNull);
+  });
+
+  test('Cloudflare vault sync is idempotent and refuses a newer remote snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('aureon-cloud-sync-');
+    final dekStore = _MemoryDekStore();
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final store = AureonCredentialVaultStore(dekStore: dekStore, rootDirectory: directory);
+    final keys = AureonRecoveryKeyService().generateKeySet(vaultId: 'vault-cloud-sync');
+    await store.initialize(keys);
+    final transport = _FakeCloudflareTransport();
+    final client = AureonCloudflareVaultClient(
+      baseUrl: 'https://aureon-test.workers.dev',
+      transport: transport,
+    );
+    addTearDown(client.close);
+
+    final first = await store.syncWithCloudflare(
+      client: client,
+      idTokenProvider: () async => 'firebase-test-token',
+    );
+    expect(first.cloudflareEnvelope, isNotNull);
+    expect(transport.uploads, 1);
+
+    final repeated = await store.syncWithCloudflare(
+      client: client,
+      idTokenProvider: () async => 'firebase-test-token',
+    );
+    expect(repeated.createdAtEpochMs, first.createdAtEpochMs);
+    expect(transport.uploads, 1);
+
+    transport.snapshot!['createdAtEpochMs'] = first.createdAtEpochMs + 1;
+    await expectLater(
+      store.syncWithCloudflare(
+        client: client,
+        idTokenProvider: () async => 'firebase-test-token',
+      ),
+      throwsStateError,
+    );
+    expect(transport.uploads, 1);
   });
 
   test('generation rotation re-encrypts records and removes the old device DEK', () async {
