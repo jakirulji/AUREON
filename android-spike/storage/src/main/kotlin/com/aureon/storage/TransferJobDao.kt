@@ -7,8 +7,12 @@ import androidx.room.Query
 
 @Dao
 interface TransferJobDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(job: TransferJobEntity)
+    /**
+     * Operation IDs are immutable identities. A duplicate enqueue must never
+     * replace an existing checkpoint or reset acknowledged progress.
+     */
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(job: TransferJobEntity)
 
     @Query("SELECT * FROM transfer_jobs WHERE operationId = :operationId LIMIT 1")
     suspend fun getById(operationId: String): TransferJobEntity?
@@ -44,7 +48,7 @@ interface TransferJobDao {
             updatedAtEpochMs = :updatedAtEpochMs
         WHERE operationId = :operationId
           AND status IN ('queued', 'uploading', 'paused')
-          AND :acknowledgedBytes >= 0
+          AND :acknowledgedBytes >= acknowledgedBytes
           AND (totalBytes IS NULL OR :acknowledgedBytes <= totalBytes)
         """
     )
