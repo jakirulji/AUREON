@@ -84,6 +84,21 @@ void main() {
     expect(transport.calls.single.body['grant_type'], 'refresh_token');
   });
 
+  test('concurrent callers share one refresh-token rotation', () async {
+    secrets.values['aureon.firebase.refresh_token.v1'] = 'old-refresh';
+    secrets.values['aureon.firebase.email.v1'] = 'owner@example.com';
+    transport.responses.add({
+      'id_token': 'single-flight-id-token',
+      'refresh_token': 'single-flight-refresh',
+      'user_id': 'user-123',
+      'expires_in': '3600',
+    });
+    final tokens = await Future.wait([auth.getIdToken(), auth.getIdToken()]);
+    expect(tokens, ['single-flight-id-token', 'single-flight-id-token']);
+    expect(transport.calls, hasLength(1));
+    expect(secrets.values['aureon.firebase.refresh_token.v1'], 'single-flight-refresh');
+  });
+
   test('email verification lookup refreshes account claim source', () async {
     transport.responses
       ..add(signInResponse())
