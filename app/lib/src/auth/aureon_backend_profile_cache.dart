@@ -9,16 +9,17 @@ import 'aureon_firebase_auth_service.dart';
 class AureonBackendProfile {
   const AureonBackendProfile({required this.discoveryId, required this.firebaseApiKey,
     required this.firebaseProjectId, required this.firebaseAuthDomain, required this.firebaseAppId,
-    required this.workerBaseUrl, required this.profileVersion});
+    required this.workerBaseUrl, required this.profileVersion, this.registered = true});
   final String discoveryId, firebaseApiKey, firebaseProjectId, firebaseAuthDomain, firebaseAppId, workerBaseUrl;
   final int profileVersion;
+  final bool registered;
 
   AureonFirebaseAuthConfig get firebaseConfig => AureonFirebaseAuthConfig(
     apiKey: firebaseApiKey, projectId: firebaseProjectId, authDomain: firebaseAuthDomain, appId: firebaseAppId);
 
   Map<String, Object?> toJson() => {'discoveryId': discoveryId, 'firebaseApiKey': firebaseApiKey,
     'firebaseProjectId': firebaseProjectId, 'firebaseAuthDomain': firebaseAuthDomain,
-    'firebaseAppId': firebaseAppId, 'workerBaseUrl': workerBaseUrl, 'profileVersion': profileVersion};
+    'firebaseAppId': firebaseAppId, 'workerBaseUrl': workerBaseUrl, 'profileVersion': profileVersion, 'registered': registered};
 
   factory AureonBackendProfile.fromJson(Map<String, Object?> json) {
     String field(String key) {
@@ -36,10 +37,11 @@ class AureonBackendProfile {
       throw const FormatException('Cloudflare Worker URL must be a valid HTTPS base URL.');
     }
     final version = json['profileVersion'];
-    if (version is! int || version < 1) throw const FormatException('Backend profile version is invalid.');
+    final registered = json['registered'] != false;
+    if (version is! int || version < 0 || (registered && version < 1)) throw const FormatException('Backend profile version is invalid.');
     return AureonBackendProfile(discoveryId: id, firebaseApiKey: field('firebaseApiKey'),
       firebaseProjectId: field('firebaseProjectId'), firebaseAuthDomain: field('firebaseAuthDomain'),
-      firebaseAppId: field('firebaseAppId'), workerBaseUrl: worker.origin, profileVersion: version);
+      firebaseAppId: field('firebaseAppId'), workerBaseUrl: worker.origin, profileVersion: version, registered: registered);
   }
 }
 
@@ -154,7 +156,7 @@ class AureonDiscoveryRegistryClient {
     });
     final profile = AureonBackendProfile(discoveryId: discoveryId, firebaseApiKey: config.apiKey,
       firebaseProjectId: config.projectId, firebaseAuthDomain: firebaseAuthDomain, firebaseAppId: firebaseAppId,
-      workerBaseUrl: worker.origin, profileVersion: result['profileVersion'] as int? ?? 1);
+      workerBaseUrl: worker.origin, profileVersion: result['profileVersion'] as int? ?? 1, registered: true);
     await _cache.write(profile);
     return profile;
   }
