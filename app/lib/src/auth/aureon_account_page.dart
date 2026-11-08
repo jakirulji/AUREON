@@ -164,24 +164,44 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   Future<void> _registerBackend() => _run(() async {
         final user = widget.auth.currentUser;
         if (user == null || !user.emailVerified) {
-          throw StateError('Verify your Master Account email before registering discovery.');
+          throw StateError('Verify your Master Account email before registering recovery.');
         }
         final workerUrl = _profile?.workerBaseUrl ?? const String.fromEnvironment('AUREON_CLOUDFLARE_API_URL');
         final config = widget.auth.config;
         if (workerUrl.isEmpty || config.authDomain.isEmpty || config.appId.isEmpty) {
           throw StateError('This first-device build needs AUREON_CLOUDFLARE_API_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
         }
-        final id = _profile?.discoveryId ?? AureonDiscoveryRegistryClient.generateDiscoveryId();
-        final profile = await _registry.register(
-          auth: widget.auth, discoveryId: id, workerBaseUrl: workerUrl,
-          firebaseAuthDomain: config.authDomain, firebaseAppId: config.appId,
-          expectedProfileVersion: _profile?.registered == true ? _profile!.profileVersion : null,
-        );
+
+        // A 256-bit CSPRNG locator makes accidental collisions astronomically
+        // unlikely. The Registry's PRIMARY KEY is still the final authority:
+        // on a concurrent collision, generate a fresh locator and retry.
+        final isFirstRegistration = _profile?.registered != true;
+        var id = _profile?.discoveryId ?? AureonDiscoveryRegistryClient.generateDiscoveryId();
+        AureonBackendProfile? registeredProfile;
+        for (var attempt = 0; attempt < (isFirstRegistration ? 5 : 1); attempt++) {
+          try {
+            registeredProfile = await _registry.register(
+              auth: widget.auth,
+              discoveryId: id,
+              workerBaseUrl: workerUrl,
+              firebaseAuthDomain: config.authDomain,
+              firebaseAppId: config.appId,
+              expectedProfileVersion: _profile?.registered == true ? _profile!.profileVersion : null,
+            );
+            break;
+          } on AureonDiscoveryRegistryException catch (error) {
+            if (!isFirstRegistration || error.statusCode != 409 || attempt == 4) rethrow;
+            id = AureonDiscoveryRegistryClient.generateDiscoveryId();
+          }
+        }
+        if (registeredProfile == null) {
+          throw StateError('Could not reserve a unique Account Recovery ID. Please retry.');
+        }
         if (mounted) {
           setState(() {
-          _profile = profile;
-          _discoveryId.text = profile.discoveryId;
-          _status = 'Discovery profile registered. Save this Discovery ID for new devices.';
+            _profile = registeredProfile;
+            _discoveryId.text = registeredProfile!.discoveryId;
+            _status = 'Your unique Account Recovery ID is registered. Save it or its QR for new-device recovery.';
           });
         }
       });
