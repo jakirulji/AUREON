@@ -154,7 +154,7 @@ class AureonDiscoveryRegistryClient {
     final result = await _post('/v1/profiles', idToken: token, body: {
       'discoveryId': discoveryId, 'firebaseProjectId': config.projectId, 'firebaseApiKey': config.apiKey,
       'firebaseAuthDomain': firebaseAuthDomain, 'firebaseAppId': firebaseAppId, 'workerBaseUrl': worker.origin,
-      if (expectedProfileVersion != null) 'expectedProfileVersion': expectedProfileVersion,
+      'expectedProfileVersion': ?expectedProfileVersion,
     });
     final profile = AureonBackendProfile(discoveryId: discoveryId, firebaseApiKey: config.apiKey,
       firebaseProjectId: config.projectId, firebaseAuthDomain: firebaseAuthDomain, firebaseAppId: firebaseAppId,
