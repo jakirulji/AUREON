@@ -41,8 +41,10 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     try {
       await widget.auth.restoreSession();
       final user = await widget.auth.reloadUser();
-      if (mounted) setState(() => _status =
-          'Signed in as ${user.email}. Email verification: ${user.emailVerified ? "verified" : "pending"}.');
+      if (mounted) {
+        setState(() => _status =
+            'Signed in as ${user.email}. Email verification: ${user.emailVerified ? "verified" : "pending"}.');
+      }
     } catch (_) {
       if (mounted) setState(() => _status = 'No active session. Sign in or create your AUREON account.');
     }
@@ -102,8 +104,10 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         final password = await _askPassword();
         if (password == null) return;
         final session = await widget.auth.reauthenticate(password: password);
-        if (mounted) setState(() => _status =
-            'Reauthentication completed for ${session.user.email}. The Firebase auth_time is now fresh for protected recovery actions.');
+        if (mounted) {
+          setState(() => _status =
+              'Reauthentication completed for ${session.user.email}. The Firebase auth_time is now fresh for protected recovery actions.');
+        }
       });
 
   Future<String?> _askPassword() async {
