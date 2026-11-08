@@ -17,7 +17,7 @@ interface PublicProfile {
 interface OwnerIdentity { issuer: string; uid: string }
 const FIREBASE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
 const MAX_BODY_BYTES = 16 * 1024;
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" };
+const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "access-control-allow-origin": "*" };
 
 class HttpError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
@@ -31,7 +31,7 @@ function requiredString(value: unknown, field: string, min = 1, max = 512): stri
   }
   return value.trim();
 }
-function validateDiscoveryId(value: unknown): string {
+export function validateDiscoveryId(value: unknown): string {
   const id = requiredString(value, "Discovery ID", 22, 128);
   if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new HttpError(400, "Invalid Discovery ID.");
   return id;
@@ -50,7 +50,7 @@ async function sha256Hex(value: string): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-function validateProfile(body: Record<string, unknown>, discoveryId: string): PublicProfile {
+export function validateProfile(body: Record<string, unknown>, discoveryId: string): PublicProfile {
   const firebaseProjectId = requiredString(body.firebaseProjectId, "Firebase project ID", 1, 128);
   if (!/^[a-z0-9-]+$/.test(firebaseProjectId)) throw new HttpError(400, "Invalid Firebase project ID.");
   const firebaseApiKey = requiredString(body.firebaseApiKey, "Firebase API key", 20, 256);
@@ -130,6 +130,19 @@ async function register(request: Request, env: Env): Promise<Response> {
   if (!result.success || result.meta.changes !== 1) throw new HttpError(409, "Profile update conflicted; reload and retry.");
   return response({ registered: false, profileVersion: nextVersion });
 }
+async function verifyBinding(request: Request, env: Env): Promise<Response> {
+  const body = await readJson(request);
+  const id = validateDiscoveryId(body.discoveryId);
+  const projectId = requiredString(body.firebaseProjectId, "Firebase project ID", 1, 128);
+  const identity = await authenticate(request, projectId);
+  const hash = await sha256Hex(id);
+  const row = await env.DB.prepare("SELECT firebase_issuer,firebase_uid FROM discovery_profiles WHERE discovery_id_hash=?")
+    .bind(hash).first<{ firebase_issuer: string; firebase_uid: string }>();
+  if (!row || row.firebase_issuer !== identity.issuer || row.firebase_uid !== identity.uid) {
+    throw new HttpError(403, "Master Account does not match this Discovery ID.");
+  }
+  return response({ bound: true });
+}
 async function unregister(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
   const id = validateDiscoveryId(body.discoveryId);
@@ -144,12 +157,16 @@ async function unregister(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "POST,PUT,DELETE,OPTIONS", "access-control-allow-headers": "authorization,content-type" } });
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "POST,PUT,DELETE,OPTIONS", "access-control-allow-headers": "authorization,content-type", "access-control-max-age": "86400" } });
     try {
       if (url.pathname === "/health/live" && request.method === "GET") return response({ status: "ok" });
       if (url.pathname === "/v1/profiles/lookup" && request.method === "POST") {
         await rateLimit(request, env);
         return await lookup(request, env);
+      }
+      if (url.pathname === "/v1/profiles/verify" && request.method === "POST") {
+        await rateLimit(request, env);
+        return await verifyBinding(request, env);
       }
       if (url.pathname === "/v1/profiles" && request.method === "POST") {
         await rateLimit(request, env);
