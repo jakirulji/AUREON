@@ -21,6 +21,17 @@ void main() {
     expect((await cache.read())?.toJson(), profile.toJson());
   });
 
+
+  test('unregistered first-device profile can be cached before Firebase sign-in', () {
+    final draft = AureonBackendProfile.fromJson({
+      ...profile.toJson(),
+      'profileVersion': 0,
+      'registered': false,
+    });
+    expect(draft.registered, isFalse);
+    expect(draft.profileVersion, 0);
+  });
+
   test('profile parser rejects insecure Worker URLs', () {
     expect(
       () => AureonBackendProfile.fromJson({
