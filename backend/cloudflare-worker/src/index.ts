@@ -104,6 +104,16 @@ function rejectPlaintextSecrets(value: unknown, path = "root"): void {
     rejectPlaintextSecrets(child, `${path}.${key}`);
   }
 }
+export function canAdvanceSnapshot(
+  existing: { generation: number; created_at_ms: number } | null,
+  next: { generation: number; createdAtEpochMs: number },
+): boolean {
+  if (!existing) return true;
+  if (next.generation < existing.generation) return false;
+  if (next.generation > existing.generation) return true;
+  return next.createdAtEpochMs > existing.created_at_ms;
+}
+
 export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot {
   if (input.format !== "AUREON-VAULT-RECOVERY-BUNDLE" || input.formatVersion !== 1) throw new HttpError(400, "Unsupported vault bundle format.");
   const vaultId = requiredString(input.vaultId, "vaultId");
@@ -222,8 +232,7 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
   const canonical = JSON.stringify(snapshot), hash = await sha256Hex(canonical);
   const existing = await env.DB.prepare("SELECT generation,created_at_ms FROM vault_snapshots WHERE user_id=? AND vault_id=?")
     .bind(identity.uid, snapshot.vaultId).first<{ generation: number; created_at_ms: number }>();
-  if (existing && (snapshot.generation < existing.generation ||
-      (snapshot.generation === existing.generation && snapshot.createdAtEpochMs <= existing.created_at_ms))) {
+  if (!canAdvanceSnapshot(existing, snapshot)) {
     throw new HttpError(409, "Stale snapshot: generation or snapshot timestamp did not advance.");
   }
   const now = Date.now();
