@@ -111,3 +111,18 @@ Losing all five Manual Recovery Keys and the `.key` export must not make the use
 - Provider OAuth re-link is independent of manual recovery. If the user also loses access to the provider's own account, AUREON cannot bypass the provider's account recovery process.
 
 This is a disaster-recovery path, not a way to recover the old provider credential vault or E2E content keys. The product must explain these distinctions in the recovery UI.
+
+
+## Recovery generation rotation workflow
+
+Manual-key rotation is a two-phase client operation:
+
+1. The currently active bundle and device DEK are authenticated; all credential records are decrypted only in process memory.
+2. A new generation is created with a fresh random DEK and five independently generated 256-bit manual keys. Every credential record is re-encrypted under the new DEK, and five new wrapping envelopes are created.
+3. The user must export the new plaintext TXT, encrypted .key, and encrypted Vault Recovery Bundle before commit. If any export is cancelled, the current generation remains active.
+4. Commit writes and verifies the new device DEK and bundle, then removes the previous generation's device-local DEK.
+5. The UI switches to the new generation only after commit succeeds.
+
+This is not remote revocation of offline exports. An old .key plus its old encrypted bundle remains capable of recovering that historical snapshot. AUREON cannot invalidate offline copies without a trusted online generation registry or a server-side policy anchor. Once Cloudflare generation enforcement is deployed, old generations must be rejected for current account restoration while historical exports remain clearly labeled as historical snapshots.
+
+The current Flutter implementation is a local prototype: it does not yet have a server-side monotonic generation registry, Cloudflare envelope refresh, or provider OAuth credential synchronization. Do not describe local rotation as global revocation.
