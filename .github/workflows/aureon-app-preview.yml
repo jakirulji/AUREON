@@ -27,6 +27,7 @@ jobs:
   android-validation:
     name: Analyze, test and compile Android
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -66,18 +67,23 @@ jobs:
         run: |
           dart pub get
           dart test
-      - name: Analyze, test and compile
+      - name: Resolve Flutter dependencies
         working-directory: ${{ runner.temp }}/aureon-android
-        run: |
-          set -euo pipefail
-          flutter pub get
-          flutter analyze
-          flutter test
-          flutter build apk --debug
+        run: flutter pub get
+      - name: Analyze Flutter app
+        working-directory: ${{ runner.temp }}/aureon-android
+        run: flutter analyze
+      - name: Run Flutter tests
+        working-directory: ${{ runner.temp }}/aureon-android
+        run: flutter test
+      - name: Compile Android debug APK (no artifact upload)
+        working-directory: ${{ runner.temp }}/aureon-android
+        run: flutter build apk --debug
 
   windows-validation:
     name: Analyze, test and compile Windows
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -119,15 +125,27 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dart test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Analyze, test and compile
+      - name: Resolve Flutter dependencies
         shell: pwsh
         working-directory: ${{ runner.temp }}/aureon-windows
         run: |
           flutter pub get
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Analyze Flutter app
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/aureon-windows
+        run: |
           flutter analyze
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run Flutter tests
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/aureon-windows
+        run: |
           flutter test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile Windows release (no artifact upload)
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/aureon-windows
+        run: |
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
