@@ -166,6 +166,7 @@ class AureonFirebaseAuthService {
   final AureonFirebaseAuthTransport _transport;
   final AureonAuthSecretStore _secrets;
   AureonFirebaseSession? _session;
+  Future<AureonFirebaseSession>? _refreshing;
 
   static const _refreshKey = 'aureon.firebase.refresh_token.v1';
   static const _emailKey = 'aureon.firebase.email.v1';
@@ -340,7 +341,17 @@ class AureonFirebaseAuthService {
     return _refreshSession(refresh);
   }
 
-  Future<AureonFirebaseSession> _refreshSession(String refreshToken) async {
+  Future<AureonFirebaseSession> _refreshSession(String refreshToken) {
+    final active = _refreshing;
+    if (active != null) return active;
+    final pending = _performRefresh(refreshToken);
+    _refreshing = pending;
+    return pending.whenComplete(() {
+      if (identical(_refreshing, pending)) _refreshing = null;
+    });
+  }
+
+  Future<AureonFirebaseSession> _performRefresh(String refreshToken) async {
     final response = await _transport.post(
       _refreshUri,
       formEncoded: true,
