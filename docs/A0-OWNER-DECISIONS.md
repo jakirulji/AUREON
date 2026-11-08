@@ -80,6 +80,14 @@ The following are already recommended or validated and should not be reopened wi
 - No quota pooling or file sharding to evade provider limits.
 
 
+## Cloudflare Worker implementation status (2026-11-08)
+
+- A TypeScript Worker/D1 foundation is committed under `backend/cloudflare-worker/`; it is not deployed.
+- Firebase RS256 token verification, verified-email checks, recent-auth checks on sensitive routes, encrypted snapshot validation, monotonic generation CAS, challenge throttling/cooldown, audit persistence and device-bound envelope rewrapping are implemented as prototype code.
+- The Worker Secret is a server-side trust boundary, not KMS/HSM. Initial envelope provisioning sends the DEK to the Worker over TLS so it can create the server envelope; the Worker can access that DEK in memory.
+- Client integration, passkey/trusted-device step-up, email notifications, WAF/IP abuse controls, provider OAuth broker, external backup replication and independent security review remain incomplete.
+- Owner provisioning remains required: Firebase project, Cloudflare account, D1 database, Firebase project ID, and Worker Secret configured privately. Never send secrets through chat.
+
 ## Dual recovery requirement — owner-approved (2026-11-08)
 
 - The owner requires two independent recovery paths for the provider credential vault: a manually held random recovery key and a Cloudflare-assisted recovery path.
