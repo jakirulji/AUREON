@@ -67,6 +67,55 @@ void main() {
     expect(await target.loadBundle(), isNotNull);
   });
 
+  test('unverified imported bundle stays pending and cannot replace active snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('aureon-vault-quarantine-');
+    final dekStore = _MemoryDekStore();
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final crypto = CredentialVaultCryptoService();
+    final service = AureonCredentialVaultStore(
+      dekStore: dekStore,
+      rootDirectory: directory,
+      crypto: crypto,
+    );
+    final recovery = AureonRecoveryKeyService();
+    final keySet = recovery.generateKeySet(vaultId: 'vault-quarantine-test');
+    final active = await service.initialize(keySet);
+    final candidate = await crypto.createBundle(
+      keySet: keySet,
+      vaultDek: List<int>.generate(32, (index) => index + 1),
+      credentialRecords: const [],
+    );
+
+    final staged = await service.importBundle(
+      utf8.encode(jsonEncode(candidate.toJson())),
+    );
+    expect(staged.createdAtEpochMs, candidate.createdAtEpochMs);
+    expect((await service.loadBundle())!.createdAtEpochMs, active.createdAtEpochMs);
+    expect((await service.loadPendingBundle())!.createdAtEpochMs, candidate.createdAtEpochMs);
+
+    final wrongKeys = recovery.generateKeySet(vaultId: keySet.vaultId);
+    await expectLater(
+      service.restoreWithManualKey(
+        bundle: staged,
+        keySet: wrongKeys,
+        manualKeyId: wrongKeys.keys.first.id,
+      ),
+      throwsFormatException,
+    );
+    expect((await service.loadBundle())!.createdAtEpochMs, active.createdAtEpochMs);
+    expect(await service.loadPendingBundle(), isNotNull);
+
+    await service.restoreWithManualKey(
+      bundle: staged,
+      keySet: keySet,
+      manualKeyId: keySet.keys[4].id,
+    );
+    expect((await service.loadBundle())!.createdAtEpochMs, candidate.createdAtEpochMs);
+    expect(await service.loadPendingBundle(), isNull);
+  });
+
   test('bundle restore rejects a recovery key from another vault', () async {
     final directory = await Directory.systemTemp.createTemp('aureon-vault-mismatch-');
     final dekStore = _MemoryDekStore();
