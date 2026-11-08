@@ -19,6 +19,8 @@ class AureonFirebaseAuthConfig {
   static const fromEnvironment = AureonFirebaseAuthConfig(
     apiKey: String.fromEnvironment('AUREON_FIREBASE_API_KEY'),
     projectId: String.fromEnvironment('AUREON_FIREBASE_PROJECT_ID'),
+    authDomain: String.fromEnvironment('AUREON_FIREBASE_AUTH_DOMAIN'),
+    appId: String.fromEnvironment('AUREON_FIREBASE_APP_ID'),
   );
 
   bool get isConfigured => apiKey.trim().isNotEmpty &&
