@@ -40,7 +40,7 @@ class TransferPersistenceTest {
             acknowledgedBytes = 512,
             totalBytes = 1024
         )
-        first.transferJobDao().upsert(entity)
+        first.transferJobDao().insert(entity)
         first.close()
 
         val reopened = openDatabase()
@@ -53,16 +53,68 @@ class TransferPersistenceTest {
     }
 
     @Test
+    fun duplicateEnqueueCannotReplaceOrResetAnExistingCheckpoint() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+        repository.enqueue(testJob("operation-immutable", acknowledgedBytes = 600, totalBytes = 1000))
+
+        val error = runCatching {
+            repository.enqueue(testJob("operation-immutable", acknowledgedBytes = 0, totalBytes = 1000))
+        }.exceptionOrNull()
+
+        assertTrue(error is android.database.sqlite.SQLiteConstraintException)
+        assertEquals(600L, repository.getTransfer("operation-immutable")?.acknowledgedBytes)
+        database.close()
+    }
+
+    @Test
+    fun acknowledgedProgressCannotRegress() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+        repository.enqueue(testJob("operation-monotonic", acknowledgedBytes = 500, totalBytes = 1000))
+
+        val error = runCatching {
+            repository.acknowledge("operation-monotonic", 499, 2500)
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalStateException)
+        assertEquals(500L, repository.getTransfer("operation-monotonic")?.acknowledgedBytes)
+        database.close()
+    }
+
+    @Test
+    fun enqueueRejectsImpossibleOrPreverifiedInitialCheckpoints() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+
+        val tooLarge = runCatching {
+            repository.enqueue(testJob("operation-too-large", acknowledgedBytes = 1001, totalBytes = 1000))
+        }.exceptionOrNull()
+        val preverified = runCatching {
+            repository.enqueue(
+                testJob("operation-preverified", acknowledgedBytes = 1000, totalBytes = 1000)
+                    .copy(remoteVerified = true, verifiedAtEpochMs = 2000)
+            )
+        }.exceptionOrNull()
+
+        assertTrue(tooLarge is IllegalArgumentException)
+        assertTrue(preverified is IllegalArgumentException)
+        assertEquals(null, repository.getTransfer("operation-too-large"))
+        assertEquals(null, repository.getTransfer("operation-preverified"))
+        database.close()
+    }
+
+    @Test
     fun recoveryAfterDatabaseReopenReconcilesInFlightInsteadOfBlindlyReuploading() = runBlocking {
         val first = openDatabase()
-        first.transferJobDao().upsert(
+        first.transferJobDao().insert(
             testJob("operation-uploading", acknowledgedBytes = 512, totalBytes = 1024)
         )
-        first.transferJobDao().upsert(
+        first.transferJobDao().insert(
             testJob("operation-queued", acknowledgedBytes = 0, totalBytes = 2048)
                 .copy(status = "queued", updatedAtEpochMs = 2000)
         )
-        first.transferJobDao().upsert(
+        first.transferJobDao().insert(
             testJob("operation-auth", acknowledgedBytes = 128, totalBytes = 512)
                 .copy(status = "waiting_for_auth", updatedAtEpochMs = 3000)
         )
