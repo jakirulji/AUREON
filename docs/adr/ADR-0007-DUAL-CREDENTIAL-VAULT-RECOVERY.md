@@ -84,6 +84,12 @@ A TypeScript Cloudflare Worker prototype now exists at `backend/cloudflare-worke
 
 This is a backend foundation, not an integrated recovery product. The Worker currently receives the DEK over authenticated TLS during initial envelope creation, so the Worker runtime can access it in memory; this trust boundary is explicit and is not zero-knowledge or HSM-backed. The Flutter client does not yet provision/sync the Cloudflare envelope or unwrap the device-bound response. Email notification, passkey/trusted-device step-up, Cloudflare WAF/IP rate limiting, provider OAuth broker/refresh, independent backup replication, and security review remain open. No production account, D1 database, Worker Secret or deployment has been provisioned.
 
+## Flutter Cloudflare client integration (2026-11-08)
+
+The Flutter layer now contains an HTTPS-only Cloudflare vault client with an injected Firebase ID-token provider, envelope provisioning, encrypted snapshot upload/download, SHA-256 response verification, P-256 ECDH device-bound DEK unwrap, HKDF-SHA-256 and AES-256-GCM authentication. The credential-vault store can provision an envelope, persist it locally before upload for safe retry, sync encrypted records, and restore a downloaded snapshot through either manual recovery or the Cloudflare device-bound path. Temporary DEK/shared-secret/cleartext buffers are zeroized where the Dart APIs expose mutable buffers.
+
+This is code-level integration, not an activated account flow: the app still needs Firebase Auth project configuration and a concrete signed-in session/token provider, a configured Worker URL, and end-to-end tests against a deployed D1/Worker instance. Cloudflare snapshots are currently limited to 900 KB because the prototype stores each complete encrypted snapshot in one D1 row; larger account sets require a chunked-record schema before production. Recovery challenge is consumed on successful server rewrap and a thirty-minute cooldown applies; interrupted-response retry/idempotency remains a hardening item. No live provider OAuth refresh broker is wired.
+
 ## Required verification
 
 1. Manual recovery on a clean device while Worker and D1 endpoints are deliberately blocked, using any one of the five keys.
