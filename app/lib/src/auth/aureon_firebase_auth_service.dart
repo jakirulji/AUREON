@@ -422,7 +422,9 @@ class AureonFirebaseAuthService {
     if (code.startsWith('INVALID_EMAIL')) return 'Enter a valid email address.';
     if (code.startsWith('INVALID_LOGIN_CREDENTIALS') ||
         code.startsWith('EMAIL_NOT_FOUND') ||
-        code.startsWith('INVALID_PASSWORD')) return 'Email or password is incorrect.';
+        code.startsWith('INVALID_PASSWORD')) {
+      return 'Email or password is incorrect.';
+    }
     if (code.startsWith('WEAK_PASSWORD')) return 'Password does not meet Firebase requirements.';
     if (code.startsWith('TOO_MANY_ATTEMPTS')) return 'Too many attempts. Wait and try again.';
     if (code.startsWith('USER_DISABLED')) return 'This account has been disabled.';
