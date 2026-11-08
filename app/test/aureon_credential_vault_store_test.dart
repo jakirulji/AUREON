@@ -98,25 +98,29 @@ void main() {
       ],
     );
 
-    final rotated = await service.rotateGeneration(
+    final plan = await service.prepareRotation(
       currentKeySet: oldKeys,
       currentManualKeyId: oldKeys.keys.first.id,
     );
 
-    expect(rotated.keySet.generation, oldKeys.generation + 1);
-    expect(rotated.bundle.generation, oldBundle.generation + 1);
-    expect(rotated.bundle.encryptedCredentialRecords, hasLength(1));
+    expect(plan.keySet.generation, oldKeys.generation + 1);
+    expect(plan.bundle.generation, oldBundle.generation + 1);
+    expect(plan.bundle.encryptedCredentialRecords, hasLength(1));
+    // Preparing a rotation must not invalidate the currently active vault.
+    expect(await dekStore.read(oldKeys.vaultId, oldKeys.generation), hasLength(32));
+    expect(await service.loadBundle(), isNotNull);
+    await service.commitRotation(currentKeySet: oldKeys, plan: plan);
     expect(await dekStore.read(oldKeys.vaultId, oldKeys.generation), isNull);
-    expect(await dekStore.read(rotated.keySet.vaultId, rotated.keySet.generation), hasLength(32));
+    expect(await dekStore.read(plan.keySet.vaultId, plan.keySet.generation), hasLength(32));
     final restored = await CredentialVaultCryptoService().restoreBundle(
-      bundle: rotated.bundle,
-      keySet: rotated.keySet,
-      manualKeyId: rotated.keySet.keys.last.id,
+      bundle: plan.bundle,
+      keySet: plan.keySet,
+      manualKeyId: plan.keySet.keys.last.id,
     );
     expect(restored.single['refreshToken'], 'test-refresh-secret');
     await expectLater(
       CredentialVaultCryptoService().restoreBundle(
-        bundle: rotated.bundle,
+        bundle: plan.bundle,
         keySet: oldKeys,
         manualKeyId: oldKeys.keys.first.id,
       ),
