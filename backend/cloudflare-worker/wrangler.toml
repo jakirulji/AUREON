@@ -5,7 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 FIREBASE_PROJECT_ID = "REPLACE_WITH_FIREBASE_PROJECT_ID"
-ENVIRONMENT = "development"\nAUREON_VAULT_ACTIVE_ROOT_VERSION = "1"
+ENVIRONMENT = "development"
+AUREON_VAULT_ACTIVE_ROOT_VERSION = "1"
 
 [[d1_databases]]
 binding = "DB"
@@ -13,5 +14,6 @@ database_name = "aureon-metadata"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
-# Configure with wrangler secret put AUREON_VAULT_ROOT_SECRET.
-# Value: base64url-encoded 32-byte random secret. Never commit secret values.
+# Configure versioned secrets with wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
+# and (during rotation) AUREON_VAULT_ROOT_SECRET_V2. Values are base64url-encoded
+# 32-byte random secrets. Keep old versions until every envelope is migrated.
