@@ -50,6 +50,11 @@ describe("vault snapshot validation", () => {
     input.cloudflareEnvelope.rootKeyVersion = 3;
     expect(() => validateSnapshot(input)).toThrow(/Cloudflare envelope cryptographic fields/);
   });
+  it("rejects snapshots that exceed the safe D1 row-size limit", () => {
+    const input = validSnapshot();
+    input.metadataPadding = "x".repeat(900_000);
+    expect(() => validateSnapshot(input)).toThrow(/safe D1 row limit/);
+  });
   it("rejects a bundle without all five manual envelopes", () => {
     const input = validSnapshot();
     input.manualKeyEnvelopes.pop();
