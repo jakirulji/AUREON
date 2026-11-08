@@ -348,8 +348,9 @@ class AureonFirebaseAuthService {
       throw const FormatException('Firebase refresh response is incomplete.');
     }
     final email = await _secrets.read(_emailKey) ?? '';
+    final previouslyVerified = _session?.user.emailVerified ?? false;
     final session = AureonFirebaseSession(
-      user: AureonFirebaseUser(localId: localId, email: email, emailVerified: false),
+      user: AureonFirebaseUser(localId: localId, email: email, emailVerified: previouslyVerified),
       idToken: idToken,
       refreshToken: nextRefresh,
       expiresAt: DateTime.now().toUtc().add(
