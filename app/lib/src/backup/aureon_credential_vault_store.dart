@@ -187,18 +187,22 @@ class AureonCredentialVaultStore {
       generation: bundle.generation,
       envelope: envelope.single,
     );
-    final records = await _crypto.restoreBundle(
-      bundle: bundle,
-      keySet: keySet,
-      manualKeyId: manualKeyId,
-    );
-    // Promote authenticated ciphertext before switching the device DEK. If
-    // secure storage fails, the pending copy remains available for a retry.
-    await _writeBundle(bundle);
-    await _dekStore.write(bundle.vaultId, bundle.generation, dek);
-    final pending = await _bundleFile(pending: true);
-    if (await pending.exists()) await pending.delete();
-    return records;
+    try {
+      final records = await _crypto.restoreBundle(
+        bundle: bundle,
+        keySet: keySet,
+        manualKeyId: manualKeyId,
+      );
+      // Promote authenticated ciphertext before switching the device DEK. If
+      // secure storage fails, the pending copy remains available for a retry.
+      await _writeBundle(bundle);
+      await _dekStore.write(bundle.vaultId, bundle.generation, dek);
+      final pending = await _bundleFile(pending: true);
+      if (await pending.exists()) await pending.delete();
+      return records;
+    } finally {
+      dek.fillRange(0, dek.length, 0);
+    }
   }
 
   /// Prepares a new generation without changing the active vault. The caller
@@ -258,15 +262,19 @@ class AureonCredentialVaultStore {
         plan.nextDek.length != 32) {
       throw const StateError('Vault changed while rotation was being prepared. Start the rotation again.');
     }
-    await _dekStore.write(plan.keySet.vaultId, plan.keySet.generation, plan.nextDek);
-    // Verify the generated bundle and the newly wrapped DEK before promotion.
-    await _crypto.restoreBundle(
-      bundle: plan.bundle,
-      keySet: plan.keySet,
-      manualKeyId: plan.keySet.keys.first.id,
-    );
-    await _writeBundle(plan.bundle);
-    await _dekStore.delete(current.vaultId, current.generation);
+    try {
+      await _dekStore.write(plan.keySet.vaultId, plan.keySet.generation, plan.nextDek);
+      // Verify the generated bundle and the newly wrapped DEK before promotion.
+      await _crypto.restoreBundle(
+        bundle: plan.bundle,
+        keySet: plan.keySet,
+        manualKeyId: plan.keySet.keys.first.id,
+      );
+      await _writeBundle(plan.bundle);
+      await _dekStore.delete(current.vaultId, current.generation);
+    } finally {
+      plan.nextDek.fillRange(0, plan.nextDek.length, 0);
+    }
   }
 
   Future<VaultRecoveryBundle> replaceCredentialRecords({
