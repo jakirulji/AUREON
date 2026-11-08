@@ -67,6 +67,28 @@ void main() {
     expect(await target.loadBundle(), isNotNull);
   });
 
+  test('initialization cannot silently replace an existing vault or DEK', () async {
+    final directory = await Directory.systemTemp.createTemp('aureon-vault-init-guard-');
+    final dekStore = _MemoryDekStore();
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final service = AureonCredentialVaultStore(
+      dekStore: dekStore,
+      rootDirectory: directory,
+    );
+    final keys = AureonRecoveryKeyService().generateKeySet(
+      vaultId: 'vault-init-guard',
+    );
+    final original = await service.initialize(keys);
+    final originalDek = await dekStore.read(keys.vaultId, keys.generation);
+
+    await expectLater(service.initialize(keys), throwsStateError);
+
+    expect(await dekStore.read(keys.vaultId, keys.generation), originalDek);
+    expect((await service.loadBundle())!.createdAtEpochMs, original.createdAtEpochMs);
+  });
+
   test('unverified imported bundle stays pending and cannot replace active snapshot', () async {
     final directory = await Directory.systemTemp.createTemp('aureon-vault-quarantine-');
     final dekStore = _MemoryDekStore();
