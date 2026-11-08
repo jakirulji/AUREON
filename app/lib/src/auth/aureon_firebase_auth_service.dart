@@ -230,6 +230,12 @@ class AureonFirebaseAuthService {
       throw StateError('Authentication session changed during sign-in. Retry the operation.');
     }
     await _secrets.write(_emailKey, email);
+    if (epoch != _sessionEpoch) {
+      final stored = await _secrets.read(_refreshKey);
+      if (stored == refreshToken) await _secrets.delete(_refreshKey);
+      await _secrets.delete(_emailKey);
+      throw StateError('Authentication session changed during sign-in. Retry the operation.');
+    }
     return session;
   }
 
