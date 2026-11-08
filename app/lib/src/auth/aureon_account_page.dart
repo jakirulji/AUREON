@@ -74,6 +74,25 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     try {
       await widget.auth.restoreSession();
       final user = await widget.auth.reloadUser();
+      if (_profile?.registered == true && _needsBindingVerification) {
+        try {
+          await _registry.verifyBinding(auth: widget.auth, profile: _profile!);
+          _needsBindingVerification = false;
+        } on AureonDiscoveryRegistryException catch (error) {
+          if (error.statusCode == 403) {
+            await widget.auth.signOut();
+            if (mounted) setState(() => _status = 'This saved session does not match this Discovery ID. Sign in with the correct Master Account.');
+            return;
+          }
+          widget.auth.lockSession();
+          if (mounted) setState(() => _status = 'Session is saved, but owner verification is pending. Connect to the internet and retry sign-in; the refresh token has been preserved.');
+          return;
+        } catch (_) {
+          widget.auth.lockSession();
+          if (mounted) setState(() => _status = 'Owner verification is temporarily unavailable. The session is locked and its refresh token is preserved; reconnect and sign in again.');
+          return;
+        }
+      }
       if (mounted) {
         setState(() => _status =
             'Signed in as ${user.email}. Email verification: ${user.emailVerified ? "verified" : "pending"}.');
@@ -190,9 +209,16 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           try {
             await _registry.verifyBinding(auth: widget.auth, profile: _profile!);
             _needsBindingVerification = false;
+          } on AureonDiscoveryRegistryException catch (error) {
+            if (error.statusCode == 403) {
+              await widget.auth.signOut();
+              throw StateError('This Firebase account does not match the Discovery ID. Login was blocked.');
+            }
+            widget.auth.lockSession();
+            throw StateError('Owner verification is temporarily unavailable. Your saved refresh token was preserved; reconnect and sign in again.');
           } catch (_) {
-            await widget.auth.signOut();
-            throw StateError('This Firebase account does not match the Discovery ID. Login was blocked.');
+            widget.auth.lockSession();
+            throw StateError('Owner verification could not be completed. Your saved refresh token was preserved; reconnect and sign in again.');
           }
         }
         if (mounted) {
