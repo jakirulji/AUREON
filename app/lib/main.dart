@@ -1,3 +1,5 @@
+import 'package:aureon/src/auth/aureon_account_page.dart';
+import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
@@ -29,9 +31,10 @@ class AureonHome extends StatefulWidget {
 }
 
 class _AureonHomeState extends State<AureonHome> {
+  final _auth = AureonFirebaseAuthService();
   int selected = 0;
-  static const labels = ['Home', 'Files', 'Cloud', 'Transfers', 'Settings'];
-  static const icons = [Icons.home_outlined, Icons.folder_outlined, Icons.cloud_outlined, Icons.swap_vert, Icons.settings_outlined];
+  static const labels = ['Home', 'Files', 'Cloud', 'Transfers', 'Account', 'Settings'];
+  static const icons = [Icons.home_outlined, Icons.folder_outlined, Icons.cloud_outlined, Icons.swap_vert, Icons.person_outline, Icons.settings_outlined];
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
@@ -72,7 +75,13 @@ class _AureonHomeState extends State<AureonHome> {
         ),
       const Spacer(),
       const Divider(color: Color(0xFF26334A)),
-      const ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: Color(0xFF243A4A), child: Icon(Icons.person_outline, color: Color(0xFF64E6C2))), title: Text('Local profile', style: TextStyle(fontSize: 13)), subtitle: Text('Prototype mode', style: TextStyle(fontSize: 11))),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: CircleAvatar(backgroundColor: const Color(0xFF243A4A), child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined, color: const Color(0xFF64E6C2))),
+        title: Text(_auth.currentUser?.email ?? 'Local profile', style: const TextStyle(fontSize: 12)),
+        subtitle: Text(_auth.currentUser == null ? 'Not signed in' : (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'), style: const TextStyle(fontSize: 11)),
+        onTap: () => setState(() => selected = 4),
+      ),
     ]),
   );
 
@@ -81,8 +90,10 @@ class _AureonHomeState extends State<AureonHome> {
       : selected == 2
           ? const AureonVirtualFoldersPage()
           : selected == 4
-              ? const AureonBackupPage()
-              : SingleChildScrollView(
+              ? AureonAccountPage(auth: _auth)
+              : selected == 5
+                  ? AureonBackupPage(auth: _auth)
+                  : SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(wide ? 34 : 20, 22, wide ? 34 : 20, 28),
     child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1180),
@@ -91,8 +102,7 @@ class _AureonHomeState extends State<AureonHome> {
           if (!wide) const Icon(Icons.all_inclusive, color: Color(0xFF64E6C2), size: 27),
           if (!wide) const SizedBox(width: 9),
           Expanded(child: Text(selected == 0 ? 'Good evening' : labels[selected], style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
-          const CircleAvatar(radius: 17, backgroundColor: Color(0xFF243A4A), child: Icon(Icons.person_outline, size: 19, color: Color(0xFF64E6C2))),
+          IconButton(onPressed: () => setState(() => selected = 4), icon: const Icon(Icons.person_outline)),
         ]),
         const SizedBox(height: 5),
         const Text('One place for all your files.', style: TextStyle(color: Color(0xFF9AA8BD))),
@@ -103,7 +113,7 @@ class _AureonHomeState extends State<AureonHome> {
           child: const Row(children: [
             Icon(Icons.science_outlined, color: Color(0xFFFFD27A)),
             SizedBox(width: 10),
-            Expanded(child: Text('Preview build • Sample data only. Real device storage and cloud accounts are not connected yet.', style: TextStyle(fontSize: 12, color: Color(0xFFFFE4B0)))),
+            Expanded(child: Text('Preview build • Sample data only. Real cloud accounts and provider transfers are not connected yet.', style: TextStyle(fontSize: 12, color: Color(0xFFFFE4B0)))),
           ]),
         ),
         const SizedBox(height: 24),
