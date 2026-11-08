@@ -2,6 +2,7 @@ import 'package:aureon/src/auth/aureon_account_page.dart';
 import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
 import 'package:aureon/src/auth/aureon_backend_profile.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
+import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
@@ -123,7 +124,9 @@ class _AureonHomeState extends State<AureonHome> {
       ? const AureonFilesPage()
       : selected == 2
           ? const AureonVirtualFoldersPage()
-          : selected == 4
+          : selected == 3
+              ? const AureonTransfersPage()
+              : selected == 4
               ? AureonAccountPage(auth: _auth)
               : selected == 5
                   ? AureonBackupPage(auth: _auth)

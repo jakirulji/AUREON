@@ -41,6 +41,12 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Export Flutter SDK path
+        shell: bash
+        run: |
+          FLUTTER_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v flutter)")")")"
+          echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> "$GITHUB_ENV"
+          flutter precache --android
       - name: Prepare local Dart packages
         shell: bash
         run: |
@@ -52,11 +58,35 @@ jobs:
         run: |
           flutter create --empty --platforms=android --project-name aureon --org com.aureon "$RUNNER_TEMP/aureon-android"
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
-          sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 24/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
+          sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
-          rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test"
+          rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test" "$RUNNER_TEMP/aureon-android/integration_test"
           cp -R app/lib "$RUNNER_TEMP/aureon-android/lib"
           cp -R app/test "$RUNNER_TEMP/aureon-android/test"
+          cp -R app/integration_test "$RUNNER_TEMP/aureon-android/integration_test"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/aureon_storage"
+          cp -R android-spike/storage/. "$RUNNER_TEMP/aureon-android/android/aureon_storage/"
+          mkdir -p "$RUNNER_TEMP/aureon-android/shared/contract-fixtures"
+          cp -R shared/contract-fixtures/. "$RUNNER_TEMP/aureon-android/shared/contract-fixtures/"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/aureon"
+          cp app/android/app/src/main/kotlin/com/aureon/aureon/MainActivity.kt "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/aureon/MainActivity.kt"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path(__import__('os').environ['RUNNER_TEMP']) / 'aureon-android' / 'android'
+          settings = root / 'settings.gradle.kts'
+          source = settings.read_text()
+          agp = re.search(r'id\("com\\.android\\.application"\)\\s+version\\s+"([^"]+)"\\s+apply false', source)
+          kotlin = re.search(r'id\("org\\.jetbrains\\.kotlin\\.android"\)\\s+version\\s+"([^"]+)"\\s+apply false', source)
+          if not agp or not kotlin:
+              raise SystemExit("Could not determine Android Gradle Plugin/Kotlin versions from generated Flutter host.")
+          source = source.replace(agp.group(0), agp.group(0) + f'\n    id("com.android.library") version "{agp.group(1)}" apply false', 1)
+          source = source.replace(kotlin.group(0), kotlin.group(0) + f'\n    id("org.jetbrains.kotlin.kapt") version "{kotlin.group(1)}" apply false', 1)
+          source += '\ninclude(":aureon_storage")\nproject(":aureon_storage").projectDir = file("aureon_storage")\n'
+          settings.write_text(source)
+          app_gradle = root / 'app' / 'build.gradle.kts'
+          app_gradle.write_text(app_gradle.read_text() + '\ndependencies { implementation(project(":aureon_storage")) }\n')
+          PY
       - name: Test native plugin Dart contract
         working-directory: packages/aureon_local_files
         run: |
@@ -67,6 +97,17 @@ jobs:
         run: |
           dart pub get
           dart test
+      - name: Generate Android transfer Pigeon bindings
+        working-directory: android-spike/pigeon
+        shell: bash
+        run: |
+          flutter pub get
+          mkdir -p "$RUNNER_TEMP/aureon-android/lib/src/transfers"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/aureon_storage/src/main/kotlin/com/aureon/storage/generated"
+          dart run pigeon --input aureon_storage_api.dart \
+            --dart_out "$RUNNER_TEMP/aureon-android/lib/src/transfers/aureon_storage_api.g.dart" \
+            --kotlin_out "$RUNNER_TEMP/aureon-android/android/aureon_storage/src/main/kotlin/com/aureon/storage/generated/AureonStorageApi.g.kt" \
+            --kotlin_package com.aureon.storage.generated
       - name: Resolve Flutter dependencies
         working-directory: ${{ runner.temp }}/aureon-android
         run: flutter pub get
@@ -79,6 +120,18 @@ jobs:
       - name: Compile Android debug APK (no artifact upload)
         working-directory: ${{ runner.temp }}/aureon-android
         run: flutter build apk --debug
+
+      - name: Run Android native transfer bridge integration test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            cd "$RUNNER_TEMP/aureon-android"
+            flutter test integration_test/transfer_bridge_test.dart
+
 
   windows-validation:
     name: Analyze, test and compile Windows
@@ -131,6 +184,14 @@ jobs:
         run: |
           flutter pub get
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Generate Windows transfer Dart binding
+        shell: pwsh
+        working-directory: android-spike/pigeon
+        run: |
+          flutter pub get
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/aureon-windows/lib/src/transfers" | Out-Null
+          dart run pigeon --input aureon_storage_api.dart --dart_out "$env:RUNNER_TEMP/aureon-windows/lib/src/transfers/aureon_storage_api.g.dart"
+
       - name: Analyze Flutter app
         shell: pwsh
         working-directory: ${{ runner.temp }}/aureon-windows
