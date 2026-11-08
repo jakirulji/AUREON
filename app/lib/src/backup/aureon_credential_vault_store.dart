@@ -11,6 +11,7 @@ import 'aureon_recovery_key_service.dart';
 abstract interface class AureonVaultDekStore {
   Future<List<int>?> read(String vaultId, int generation);
   Future<void> write(String vaultId, int generation, List<int> dek);
+  Future<void> delete(String vaultId, int generation);
 }
 
 class PlatformAureonVaultDekStore implements AureonVaultDekStore {
@@ -40,6 +41,10 @@ class PlatformAureonVaultDekStore implements AureonVaultDekStore {
   }
 
   @override
+  Future<void> delete(String vaultId, int generation) =>
+      _storage.delete(key: _name(vaultId, generation));
+
+  @override
   Future<void> write(String vaultId, int generation, List<int> dek) async {
     if (dek.length != 32) throw ArgumentError('Vault DEK must be 256 bits.');
     await _storage.write(
@@ -47,6 +52,12 @@ class PlatformAureonVaultDekStore implements AureonVaultDekStore {
       value: base64Url.encode(dek),
     );
   }
+}
+
+class AureonVaultRotationResult {
+  const AureonVaultRotationResult({required this.keySet, required this.bundle});
+  final ManualRecoveryKeySet keySet;
+  final VaultRecoveryBundle bundle;
 }
 
 /// Owns the device-protected DEK and portable encrypted Recovery Bundle.
@@ -180,6 +191,55 @@ class AureonCredentialVaultStore {
     final pending = await _bundleFile(pending: true);
     if (await pending.exists()) await pending.delete();
     return records;
+  }
+
+  /// Rotates the vault DEK and all five manual recovery keys to a new
+  /// generation. The caller must export the returned key set and bundle.
+  /// Historical exported bundles remain recoverable with their old keys;
+  /// this method cannot revoke copies outside this device.
+  Future<AureonVaultRotationResult> rotateGeneration({
+    required ManualRecoveryKeySet currentKeySet,
+    required String currentManualKeyId,
+  }) async {
+    final current = await loadBundle();
+    if (current == null) throw StateError('No active vault bundle exists.');
+    if (current.vaultId != currentKeySet.vaultId ||
+        current.generation != currentKeySet.generation) {
+      throw const FormatException('Current key set does not match the active vault generation.');
+    }
+    final oldDek = await _dekStore.read(current.vaultId, current.generation);
+    if (oldDek == null || oldDek.length != 32) {
+      throw StateError('The current vault is locked. Restore it before rotating keys.');
+    }
+    final records = await _crypto.restoreBundle(
+      bundle: current,
+      keySet: currentKeySet,
+      manualKeyId: currentManualKeyId,
+    );
+    final nextKeys = AureonRecoveryKeyService().generateKeySet(
+      vaultId: current.vaultId,
+      generation: current.generation + 1,
+    );
+    final nextDek = _randomBytes(32);
+    final nextBundle = await _crypto.createBundle(
+      keySet: nextKeys,
+      vaultDek: nextDek,
+      credentialRecords: records,
+    );
+
+    // Stage and verify the next generation before replacing the active bundle.
+    await _writeBundle(nextBundle, pending: true);
+    await _dekStore.write(nextKeys.vaultId, nextKeys.generation, nextDek);
+    await _crypto.restoreBundle(
+      bundle: nextBundle,
+      keySet: nextKeys,
+      manualKeyId: nextKeys.keys.first.id,
+    );
+    await _writeBundle(nextBundle);
+    final pending = await _bundleFile(pending: true);
+    if (await pending.exists()) await pending.delete();
+    await _dekStore.delete(current.vaultId, current.generation);
+    return AureonVaultRotationResult(keySet: nextKeys, bundle: nextBundle);
   }
 
   Future<VaultRecoveryBundle> replaceCredentialRecords({
