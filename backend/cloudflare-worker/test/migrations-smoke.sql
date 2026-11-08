@@ -28,3 +28,55 @@ FROM sqlite_master
 WHERE type = 'index' AND name = 'recovery_challenges_user_vault_time_idx';
 
 SELECT assertion FROM migration_assertions ORDER BY assertion;
+
+-- Exercise the same conditional INSERT predicates used by the Worker route.
+INSERT INTO recovery_challenges
+  (challenge_id,user_id,vault_id,generation,challenge_sha256,expires_at_ms,created_at_ms)
+VALUES
+  ('cap-1','user-cap','vault-cap',1,'hash-1',1800000300000,1800000000000),
+  ('cap-2','user-cap','vault-cap',1,'hash-2',1800000300000,1800000000000);
+
+INSERT INTO recovery_challenges
+  (challenge_id,user_id,vault_id,generation,challenge_sha256,expires_at_ms,created_at_ms)
+SELECT 'cap-3','user-cap','vault-cap',1,'hash-3',1800000300000,1800000000000
+WHERE (SELECT COUNT(*) FROM recovery_challenges
+  WHERE user_id='user-cap' AND vault_id='vault-cap'
+    AND created_at_ms>1799999400000) < 3
+AND NOT EXISTS (SELECT 1 FROM recovery_cooldowns
+  WHERE user_id='user-cap' AND vault_id='vault-cap'
+    AND next_allowed_at_ms>1800000000000);
+
+INSERT INTO migration_assertions
+SELECT 'third recovery challenge is permitted', COUNT(*) = 3
+FROM recovery_challenges WHERE user_id='user-cap' AND vault_id='vault-cap';
+
+INSERT INTO recovery_challenges
+  (challenge_id,user_id,vault_id,generation,challenge_sha256,expires_at_ms,created_at_ms)
+SELECT 'cap-4','user-cap','vault-cap',1,'hash-4',1800000300000,1800000000000
+WHERE (SELECT COUNT(*) FROM recovery_challenges
+  WHERE user_id='user-cap' AND vault_id='vault-cap'
+    AND created_at_ms>1799999400000) < 3
+AND NOT EXISTS (SELECT 1 FROM recovery_cooldowns
+  WHERE user_id='user-cap' AND vault_id='vault-cap'
+    AND next_allowed_at_ms>1800000000000);
+
+INSERT INTO migration_assertions
+SELECT 'fourth recovery challenge is blocked', COUNT(*) = 3
+FROM recovery_challenges WHERE user_id='user-cap' AND vault_id='vault-cap';
+
+INSERT INTO recovery_cooldowns(user_id,vault_id,next_allowed_at_ms)
+VALUES ('user-cooldown','vault-cooldown',1800001800000);
+
+INSERT INTO recovery_challenges
+  (challenge_id,user_id,vault_id,generation,challenge_sha256,expires_at_ms,created_at_ms)
+SELECT 'cooldown-blocked','user-cooldown','vault-cooldown',1,'hash-5',1800000300000,1800000000000
+WHERE (SELECT COUNT(*) FROM recovery_challenges
+  WHERE user_id='user-cooldown' AND vault_id='vault-cooldown'
+    AND created_at_ms>1799999400000) < 3
+AND NOT EXISTS (SELECT 1 FROM recovery_cooldowns
+  WHERE user_id='user-cooldown' AND vault_id='vault-cooldown'
+    AND next_allowed_at_ms>1800000000000);
+
+INSERT INTO migration_assertions
+SELECT 'active recovery cooldown blocks challenge issuance', COUNT(*) = 0
+FROM recovery_challenges WHERE user_id='user-cooldown' AND vault_id='vault-cooldown';
