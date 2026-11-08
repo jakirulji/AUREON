@@ -85,7 +85,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         const workerUrl = String.fromEnvironment('AUREON_CLOUDFLARE_API_URL');
         final config = widget.auth.config;
         if (workerUrl.isEmpty || config.authDomain.isEmpty || config.appId.isEmpty) {
-          throw StateError('This first-device build needs AUREON_CLOUDFLARE_WORKER_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
+          throw StateError('This first-device build needs AUREON_CLOUDFLARE_API_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
         }
         final id = _profile?.discoveryId ?? AureonDiscoveryRegistryClient.generateDiscoveryId();
         final profile = await _registry.register(
