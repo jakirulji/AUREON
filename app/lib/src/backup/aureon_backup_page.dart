@@ -28,6 +28,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   ManualRecoveryKeySet? _keySet;
   VaultRecoveryBundle? _vaultBundle;
   bool _busy = false;
+  bool _vaultLoading = true;
   String _status = 'Recovery key and metadata backup tools are available. Live credential-vault recovery is not connected yet.';
   List<String> _restoreConflicts = const [];
 
@@ -43,6 +44,8 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
       if (mounted && bundle != null) setState(() => _vaultBundle = bundle);
     } catch (error) {
       if (mounted) setState(() => _status = 'Local Recovery Bundle could not be read: $error');
+    } finally {
+      if (mounted) setState(() => _vaultLoading = false);
     }
   }
 
@@ -121,6 +124,11 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   }
 
   Future<void> _generateKeys() => _run(() async {
+    final existing = _vaultBundle ?? await _vaultStore.loadBundle();
+    if (existing != null) {
+      setState(() => _vaultBundle = existing);
+      throw StateError('A local vault already exists. Import its matching .key file instead of creating a new vault.');
+    }
     final set = _recovery.generateKeySet(vaultId: _newVaultId());
     final bundle = await _vaultStore.initialize(set);
     setState(() {
@@ -294,12 +302,22 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
         title: 'Manual credential-vault recovery',
         subtitle: 'Exactly five independent 256-bit keys. Any one active key can unwrap the same vault DEK when the matching encrypted Vault Recovery Bundle is available.',
         children: [
-          if (_keySet == null)
+          if (_keySet == null && _vaultBundle == null)
             FilledButton.icon(
-              onPressed: _busy ? null : _generateKeys,
+              onPressed: _busy || _vaultLoading ? null : _generateKeys,
               icon: const Icon(Icons.key_outlined),
               label: const Text('Generate five recovery keys'),
             )
+          else if (_keySet == null) ...[
+            Text('Existing vault: ${_vaultBundle!.vaultId} • Generation ${_vaultBundle!.generation}', style: const TextStyle(fontSize: 12, color: Color(0xFF9AA8BD))),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _importEncryptedKeyFile,
+              icon: const Icon(Icons.file_open_outlined),
+              label: const Text('Import matching .key file'),
+            ),
+            const Text('A vault already exists on this device. A new key set will not be generated over it. Import the matching recovery-key file to unlock it.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
+          ]
           else ...[
             Text('Vault: ${_keySet!.vaultId} • Generation ${_keySet!.generation}', style: const TextStyle(fontSize: 12, color: Color(0xFF9AA8BD))),
             const SizedBox(height: 8),
@@ -368,7 +386,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
           title: Text('Restore conflicts (${_restoreConflicts.length})'),
           children: _restoreConflicts.map((conflict) => ListTile(dense: true, leading: const Icon(Icons.warning_amber_outlined, color: Color(0xFFFFC477)), title: Text(conflict, style: const TextStyle(fontSize: 12)))).toList(),
         ),
-      if (_busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+      if (_busy || _vaultLoading) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
     ],
   );
 
