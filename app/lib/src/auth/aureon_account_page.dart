@@ -59,6 +59,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       _profile = await _profileCache.read();
       if (_profile != null) {
         _discoveryId.text = _profile!.discoveryId;
+        _firebaseApiKey.text = _profile!.firebaseApiKey;
+        _firebaseProjectId.text = _profile!.firebaseProjectId;
+        _firebaseAuthDomain.text = _profile!.firebaseAuthDomain;
+        _firebaseAppId.text = _profile!.firebaseAppId;
+        _workerUrl.text = _profile!.workerBaseUrl;
         // Discovery lookup may have happened immediately before the app was
         // closed. Re-arm the owner-binding check after process restart so a
         // cached locator can never silently bypass Firebase issuer + UID
@@ -287,12 +292,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     }
   }
 
-
   Future<void> _scanDiscoveryQr() async {
     final scannedId = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Scan AUREON Discovery QR'),
+        title: const Text('Scan AUREON Account Recovery QR'),
         content: SizedBox(
           width: 320,
           height: 320,
@@ -309,7 +313,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Share AUREON Discovery ID'),
+        title: const Text('AUREON Account Recovery ID'),
         content: SizedBox(
           width: 280,
           child: Column(
@@ -326,7 +330,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
               SelectableText(id, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               const Text(
-                'This QR contains only a locator. The new device must still sign in to the matching Firebase Master Account.',
+                'This QR contains only a locator. The new device must still sign in to the matching Firebase Master Account. It cannot unlock your encrypted vault.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12),
               ),
@@ -365,19 +369,19 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         ),
         const SizedBox(height: 18),
         if (needsBackendSetup) ...[
-          _notice(Icons.settings_suggest_outlined, 'Find your Master Account backend',
-            'On a new device, enter the Discovery ID from a device where AUREON is already configured. The ID finds your public Firebase and Worker configuration; it is not a password.'),
+          _notice(Icons.settings_suggest_outlined, 'Recover your AUREON account on a new device',
+            'Enter your Account Recovery ID or scan its QR. You do not need an old logged-in device. The ID only locates your public Firebase and Worker configuration; Firebase sign-in still proves ownership.'),
           TextField(controller: _discoveryId, autocorrect: false, decoration: const InputDecoration(
-            labelText: 'AUREON Discovery ID', border: OutlineInputBorder())),
+            labelText: 'AUREON Account Recovery ID', border: OutlineInputBorder())),
           const SizedBox(height: 10),
           if (defaultTargetPlatform == TargetPlatform.android)
             OutlinedButton.icon(
               onPressed: _busy ? null : _scanDiscoveryQr,
               icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Scan QR from existing device'),
+              label: const Text('Scan recovery QR'),
             ),
           FilledButton.icon(onPressed: _busy ? null : _discoverBackend,
-            icon: const Icon(Icons.manage_search), label: const Text('Find my backend')),
+            icon: const Icon(Icons.manage_search), label: const Text('Find my account')),
           const SizedBox(height: 16),
           const Divider(),
           const SizedBox(height: 10),
@@ -449,11 +453,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           ),
           if (_profile?.registered != true)
             OutlinedButton.icon(onPressed: _busy ? null : _registerBackend,
-              icon: const Icon(Icons.qr_code_2), label: const Text('Create / register Discovery ID')),
+              icon: const Icon(Icons.qr_code_2), label: const Text('Create Account Recovery ID')),
           if (_profile != null)
             Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('AUREON Discovery ID', style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text('AUREON Account Recovery ID', style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 SelectableText(_profile!.discoveryId, style: const TextStyle(fontSize: 12)),
                 Wrap(
@@ -472,7 +476,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
                     ),
                   ],
                 ),
-                Text('Backend profile version ${_profile!.profileVersion}. Keep this ID for new devices.',
+                Text('Backend profile version ${_profile!.profileVersion}. Save this ID or its QR somewhere safe; it is needed to locate your backend on a new device.',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
               ]))),
           OutlinedButton.icon(
