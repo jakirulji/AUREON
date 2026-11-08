@@ -250,10 +250,14 @@ class AureonFirebaseAuthService {
         'Use a password with at least 8 characters.',
       );
     }
+    final requestEpoch = _sessionEpoch;
     final response = await _transport.post(
       _identityUri('accounts:signUp'),
       body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
     );
+    if (requestEpoch != _sessionEpoch) {
+      throw StateError('Authentication session changed during account creation. Retry the operation.');
+    }
     final session = await _sessionFromResponse(response);
     await sendVerificationEmail();
     return session;
@@ -264,10 +268,14 @@ class AureonFirebaseAuthService {
     required String password,
   }) async {
     _requireConfiguration();
+    final requestEpoch = _sessionEpoch;
     final response = await _transport.post(
       _identityUri('accounts:signInWithPassword'),
       body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
     );
+    if (requestEpoch != _sessionEpoch) {
+      throw StateError('Authentication session changed during sign-in. Retry the operation.');
+    }
     return _sessionFromResponse(response);
   }
 
