@@ -16,6 +16,33 @@ class _MemoryMetadataKeyStore implements AureonMetadataKeyStore {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('local metadata catalog refuses stale-generation rollback', () async {
+    final directory = await Directory.systemTemp.createTemp('aureon-metadata-rollback-');
+    final keyStore = _MemoryMetadataKeyStore();
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final store = AureonMetadataStore(rootDirectory: directory, keyStore: keyStore);
+    final generationTwo = AureonMetadataSnapshot(
+      snapshotId: 'metadata-two',
+      generation: 2,
+      createdAtEpochMs: 2000,
+      globalTags: const ['newer'],
+    );
+    await store.save(generationTwo);
+    final stale = AureonMetadataSnapshot(
+      snapshotId: 'metadata-one',
+      generation: 1,
+      createdAtEpochMs: 1000,
+      globalTags: const ['older'],
+    );
+
+    await expectLater(store.save(stale), throwsStateError);
+    final loaded = await store.load();
+    expect(loaded.generation, 2);
+    expect(loaded.globalTags, ['newer']);
+  });
+
   test('encrypted backup restores exact AUREON organization on a fresh device store', () async {
     final targetDirectory = await Directory.systemTemp.createTemp('aureon-target-');
     final targetKeyStore = _MemoryMetadataKeyStore();
