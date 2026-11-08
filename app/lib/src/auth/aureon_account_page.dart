@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
 
 import 'aureon_firebase_auth_service.dart';
@@ -284,6 +285,51 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     }
   }
 
+  Future<void> _showDiscoveryQr() async {
+    final id = _profile?.discoveryId;
+    if (id == null || id.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Share AUREON Discovery ID'),
+        content: SizedBox(
+          width: 280,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              QrImageView(
+                data: id,
+                version: QrVersions.auto,
+                size: 220,
+                backgroundColor: Colors.white,
+                errorCorrectionLevel: QrErrorCorrectLevel.M,
+              ),
+              const SizedBox(height: 12),
+              SelectableText(id, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              const Text(
+                'This QR contains only a locator. The new device must still sign in to the matching Firebase Master Account.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Clipboard.setData(ClipboardData(text: id)),
+            icon: const Icon(Icons.copy),
+            label: const Text('Copy ID'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.auth.currentUser;
@@ -386,9 +432,22 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
                 const Text('AUREON Discovery ID', style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 SelectableText(_profile!.discoveryId, style: const TextStyle(fontSize: 12)),
-                Align(alignment: Alignment.centerRight, child: TextButton.icon(
-                  onPressed: () => Clipboard.setData(ClipboardData(text: _profile!.discoveryId)),
-                  icon: const Icon(Icons.copy), label: const Text('Copy ID'))),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _showDiscoveryQr,
+                      icon: const Icon(Icons.qr_code_2),
+                      label: const Text('Show QR'),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => Clipboard.setData(ClipboardData(text: _profile!.discoveryId)),
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy ID'),
+                    ),
+                  ],
+                ),
                 Text('Backend profile version ${_profile!.profileVersion}. Keep this ID for new devices.',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
               ]))),
