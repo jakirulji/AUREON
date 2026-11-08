@@ -17,6 +17,7 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.1.4
   path_provider: ^2.1.5
+  pdf: ^3.11.3
   aureon_contracts:
     path: ../shared/aureon_contracts
 dev_dependencies:
