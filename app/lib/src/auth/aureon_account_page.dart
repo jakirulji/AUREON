@@ -17,6 +17,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _discoveryId = TextEditingController();
+  final _firebaseApiKey = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_API_KEY'));
+  final _firebaseProjectId = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_PROJECT_ID'));
+  final _firebaseAuthDomain = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_AUTH_DOMAIN'));
+  final _firebaseAppId = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_APP_ID'));
+  final _workerUrl = TextEditingController(text: const String.fromEnvironment('AUREON_CLOUDFLARE_API_URL'));
   final _profileCache = AureonBackendProfileCache();
   final _registry = AureonDiscoveryRegistryClient();
   AureonBackendProfile? _profile;
@@ -36,6 +41,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _email.dispose();
     _password.dispose();
     _discoveryId.dispose();
+    _firebaseApiKey.dispose();
+    _firebaseProjectId.dispose();
+    _firebaseAuthDomain.dispose();
+    _firebaseAppId.dispose();
+    _workerUrl.dispose();
     super.dispose();
   }
 
@@ -66,6 +76,40 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     }
   }
 
+
+
+  Future<void> _saveBackendConfiguration() => _run(() async {
+        final apiKey = _firebaseApiKey.text.trim();
+        final projectId = _firebaseProjectId.text.trim();
+        final authDomain = _firebaseAuthDomain.text.trim();
+        final appId = _firebaseAppId.text.trim();
+        final worker = Uri.tryParse(_workerUrl.text.trim());
+        if (apiKey.length < 20 || projectId.isEmpty || authDomain.isEmpty || appId.isEmpty) {
+          throw StateError('Enter the Firebase Web API key, project ID, auth domain and app ID.');
+        }
+        if (worker == null || worker.scheme != 'https' || worker.host.isEmpty ||
+            worker.userInfo.isNotEmpty || worker.query.isNotEmpty || worker.fragment.isNotEmpty ||
+            (worker.path.isNotEmpty && worker.path != '/')) {
+          throw StateError('Enter your Cloudflare Worker HTTPS origin, without a path.');
+        }
+        final profile = AureonBackendProfile(
+          discoveryId: AureonDiscoveryRegistryClient.generateDiscoveryId(),
+          firebaseApiKey: apiKey,
+          firebaseProjectId: projectId,
+          firebaseAuthDomain: authDomain,
+          firebaseAppId: appId,
+          workerBaseUrl: worker.origin,
+          profileVersion: 0,
+          registered: false,
+        );
+        await _profileCache.write(profile);
+        widget.auth.configure(profile.firebaseConfig);
+        if (mounted) setState(() {
+          _profile = profile;
+          _discoveryId.text = profile.discoveryId;
+          _status = 'Your backend configuration is saved on this device. Create/sign in to your Master Account, verify the email, then register the Discovery ID.';
+        });
+      });
 
   Future<void> _discoverBackend() => _run(() async {
         final id = _discoveryId.text.trim();
@@ -222,6 +266,23 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           FilledButton.icon(onPressed: _busy ? null : _discoverBackend,
             icon: const Icon(Icons.manage_search), label: const Text('Find my backend')),
           const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 10),
+          const Text('New to AUREON? Configure your own backend', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          _field(_firebaseApiKey, 'Firebase Web API key'),
+          const SizedBox(height: 8),
+          _field(_firebaseProjectId, 'Firebase project ID'),
+          const SizedBox(height: 8),
+          _field(_firebaseAuthDomain, 'Firebase auth domain'),
+          const SizedBox(height: 8),
+          _field(_firebaseAppId, 'Firebase app ID'),
+          const SizedBox(height: 8),
+          _field(_workerUrl, 'Your Cloudflare Worker HTTPS URL'),
+          const SizedBox(height: 10),
+          FilledButton.icon(onPressed: _busy ? null : _saveBackendConfiguration,
+            icon: const Icon(Icons.save_outlined), label: const Text('Save my backend configuration')),
+          const SizedBox(height: 16),
         ],
         if (user == null && widget.auth.isConfigured) ...[
           _field(_email, 'Email address', keyboardType: TextInputType.emailAddress),
@@ -273,7 +334,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             icon: const Icon(Icons.lock_reset),
             label: const Text('Reauthenticate for protected recovery'),
           ),
-          if (_profile == null)
+          if (_profile?.registered != true)
             OutlinedButton.icon(onPressed: _busy ? null : _registerBackend,
               icon: const Icon(Icons.qr_code_2), label: const Text('Create / register Discovery ID')),
           if (_profile != null)
