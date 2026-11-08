@@ -76,11 +76,45 @@ async function authenticate(request: Request, env: Env, requireRecentAuth = fals
   }
   return { uid, email, authTime };
 }
-async function readJson(request: Request): Promise<Record<string, unknown>> {
-  const length = Number(request.headers.get("content-length") ?? "0");
-  if (length > MAX_BODY_BYTES) throw new HttpError(413, "Request body is too large.");
-  const raw = await request.text();
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) throw new HttpError(413, "Request body is too large.");
+export async function readJson(request: Request): Promise<Record<string, unknown>> {
+  const lengthHeader = request.headers.get("content-length");
+  if (lengthHeader !== null) {
+    const length = Number(lengthHeader);
+    if (!Number.isSafeInteger(length) || length < 0) {
+      throw new HttpError(400, "Invalid Content-Length header.");
+    }
+    if (length > MAX_BODY_BYTES) throw new HttpError(413, "Request body is too large.");
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) throw new HttpError(400, "A JSON request body is required.");
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const part = await reader.read();
+    if (part.done) break;
+    totalBytes += part.value.byteLength;
+    if (totalBytes > MAX_BODY_BYTES) {
+      try { await reader.cancel(); } catch { /* the size rejection remains authoritative */ }
+      throw new HttpError(413, "Request body is too large.");
+    }
+    chunks.push(part.value);
+  }
+  reader.releaseLock();
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  let raw: string;
+  try {
+    raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new HttpError(400, "Request body must be valid UTF-8.");
+  }
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
