@@ -261,9 +261,6 @@ class AureonCloudflareVaultClient {
     return VaultRecoveryBundle.fromJson(raw.cast<String, Object?>());
   }
 
-  static String _encodeBase64Url(List<int> bytes) =>
-      base64Url.encode(bytes).replaceAll('=', '');
-
   static Uint8List _decodeBase64Url(Object? value, int expectedLength) {
     if (value is! String || !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(value)) {
       throw const FormatException('Invalid Cloudflare envelope encoding.');
