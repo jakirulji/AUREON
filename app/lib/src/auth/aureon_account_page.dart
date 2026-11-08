@@ -28,6 +28,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   bool _busy = false;
   bool _createMode = false;
   bool _obscure = true;
+  bool _needsBindingVerification = false;
   String _status = 'Checking saved AUREON session…';
 
   @override
@@ -118,6 +119,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         widget.auth.configure(profile.firebaseConfig);
         if (mounted) setState(() {
           _profile = profile;
+          _needsBindingVerification = true;
           _status = 'Backend profile found and saved on this device. Now sign in to your Master Account.';
         });
       });
@@ -172,9 +174,10 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
         final user = await widget.auth.reloadUser();
-        if (_profile?.registered == true) {
+        if (_profile?.registered == true && _needsBindingVerification) {
           try {
             await _registry.verifyBinding(auth: widget.auth, profile: _profile!);
+            _needsBindingVerification = false;
           } catch (_) {
             await widget.auth.signOut();
             throw StateError('This Firebase account does not match the Discovery ID. Login was blocked.');
