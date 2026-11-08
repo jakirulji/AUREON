@@ -15,7 +15,7 @@ function validSnapshot() {
       recordVersion: 1, cipher: "AES-256-GCM", nonce: b64(Array(12).fill(5)),
       cipherText: b64([6, 7, 8]), mac: b64(Array(16).fill(9)) }],
     manualKeyEnvelopes: ["key-1", "key-2", "key-3", "key-4", "key-5"].map(envelope),
-    cloudflareEnvelope: { formatVersion: 1, algorithm: "HKDF-SHA-256/AES-256-GCM",
+    cloudflareEnvelope: { formatVersion: 1, rootKeyVersion: 1, algorithm: "HKDF-SHA-256/AES-256-GCM",
       salt: b64(Array(32).fill(10)), nonce: b64(Array(12).fill(11)), cipherText: b64(Array(48).fill(12)) } };
 }
 
