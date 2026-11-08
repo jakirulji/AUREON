@@ -37,6 +37,11 @@ void main() {
     auth = AureonFirebaseAuthService(config: config, transport: transport, secretStore: secrets);
   });
 
+  const scope = 'YXVyZW9uLXRlc3Q';
+  const activeUidKey = 'aureon.firebase.$scope.active_uid.v2';
+  const refreshKey = 'aureon.firebase.$scope.user-123.refresh_token.v2';
+  const emailKey = 'aureon.firebase.$scope.user-123.email.v2';
+
   Map<String, Object?> signInResponse({bool verified = false}) => {
     'idToken': 'firebase-id-token',
     'refreshToken': 'firebase-refresh-token',
@@ -70,8 +75,9 @@ void main() {
   });
 
   test('expired session refreshes through Secure Token API and rotates refresh token', () async {
-    secrets.values['aureon.firebase.refresh_token.v1'] = 'old-refresh';
-    secrets.values['aureon.firebase.email.v1'] = 'owner@example.com';
+    secrets.values[activeUidKey] = 'user-123';
+    secrets.values[refreshKey] = 'old-refresh';
+    secrets.values[emailKey] = 'owner@example.com';
     transport.responses.add({
       'id_token': 'new-id-token',
       'refresh_token': 'rotated-refresh',
@@ -79,7 +85,7 @@ void main() {
       'expires_in': '3600',
     });
     expect(await auth.getIdToken(), 'new-id-token');
-    expect(secrets.values['aureon.firebase.refresh_token.v1'], 'rotated-refresh');
+    expect(secrets.values[refreshKey], 'rotated-refresh');
     expect(transport.calls.single.form, isTrue);
     expect(transport.calls.single.body['grant_type'], 'refresh_token');
   });
