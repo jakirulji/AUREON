@@ -7,7 +7,7 @@ This Worker is the first deployable control-plane slice for Firebase-authenticat
 - GET /health/live — liveness.
 - GET /health/ready — D1 and required configuration readiness.
 - POST /v1/vault/envelope — accepts a 32-byte DEK over authenticated TLS and returns a Worker-Secret-wrapped AES-256-GCM envelope. The Worker can see the DEK during initial provisioning; this is an explicit server trust boundary, not zero-knowledge.
-- PUT /v1/vault/snapshot — stores validated encrypted credential records and wrapped-key envelopes. Generation starts at 1 and advances exactly one generation; D1 conditional update rejects stale/concurrent writes.
+- GET /v1/vault/snapshot?vaultId=... — returns the authenticated owner's encrypted snapshot for restore.\n- PUT /v1/vault/snapshot — stores validated encrypted credential records and wrapped-key envelopes. Generation starts at 1 and advances exactly one generation; D1 conditional update rejects stale/concurrent writes.
 - POST /v1/vault/recovery/challenge — issues a short-lived, single-use challenge for the current vault generation.
 - POST /v1/vault/recovery/rewrap — verifies Firebase identity and recent authentication, consumes the one-time challenge, unwraps the Worker envelope in memory, then returns only a P-256 ECDH + HKDF + AES-GCM device-bound envelope.
 
@@ -26,7 +26,7 @@ Create a D1 database, replace the placeholder database_id and Firebase project I
 - npx wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
 - npx wrangler deploy
 
-Generate each versioned Worker root secret offline as 32 random bytes and encode it base64url. The active version is selected by AUREON_VAULT_ACTIVE_ROOT_VERSION. During rotation, provision V2 and switch the active version to 2 while retaining V1 until all V1 envelopes have been rewrapped and verified. Keep an encrypted offline emergency copy under owner control. Never commit it or send it through chat. A Worker Secret is not KMS/HSM; compromise of the Worker deployment/account can expose the server-assisted recovery capability.
+Generate each versioned Worker root secret offline as 32 random bytes and encode it base64url. AUREON_VAULT_ACTIVE_ROOT_VERSION selects the current version; during rotation provision V2 and switch the active version to 2 while retaining V1 until all V1 envelopes are rewrapped and verified. The active version is selected by AUREON_VAULT_ACTIVE_ROOT_VERSION. During rotation, provision V2 and switch the active version to 2 while retaining V1 until all V1 envelopes have been rewrapped and verified. Keep an encrypted offline emergency copy under owner control. Never commit it or send it through chat. A Worker Secret is not KMS/HSM; compromise of the Worker deployment/account can expose the server-assisted recovery capability.
 
 ## Security limitations / release gates
 
