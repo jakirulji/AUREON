@@ -41,6 +41,15 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Cache Gradle wrapper and dependency artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper/dists
+          key: gradle-linux-${{ hashFiles('app/pubspec.yaml') }}
+          restore-keys: |
+            gradle-linux-
       - name: Prepare local Dart packages
         shell: bash
         run: |
@@ -78,7 +87,24 @@ jobs:
         run: flutter test
       - name: Compile Android debug APK (no artifact upload)
         working-directory: ${{ runner.temp }}/aureon-android
-        run: flutter build apk --debug
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            log_file="$RUNNER_TEMP/aureon-android-build.log"
+            if flutter build apk --debug 2>&1 | tee "$log_file"; then
+              exit 0
+            fi
+            if ! grep -Eqi 'Received status code (429|5[0-9][0-9])|timed out|Temporary failure|Connection reset|Could not GET' "$log_file"; then
+              echo "Android build failed for a non-network reason; not retrying."
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android build exhausted three attempts after transient dependency-download failures."
+              exit 1
+            fi
+            echo "Transient dependency download failure; retrying Android build (attempt $((attempt + 1))/3) after 20 seconds."
+            sleep 20
+          done
 
   windows-validation:
     name: Analyze, test and compile Windows
