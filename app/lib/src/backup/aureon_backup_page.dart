@@ -263,6 +263,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
         currentBundle.vaultId != currentKeys.vaultId) {
       throw StateError('Current key set and active vault do not match.');
     }
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -307,7 +308,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     final keyUri = await FilePicker.saveFile(
       dialogTitle: 'Save new encrypted AUREON recovery key',
       fileName: 'AUREON-Recovery.key',
-      bytes: encryptedKeyBytes,
+      bytes: Uint8List.fromList(encryptedKeyBytes),
     );
     if (keyUri == null || !mounted) {
       setState(() => _status = 'Rotation not committed. The previous generation remains active. An uncommitted TXT export may exist; keep it separate and do not use it to replace the current backup.');
