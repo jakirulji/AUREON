@@ -321,7 +321,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             for (final barcode in capture.barcodes) {
               final value = barcode.rawValue?.trim();
               if (value != null && value.length >= 22 && value.length <= 128 &&
-                  RegExp(r'^[A-Za-z0-9_-]+$') {
+                  RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(value)) {
                 Navigator.of(dialogContext).pop(value);
                 return;
               }
