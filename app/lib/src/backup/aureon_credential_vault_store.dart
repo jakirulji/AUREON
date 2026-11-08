@@ -337,6 +337,53 @@ class AureonCredentialVaultStore {
       throw StateError('The local vault is locked. Restore it with an active manual recovery key before cloud sync.');
     }
     try {
+      VaultRecoveryBundle? remote;
+      try {
+        remote = await client.fetchSnapshot(
+          vaultId: current.vaultId,
+          idTokenProvider: idTokenProvider,
+        );
+      } on AureonCloudflareApiException catch (error) {
+        if (error.statusCode != 404) rethrow;
+      }
+
+      if (remote != null) {
+        if (remote.generation > current.generation) {
+          throw StateError('Cloudflare has a newer vault generation. Restore it before attempting another upload.');
+        }
+        if (remote.generation == current.generation) {
+          if (remote.createdAtEpochMs > current.createdAtEpochMs) {
+            throw StateError('The Cloudflare snapshot is newer than this device. Restore/reconcile it before syncing to avoid overwriting another device.');
+          }
+          if (remote.createdAtEpochMs == current.createdAtEpochMs) {
+            final sameRecords = jsonEncode(remote.encryptedCredentialRecords) ==
+                jsonEncode(current.encryptedCredentialRecords);
+            final sameManualEnvelopes = jsonEncode(remote.manualKeyEnvelopes) ==
+                jsonEncode(current.manualKeyEnvelopes);
+            if (!sameRecords || !sameManualEnvelopes) {
+              throw StateError('A same-generation Cloudflare snapshot conflicts with local data. Restore and reconcile before syncing.');
+            }
+            if (current.cloudflareEnvelope != null &&
+                jsonEncode(current.cloudflareEnvelope) != jsonEncode(remote.cloudflareEnvelope)) {
+              throw StateError('The local and Cloudflare recovery envelopes differ for the same vault generation.');
+            }
+            if (current.cloudflareEnvelope == null) {
+              final adopted = VaultRecoveryBundle(
+                vaultId: current.vaultId,
+                generation: current.generation,
+                createdAtEpochMs: current.createdAtEpochMs,
+                encryptedCredentialRecords: current.encryptedCredentialRecords,
+                manualKeyEnvelopes: current.manualKeyEnvelopes,
+                cloudflareEnvelope: remote.cloudflareEnvelope,
+              );
+              await _writeBundle(adopted);
+              return adopted;
+            }
+            return current;
+          }
+        }
+      }
+
       final envelope = current.cloudflareEnvelope ??
           await client.createCloudflareEnvelope(
             vaultId: current.vaultId,
