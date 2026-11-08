@@ -19,7 +19,7 @@ The Flutter app uses Firebase Identity Toolkit and Secure Token REST endpoints d
 
 ## 2. Configure a local or CI app build
 
-Pass these compile-time values:
+The Firebase/Worker public configuration can be entered in the app on first-device setup. For owner-managed preconfigured builds, these optional compile-time values can be passed:
 
 - AUREON_FIREBASE_API_KEY — Firebase Web API Key
 - AUREON_FIREBASE_PROJECT_ID — Firebase Project ID
