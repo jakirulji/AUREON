@@ -66,10 +66,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         await widget.auth.restoreSession();
         final user = await widget.auth.reloadUser();
         final bound = await _bindProfile(user.localId);
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _activeProfile = bound;
           _status = 'Signed in as ${user.email}. Backend profile “${bound.name}” is bound to this Firebase identity and Worker.';
-        });
+          });
+        }
       } catch (_) {
         if (mounted) setState(() => _status = 'Backend profile “${active.name}” is active. Sign in or create your AUREON account.');
       }
@@ -103,11 +105,13 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     );
     widget.auth.configureProfile(profile);
     final profiles = await _profileStore.listProfiles();
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _activeProfile = profile;
       _profiles = profiles;
       _status = 'Backend profile “${profile.name}” saved locally and selected. It will be bound to your Master Account after sign-in.';
-    });
+      });
+    }
   });
 
   Future<void> _activateBackendProfile(String id) => _run(() async {
@@ -118,14 +122,16 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     final profile = await _profileStore.activeProfile();
     if (profile == null) throw StateError('Selected backend profile could not be loaded.');
     widget.auth.configureProfile(profile);
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _activeProfile = profile;
       _profileName.text = profile.name;
       _firebaseApiKey.text = profile.firebaseApiKey;
       _firebaseProjectId.text = profile.firebaseProjectId;
       _workerUrl.text = profile.workerBaseUrl;
       _status = 'Using backend profile “${profile.name}”.';
-    });
+      });
+    }
   });
 
   Future<void> _run(Future<void> Function() action) async {
@@ -247,7 +253,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         const SizedBox(height: 8),
         if (_profiles.isNotEmpty)
           DropdownButtonFormField<String>(
-            value: _activeProfile?.id,
+            initialValue: _activeProfile?.id,
             decoration: const InputDecoration(labelText: 'Saved backend profile', border: OutlineInputBorder()),
             items: _profiles.map((profile) => DropdownMenuItem(
               value: profile.id, child: Text(profile.name),
