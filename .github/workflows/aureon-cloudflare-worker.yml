@@ -34,6 +34,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Unit tests
         run: npm test
+      - name: Validate D1 migrations against SQLite
+        run: sqlite3 :memory: < test/migrations-smoke.sql
       - name: Type check
         run: npm run typecheck
       - name: Cloudflare dry-run
