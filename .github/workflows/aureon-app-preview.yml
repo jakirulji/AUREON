@@ -47,7 +47,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper/dists
-          key: gradle-linux-${{ hashFiles('app/pubspec.yaml') }}
+          key: gradle-linux-${{ hashFiles('app/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('app/pubspec.yaml') }}
           restore-keys: |
             gradle-linux-
       - name: Prepare local Dart packages
@@ -94,7 +94,7 @@ jobs:
             if flutter build apk --debug 2>&1 | tee "$log_file"; then
               exit 0
             fi
-            if ! grep -Eqi 'Received status code (429|5[0-9][0-9])|timed out|Temporary failure|Connection reset|Could not GET' "$log_file"; then
+            if ! grep -Eqi 'Received status code (429|5[0-9][0-9])|Server returned HTTP response code: (429|5[0-9][0-9])|HTTP (429|5[0-9][0-9])|timed out|Temporary failure|Connection reset|Could not GET|UnknownHostException|Temporary failure in name resolution' "$log_file"; then
               echo "Android build failed for a non-network reason; not retrying."
               exit 1
             fi
