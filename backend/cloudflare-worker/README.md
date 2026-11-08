@@ -8,7 +8,7 @@ This TypeScript Worker is the first control-plane prototype for Firebase-authent
 - GET /health/ready — D1 and required configuration readiness.
 - POST /v1/vault/envelope — accepts a 32-byte DEK over authenticated TLS and returns a Worker-Secret-wrapped AES-256-GCM envelope. The Worker can see the DEK during initial provisioning; this is an explicit server trust boundary, not zero-knowledge.
 - GET /v1/vault/snapshot?vaultId=... — returns the authenticated owner's encrypted snapshot for restore.
-- PUT /v1/vault/snapshot — stores validated encrypted credential records and wrapped-key envelopes. Key generation starts at 1 and advances by one only during key rotation. Snapshot updates within the same key generation require a strictly newer createdAtEpochMs; conditional D1 updates reject stale/concurrent writes. Encrypted snapshot JSON is capped at 900 KB to stay below the D1 row limit; larger account sets need a future chunked-record schema.
+- PUT /v1/vault/snapshot — stores validated encrypted credential records and wrapped-key envelopes. The first registered key generation may be greater than 1 if the owner rotated offline before connecting Cloudflare. Thereafter key generation advances by one only during key rotation. Snapshot updates within the same key generation require a strictly newer createdAtEpochMs; conditional D1 updates reject stale/concurrent writes. Encrypted snapshot JSON is capped at 900 KB to stay below the D1 row limit; larger account sets need a future chunked-record schema.
 - POST /v1/vault/recovery/challenge — issues a short-lived, single-use challenge for the current vault generation.
 - POST /v1/vault/recovery/rewrap — verifies Firebase identity and recent authentication, consumes the one-time challenge, unwraps the Worker envelope in memory, then returns only a P-256 ECDH + HKDF + AES-GCM device-bound envelope.
 
@@ -31,7 +31,7 @@ Generate each Worker root secret offline as 32 random bytes and encode it base64
 
 ## Explicitly incomplete release gates
 
-- Flutter client integration for envelope provisioning, encrypted snapshot sync, ECDH device rewrap and local unwrap is not implemented. The current client bundle's Cloudflare envelope remains null until wired end-to-end.
+- Flutter now has an authenticated HTTPS transport, envelope provisioning, encrypted snapshot upload/download with SHA-256 verification, P-256 ECDH/HKDF/AES-GCM device rewrap, and local DEK restore logic. It is not yet connected to a Firebase Auth session/UI, and has not been device-tested against a deployed Worker.
 - Real email notification and passkey/trusted-device step-up are not implemented. Challenge issuance is not phishing-resistant MFA.
 - Cloudflare WAF/IP abuse controls and external rate-limit configuration remain required.
 - Provider OAuth refresh/rotation and provider API broker are not implemented.
