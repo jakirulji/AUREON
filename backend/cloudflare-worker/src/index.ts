@@ -161,7 +161,7 @@ async function deriveRootKey(env: Env, keyVersion: number, salt: Uint8Array, vau
   if (root.length !== 32) throw new HttpError(503, "Vault recovery service is not configured.");
   const material = await crypto.subtle.importKey("raw", asArrayBuffer(root), "HKDF", false, ["deriveKey"]);
   root.fill(0);
-  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt,
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: asArrayBuffer(salt),
     info: new TextEncoder().encode(`AUREON|CREDENTIAL-VAULT|CLOUDFLARE-WRAP|v1|${vaultId}|${generation}`) },
     material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
