@@ -47,7 +47,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper/dists
-          key: gradle-linux-${{ hashFiles('app/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('app/pubspec.yaml') }}
+          key: gradle-linux-9.3.1-all-${{ hashFiles('app/pubspec.yaml') }}
           restore-keys: |
             gradle-linux-
       - name: Prepare local Dart packages
@@ -60,6 +60,7 @@ jobs:
         shell: bash
         run: |
           flutter create --empty --platforms=android --project-name aureon --org com.aureon "$RUNNER_TEMP/aureon-android"
+          sed -i 's#https\\://github.com/gradle/gradle-distributions/releases/download/v9.3.1/gradle-9.3.1-all.zip#https\\://downloads.gradle.org/distributions/gradle-9.3.1-all.zip#' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 24/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
