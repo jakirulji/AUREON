@@ -52,7 +52,6 @@ class _AureonHomeState extends State<AureonHome> {
       }
       if (_auth.isConfigured) {
         await _auth.restoreSession();
-        await _auth.reloadUser();
       }
     } catch (_) {
       // Keep the refresh token and cached public profile on transient network
