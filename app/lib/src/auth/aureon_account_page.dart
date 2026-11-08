@@ -127,7 +127,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (user == null || !user.emailVerified) {
           throw StateError('Verify your Master Account email before registering discovery.');
         }
-        const workerUrl = String.fromEnvironment('AUREON_CLOUDFLARE_API_URL');
+        final workerUrl = _profile?.workerBaseUrl ?? const String.fromEnvironment('AUREON_CLOUDFLARE_API_URL');
         final config = widget.auth.config;
         if (workerUrl.isEmpty || config.authDomain.isEmpty || config.appId.isEmpty) {
           throw StateError('This first-device build needs AUREON_CLOUDFLARE_API_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
@@ -136,7 +136,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         final profile = await _registry.register(
           auth: widget.auth, discoveryId: id, workerBaseUrl: workerUrl,
           firebaseAuthDomain: config.authDomain, firebaseAppId: config.appId,
-          expectedProfileVersion: _profile?.profileVersion,
+          expectedProfileVersion: _profile?.registered == true ? _profile!.profileVersion : null,
         );
         if (mounted) setState(() {
           _profile = profile;
