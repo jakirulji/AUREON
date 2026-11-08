@@ -22,7 +22,8 @@ void main() {
     // lazy ListView. Scroll it into the viewport before asserting its actions.
     await tester.scrollUntilVisible(
       find.text('Create encrypted metadata backup'),
-      find.byType(Scrollable).first,
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     expect(find.text('Create encrypted metadata backup'), findsOneWidget);
