@@ -15,26 +15,22 @@ This guide is for the project owner. Do not send passwords, service-account JSON
 
 The Flutter app uses Firebase Identity Toolkit and Secure Token REST endpoints directly so the same email/password flow works on Android and Windows without a Firebase native plugin dependency. Passwords are sent only to Firebase over HTTPS and are not persisted by AUREON. The rotating refresh token is stored using flutter_secure_storage (Android Keystore-backed storage / Windows DPAPI-backed storage); ID tokens remain in memory. Signing out clears this device's local refresh token. It does not revoke the Firebase refresh token server-side.
 
-## 2. Configure a local or CI app build
+## 2. Configure AUREON with your own backend profile
 
-Pass these compile-time values:
+AUREON does not ship with a shared developer-hosted Firebase or Cloudflare backend. Each user must create and own their Firebase project and Cloudflare Worker/D1 deployment.
 
-- AUREON_FIREBASE_API_KEY — Firebase Web API Key
-- AUREON_FIREBASE_PROJECT_ID — Firebase Project ID
-- AUREON_CLOUDFLARE_API_URL — deployed Worker URL, for example https://aureon-api.your-subdomain.workers.dev
+After building/installing the app:
 
-Example local build command (replace values locally; never commit them into source):
+1. Open **Account → Your backend**.
+2. Enter a profile name, Firebase Web API Key, Firebase Project ID and the HTTPS URL of your own deployed Cloudflare Worker.
+3. Save and use the profile, then create/sign in to the AUREON Master Account in that Firebase project.
+4. AUREON binds the saved profile to the Firebase issuer/project ID, authenticated UID and canonical Worker identity. A profile already bound to a different identity cannot be silently reused; create a separate profile for another identity.
+5. The active profile is saved locally and restored on later launches. Firebase refresh tokens are stored in secure storage under a project-and-UID-specific namespace, so tokens from one Firebase project cannot be reused against another.
 
-~~~bash
-flutter build apk --release \
-  --dart-define=AUREON_FIREBASE_API_KEY="$AUREON_FIREBASE_API_KEY" \
-  --dart-define=AUREON_FIREBASE_PROJECT_ID="$AUREON_FIREBASE_PROJECT_ID" \
-  --dart-define=AUREON_CLOUDFLARE_API_URL="$AUREON_CLOUDFLARE_API_URL"
-~~~
+The Firebase Web API Key, project ID and Worker URL are public client configuration—not secrets. Never enter or store service-account JSON, Firebase private keys, Cloudflare Worker Secrets, passwords, OAuth refresh tokens or recovery keys in a backend profile. Profile records remain device-local; they are not uploaded to a shared AUREON service.
 
-The current CI preview intentionally builds with no owner configuration. Account and Cloudflare actions remain disabled in that preview; a green preview build does not mean the live service has been configured.
+The preview CI intentionally has no owner backend configuration. A green preview build does not mean a Firebase project or Worker has been deployed or tested. Compile-time `AUREON_FIREBASE_API_KEY`, `AUREON_FIREBASE_PROJECT_ID` and `AUREON_CLOUDFLARE_API_URL` are not required for normal user setup; the app's default configuration is empty and fails closed until a user saves their own profile.
 
-For GitHub Actions release builds, add the three values as repository Actions variables (the Firebase API key and project ID are public configuration; the Worker URL is also not a secret). Wire them into the final release workflow's --dart-define arguments only when the release workflow is prepared. Do not put the Worker root secret or Firebase service-account credentials into Dart defines.
 
 ## 3. Cloudflare Workers + D1 (no paid domain required)
 
