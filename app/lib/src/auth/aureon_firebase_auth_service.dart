@@ -167,6 +167,7 @@ class AureonFirebaseAuthService {
   final AureonAuthSecretStore _secrets;
   AureonFirebaseSession? _session;
   Future<AureonFirebaseSession>? _refreshing;
+  int _sessionEpoch = 0;
 
   static const _refreshKey = 'aureon.firebase.refresh_token.v1';
   static const _emailKey = 'aureon.firebase.email.v1';
@@ -220,8 +221,14 @@ class AureonFirebaseAuthService {
       refreshToken: refreshToken,
       expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
     );
+    final epoch = ++_sessionEpoch;
     _session = session;
     await _secrets.write(_refreshKey, refreshToken);
+    if (epoch != _sessionEpoch) {
+      final stored = await _secrets.read(_refreshKey);
+      if (stored == refreshToken) await _secrets.delete(_refreshKey);
+      throw StateError('Authentication session changed during sign-in. Retry the operation.');
+    }
     await _secrets.write(_emailKey, email);
     return session;
   }
@@ -352,6 +359,7 @@ class AureonFirebaseAuthService {
   }
 
   Future<AureonFirebaseSession> _performRefresh(String refreshToken) async {
+    final epoch = _sessionEpoch;
     final response = await _transport.post(
       _refreshUri,
       formEncoded: true,
@@ -363,6 +371,9 @@ class AureonFirebaseAuthService {
     if (idToken is! String || nextRefresh is! String || localId is! String) {
       throw const FormatException('Firebase refresh response is incomplete.');
     }
+    if (epoch != _sessionEpoch) {
+      throw StateError('Authentication session changed while refreshing. Retry the operation.');
+    }
     final email = await _secrets.read(_emailKey) ?? '';
     final previouslyVerified = _session?.user.emailVerified ?? false;
     final session = AureonFirebaseSession(
@@ -373,12 +384,18 @@ class AureonFirebaseAuthService {
         Duration(seconds: int.tryParse(response['expires_in']?.toString() ?? '') ?? 3600),
       ),
     );
-    _session = session;
     await _secrets.write(_refreshKey, nextRefresh);
+    if (epoch != _sessionEpoch) {
+      final stored = await _secrets.read(_refreshKey);
+      if (stored == nextRefresh) await _secrets.delete(_refreshKey);
+      throw StateError('Authentication session changed during token refresh. Retry the operation.');
+    }
+    _session = session;
     return session;
   }
 
   Future<void> signOut() async {
+    _sessionEpoch++;
     _session = null;
     await _secrets.delete(_refreshKey);
     await _secrets.delete(_emailKey);
