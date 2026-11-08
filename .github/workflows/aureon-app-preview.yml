@@ -60,7 +60,8 @@ jobs:
         shell: bash
         run: |
           flutter create --empty --platforms=android --project-name aureon --org com.aureon "$RUNNER_TEMP/aureon-android"
-          sed -i 's#https\\://github.com/gradle/gradle-distributions/releases/download/v9.3.1/gradle-9.3.1-all.zip#https\\://downloads.gradle.org/distributions/gradle-9.3.1-all.zip#' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"
+          sed -i 's#github.com/gradle/gradle-distributions/releases/download/v9.3.1#downloads.gradle.org/distributions#' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"
+          grep -q 'distributionUrl=https\\://downloads.gradle.org/distributions/gradle-9.3.1-all.zip' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties" || { echo "Gradle wrapper URL rewrite did not apply"; cat "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"; exit 1; }
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 24/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
