@@ -71,8 +71,9 @@ class AureonBackendProfileCache {
 }
 
 class AureonDiscoveryRegistryException implements Exception {
-  const AureonDiscoveryRegistryException(this.message);
+  const AureonDiscoveryRegistryException(this.message, [this.statusCode]);
   final String message;
+  final int? statusCode;
   @override
   String toString() => message;
 }
@@ -114,7 +115,7 @@ class AureonDiscoveryRegistryClient {
     if (decoded is! Map) throw const FormatException('Discovery returned invalid JSON.');
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final message = decoded['message'];
-      throw AureonDiscoveryRegistryException(message is String ? message : 'Discovery request failed (${response.statusCode}).');
+      throw AureonDiscoveryRegistryException(message is String ? message : 'Discovery request failed (${response.statusCode}).', response.statusCode);
     }
     return decoded.cast<String, Object?>();
   }
