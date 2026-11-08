@@ -386,7 +386,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
           title: Text('Restore conflicts (${_restoreConflicts.length})'),
           children: _restoreConflicts.map((conflict) => ListTile(dense: true, leading: const Icon(Icons.warning_amber_outlined, color: Color(0xFFFFC477)), title: Text(conflict, style: const TextStyle(fontSize: 12)))).toList(),
         ),
-      if (_busy || _vaultLoading) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+      if (_busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
     ],
   );
 
