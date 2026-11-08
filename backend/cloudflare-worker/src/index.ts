@@ -196,9 +196,13 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
       created_at_ms=excluded.created_at_ms,snapshot_json=excluded.snapshot_json,snapshot_sha256=excluded.snapshot_sha256,updated_at_ms=excluded.updated_at_ms
       WHERE vault_snapshots.generation=excluded.generation-1`)
       .bind(identity.uid, snapshot.vaultId, snapshot.generation, snapshot.createdAtEpochMs, canonical, hash, now),
-    auditStatement(env, identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, { recordCount: snapshot.encryptedCredentialRecords.length }),
+    env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM vault_snapshots WHERE user_id=? AND vault_id=? AND generation=?)")
+      .bind(base64Url(randomBytes(18)), identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, now,
+        JSON.stringify({ recordCount: snapshot.encryptedCredentialRecords.length }), identity.uid, snapshot.vaultId, snapshot.generation),
   ]);
-  if (!results[0]?.success || results[0].meta.changes !== 1 || !results[1]?.success) throw new HttpError(409, "Vault update or audit failed; transaction was rolled back.");
+  const [snapshotWrite, auditWrite] = results;
+  if (!snapshotWrite || !auditWrite || !snapshotWrite.success || snapshotWrite.meta.changes !== 1 ||
+      !auditWrite.success || auditWrite.meta.changes !== 1) throw new HttpError(409, "Vault update or audit failed; transaction was rolled back.");
   return json({ vaultId: snapshot.vaultId, generation: snapshot.generation, snapshotSha256: hash, storedAtEpochMs: now });
 }
 async function issueChallenge(request: Request, env: Env, identity: FirebaseIdentity): Promise<Response> {
@@ -230,12 +234,19 @@ async function recoverVault(request: Request, env: Env, identity: FirebaseIdenti
   const deviceBoundEnvelope = await unwrapAndRewrap(snapshot.cloudflareEnvelope, vaultId, row.generation, body.devicePublicKey as JsonWebKey, env);
   const now = Date.now();
   const results = await env.DB.batch([
-    env.DB.prepare("DELETE FROM recovery_challenges WHERE challenge_id=? AND challenge_sha256=?").bind(challengeId, challengeRow.challenge_sha256),
+    env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM recovery_challenges WHERE challenge_id=? AND user_id=? AND vault_id=? AND challenge_sha256=? AND expires_at_ms>=?)")
+      .bind(base64Url(randomBytes(18)), identity.uid, vaultId, "vault.recovery.completed", row.generation, now,
+        JSON.stringify({ method: "cloudflare-device-bound" }), challengeId, identity.uid, vaultId, challengeRow.challenge_sha256, now),
+    env.DB.prepare("DELETE FROM recovery_challenges WHERE challenge_id=? AND challenge_sha256=? AND expires_at_ms>=?")
+      .bind(challengeId, challengeRow.challenge_sha256, now),
     env.DB.prepare("INSERT INTO recovery_cooldowns (user_id,vault_id,next_allowed_at_ms) VALUES (?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET next_allowed_at_ms=excluded.next_allowed_at_ms")
       .bind(identity.uid, vaultId, now + RECOVERY_COOLDOWN_MS),
-    auditStatement(env, identity.uid, vaultId, "vault.recovery.completed", row.generation, { method: "cloudflare-device-bound" }),
   ]);
-  if (!results[0]?.success || results[0].meta.changes !== 1 || !results[1]?.success || !results[2]?.success) throw new HttpError(409, "Recovery completion/audit transaction failed.");
+  const [auditWrite, challengeDelete, cooldownWrite] = results;
+  if (!auditWrite || !challengeDelete || !cooldownWrite || !auditWrite.success || auditWrite.meta.changes !== 1 ||
+      !challengeDelete.success || challengeDelete.meta.changes !== 1 || !cooldownWrite.success) {
+    throw new HttpError(409, "Recovery completion/audit transaction failed.");
+  }
   return json({ vaultId, generation: row.generation, deviceBoundEnvelope });
 }
 export default {
