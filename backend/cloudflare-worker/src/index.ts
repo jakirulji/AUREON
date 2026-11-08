@@ -20,7 +20,7 @@ interface VaultSnapshot {
 }
 
 const FIREBASE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = 900_000;\nconst MAX_SNAPSHOT_BYTES = 900_000;
 const MAX_RECORDS = 256;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const RECOVERY_COOLDOWN_MS = 30 * 60 * 1000;
@@ -123,7 +123,7 @@ export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot 
     const mac = fromBase64Url(requiredString(item.mac, "record MAC", 64));
     if (nonce.length !== 12 || ciphertext.length < 1 || ciphertext.length > 1024 * 1024 || mac.length !== 16) throw new HttpError(400, "Credential record cryptographic fields are invalid.");
   }
-  const keyIds = new Set<string>();
+  if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_SNAPSHOT_BYTES) {\n    throw new HttpError(413, "Encrypted vault snapshot exceeds the safe D1 row limit.");\n  }\n  const keyIds = new Set<string>();
   for (const envelope of input.manualKeyEnvelopes) {
     if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) throw new HttpError(400, "Invalid manual envelope.");
     const item = envelope as Record<string, unknown>; rejectPlaintextSecrets(item);
@@ -225,7 +225,7 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
     env.DB.prepare(`INSERT INTO vault_snapshots (user_id,vault_id,generation,created_at_ms,snapshot_json,snapshot_sha256,updated_at_ms)
       VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET generation=excluded.generation,
       created_at_ms=excluded.created_at_ms,snapshot_json=excluded.snapshot_json,snapshot_sha256=excluded.snapshot_sha256,updated_at_ms=excluded.updated_at_ms
-      WHERE vault_snapshots.generation=excluded.generation-1`)
+      WHERE (vault_snapshots.generation=excluded.generation-1) OR (vault_snapshots.generation=excluded.generation AND vault_snapshots.created_at_ms<excluded.created_at_ms)`)
       .bind(identity.uid, snapshot.vaultId, snapshot.generation, snapshot.createdAtEpochMs, canonical, hash, now),
     env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM vault_snapshots WHERE user_id=? AND vault_id=? AND generation=?)")
       .bind(base64Url(randomBytes(18)), identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, now,
