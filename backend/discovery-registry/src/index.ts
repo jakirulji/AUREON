@@ -110,10 +110,19 @@ async function register(request: Request, env: Env): Promise<Response> {
   const existing = await env.DB.prepare("SELECT firebase_issuer,firebase_uid,profile_version FROM discovery_profiles WHERE discovery_id_hash=?")
     .bind(hash).first<{ firebase_issuer: string; firebase_uid: string; profile_version: number }>();
   if (!existing) {
-    const result = await env.DB.prepare("INSERT INTO discovery_profiles (discovery_id_hash,firebase_project_id,firebase_api_key,firebase_auth_domain,firebase_app_id,worker_base_url,firebase_issuer,firebase_uid,profile_version,created_at_ms,updated_at_ms) VALUES (?,?,?,?,?,?,?,?,1,?,?)")
-      .bind(hash, profile.firebaseProjectId, profile.firebaseApiKey, profile.firebaseAuthDomain, profile.firebaseAppId,
-        profile.workerBaseUrl, identity.issuer, identity.uid, now, now).run();
-    if (!result.success || result.meta.changes !== 1) throw new HttpError(409, "Profile registration conflicted; retry after lookup.");
+    try {
+      const result = await env.DB.prepare("INSERT INTO discovery_profiles (discovery_id_hash,firebase_project_id,firebase_api_key,firebase_auth_domain,firebase_app_id,worker_base_url,firebase_issuer,firebase_uid,profile_version,created_at_ms,updated_at_ms) VALUES (?,?,?,?,?,?,?,?,1,?,?)")
+        .bind(hash, profile.firebaseProjectId, profile.firebaseApiKey, profile.firebaseAuthDomain, profile.firebaseAppId,
+          profile.workerBaseUrl, identity.issuer, identity.uid, now, now).run();
+      if (!result.success || result.meta.changes !== 1) {
+        throw new HttpError(409, "Account Recovery ID reservation conflicted; generate a new ID and retry.");
+      }
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      // The database primary key is the final uniqueness guard. A concurrent
+      // insert of the same hashed locator must never overwrite another owner.
+      throw new HttpError(409, "Account Recovery ID is already reserved; generate a new ID and retry.");
+    }
     return response({ registered: true, profileVersion: 1 }, 201);
   }
   if (existing.firebase_issuer !== identity.issuer || existing.firebase_uid !== identity.uid) {
