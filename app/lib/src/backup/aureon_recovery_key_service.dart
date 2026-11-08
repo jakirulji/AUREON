@@ -264,29 +264,37 @@ class CredentialVaultCryptoService {
       generation: bundle.generation,
       envelope: envelope,
     );
-    final records = <Map<String, Object?>>[];
-    for (final encrypted in bundle.encryptedCredentialRecords) {
-      if (encrypted['formatVersion'] != 1 || encrypted['cipher'] != 'AES-256-GCM' ||
-          encrypted['providerAccountId'] is! String || encrypted['recordVersion'] != 1) {
-        throw const FormatException('Unsupported encrypted provider credential record.');
+    try {
+      final records = <Map<String, Object?>>[];
+      for (final encrypted in bundle.encryptedCredentialRecords) {
+        if (encrypted['formatVersion'] != 1 || encrypted['cipher'] != 'AES-256-GCM' ||
+            encrypted['providerAccountId'] is! String || encrypted['recordVersion'] != 1) {
+          throw const FormatException('Unsupported encrypted provider credential record.');
+        }
+        final accountId = encrypted['providerAccountId'] as String;
+        final nonce = _decodeBase64(_requiredString(encrypted, 'nonce'), expectedLength: 12);
+        final cipherText = _decodeBase64(_requiredString(encrypted, 'cipherText'));
+        final mac = _decodeBase64(_requiredString(encrypted, 'mac'), expectedLength: 16);
+        final aad = utf8.encode('AUREON|PROVIDER-CREDENTIAL|v1|${bundle.vaultId}|${bundle.generation}|$accountId|1');
+        final clear = await _cipher.decrypt(
+          SecretBox(cipherText, nonce: nonce, mac: Mac(mac)),
+          secretKey: SecretKey(dek),
+          aad: aad,
+        );
+        try {
+          final value = jsonDecode(utf8.decode(clear));
+          if (value is! Map || value['providerAccountId'] != accountId) {
+            throw const FormatException('Decrypted credential record identity mismatch.');
+          }
+          records.add(value.cast<String, Object?>());
+        } finally {
+          clear.fillRange(0, clear.length, 0);
+        }
       }
-      final accountId = encrypted['providerAccountId'] as String;
-      final nonce = _decodeBase64(_requiredString(encrypted, 'nonce'), expectedLength: 12);
-      final cipherText = _decodeBase64(_requiredString(encrypted, 'cipherText'));
-      final mac = _decodeBase64(_requiredString(encrypted, 'mac'), expectedLength: 16);
-      final aad = utf8.encode('AUREON|PROVIDER-CREDENTIAL|v1|${bundle.vaultId}|${bundle.generation}|$accountId|1');
-      final clear = await _cipher.decrypt(
-        SecretBox(cipherText, nonce: nonce, mac: Mac(mac)),
-        secretKey: SecretKey(dek),
-        aad: aad,
-      );
-      final value = jsonDecode(utf8.decode(clear));
-      if (value is! Map || value['providerAccountId'] != accountId) {
-        throw const FormatException('Decrypted credential record identity mismatch.');
-      }
-      records.add(value.cast<String, Object?>());
+      return records;
+    } finally {
+      dek.fillRange(0, dek.length, 0);
     }
-    return records;
   }
 
   List<int> _randomBytes(int count) => List<int>.generate(count, (_) => _random.nextInt(256));
