@@ -18,7 +18,7 @@ void main() {
   test('profile round-trips through local cache', () async {
     final cache = AureonBackendProfileCache();
     await cache.write(profile);
-    expect(await cache.read(), profile.toJson());
+    expect((await cache.read())?.toJson(), profile.toJson());
   });
 
   test('profile parser rejects insecure Worker URLs', () {
@@ -41,7 +41,7 @@ void main() {
     );
   });
 
-  test('sign-out does not clear cached public backend profile', () async {
+  test('cached profile is retained until explicit profile removal', () async {
     final cache = AureonBackendProfileCache();
     await cache.write(profile);
     await cache.clear();
