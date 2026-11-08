@@ -260,7 +260,7 @@ class AureonCredentialVaultStore {
         plan.keySet.vaultId != current.vaultId ||
         plan.keySet.generation != current.generation + 1 ||
         plan.nextDek.length != 32) {
-      throw const StateError('Vault changed while rotation was being prepared. Start the rotation again.');
+      throw StateError('Vault changed while rotation was being prepared. Start the rotation again.');
     }
     try {
       await _dekStore.write(plan.keySet.vaultId, plan.keySet.generation, plan.nextDek);
