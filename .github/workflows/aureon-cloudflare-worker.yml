@@ -1,0 +1,42 @@
+name: AUREON Cloudflare Worker Validation (No Artifacts)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/cloudflare-worker/**"
+      - ".github/workflows/aureon-cloudflare-worker.yml"
+  pull_request:
+    paths:
+      - "backend/cloudflare-worker/**"
+      - ".github/workflows/aureon-cloudflare-worker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: aureon-cloudflare-worker-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  worker-validation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/cloudflare-worker
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/cloudflare-worker/package-lock.json
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Unit tests
+        run: npm test
+      - name: Type check
+        run: npm run typecheck
+      - name: Cloudflare dry-run
+        run: npm run dry-run
