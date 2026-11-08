@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'aureon_firebase_auth_service.dart';
+import 'aureon_backend_profile_cache.dart';
 
 class AureonAccountPage extends StatefulWidget {
   const AureonAccountPage({super.key, required this.auth});
@@ -14,6 +15,10 @@ class AureonAccountPage extends StatefulWidget {
 class _AureonAccountPageState extends State<AureonAccountPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _discoveryId = TextEditingController();
+  final _profileCache = AureonBackendProfileCache();
+  final _registry = AureonDiscoveryRegistryClient();
+  AureonBackendProfile? _profile;
   bool _busy = false;
   bool _createMode = false;
   bool _obscure = true;
@@ -29,10 +34,20 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _discoveryId.dispose();
     super.dispose();
   }
 
   Future<void> _restore() async {
+    try {
+      _profile = await _profileCache.read();
+      if (_profile != null) {
+        _discoveryId.text = _profile!.discoveryId;
+        if (!widget.auth.isConfigured) widget.auth.configure(_profile!.firebaseConfig);
+      }
+    } catch (_) {
+      // A malformed cache is ignored; manual discovery remains available.
+    }
     if (!widget.auth.isConfigured) {
       setState(() => _status =
           'Firebase is not configured yet. The app is ready for the owner-provisioned Firebase project; no account or password is required in this preview.');
@@ -49,6 +64,41 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       if (mounted) setState(() => _status = 'No active session. Sign in or create your AUREON account.');
     }
   }
+
+
+  Future<void> _discoverBackend() => _run(() async {
+        final id = _discoveryId.text.trim();
+        if (id.isEmpty) throw StateError('Enter your AUREON Discovery ID.');
+        final profile = await _registry.discover(id);
+        widget.auth.configure(profile.firebaseConfig);
+        if (mounted) setState(() {
+          _profile = profile;
+          _status = 'Backend profile found and saved on this device. Now sign in to your Master Account.';
+        });
+      });
+
+  Future<void> _registerBackend() => _run(() async {
+        final user = widget.auth.currentUser;
+        if (user == null || !user.emailVerified) {
+          throw StateError('Verify your Master Account email before registering discovery.');
+        }
+        const workerUrl = String.fromEnvironment('AUREON_CLOUDFLARE_WORKER_URL');
+        final config = widget.auth.config;
+        if (workerUrl.isEmpty || config.authDomain.isEmpty || config.appId.isEmpty) {
+          throw StateError('This first-device build needs AUREON_CLOUDFLARE_WORKER_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
+        }
+        final id = _profile?.discoveryId ?? AureonDiscoveryRegistryClient.generateDiscoveryId();
+        final profile = await _registry.register(
+          auth: widget.auth, discoveryId: id, workerBaseUrl: workerUrl,
+          firebaseAuthDomain: config.authDomain, firebaseAppId: config.appId,
+          expectedProfileVersion: _profile?.profileVersion,
+        );
+        if (mounted) setState(() {
+          _profile = profile;
+          _discoveryId.text = profile.discoveryId;
+          _status = 'Discovery profile registered. Save this Discovery ID for new devices.';
+        });
+      });
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -154,13 +204,17 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           style: TextStyle(color: Color(0xFF9AA8BD)),
         ),
         const SizedBox(height: 18),
-        if (!widget.auth.isConfigured)
-          _notice(
-            Icons.settings_suggest_outlined,
-            'Firebase project setup required',
-            'Email/Password Authentication must be enabled in Firebase. Then build with AUREON_FIREBASE_API_KEY and AUREON_FIREBASE_PROJECT_ID. These values are public client configuration, not passwords. Do not paste service-account keys or private secrets into the app.',
-          ),
-        if (user == null) ...[
+        if (!widget.auth.isConfigured) ...[
+          _notice(Icons.settings_suggest_outlined, 'Find your Master Account backend',
+            'On a new device, enter the Discovery ID from a device where AUREON is already configured. The ID finds your public Firebase and Worker configuration; it is not a password.'),
+          TextField(controller: _discoveryId, autocorrect: false, decoration: const InputDecoration(
+            labelText: 'AUREON Discovery ID', border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          FilledButton.icon(onPressed: _busy ? null : _discoverBackend,
+            icon: const Icon(Icons.manage_search), label: const Text('Find my backend')),
+          const SizedBox(height: 16),
+        ],
+        if (user == null && widget.auth.isConfigured) ...[
           _field(_email, 'Email address', keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 10),
           _field(_password, 'Password', obscure: _obscure),
@@ -186,7 +240,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             icon: Icon(_createMode ? Icons.person_add_alt_1 : Icons.login),
             label: Text(_createMode ? 'Create account' : 'Sign in'),
           ),
-        ] else ...[
+        ] else if (user != null) ...[
           _notice(
             user.emailVerified ? Icons.verified_user_outlined : Icons.mark_email_unread_outlined,
             user.email,
@@ -210,6 +264,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             icon: const Icon(Icons.lock_reset),
             label: const Text('Reauthenticate for protected recovery'),
           ),
+          if (_profile == null)
+            OutlinedButton.icon(onPressed: _busy ? null : _registerBackend,
+              icon: const Icon(Icons.qr_code_2), label: const Text('Create / register Discovery ID')),
+          if (_profile != null)
+            _notice(Icons.devices_outlined, 'Discovery ID',
+              '${_profile!.discoveryId}\\nBackend profile version ${_profile!.profileVersion}. Save this locator for new devices.'),
           OutlinedButton.icon(
             onPressed: _busy
                 ? null
