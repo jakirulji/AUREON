@@ -126,6 +126,15 @@ class AureonDiscoveryRegistryClient {
     return profile;
   }
 
+  Future<void> verifyBinding({required AureonFirebaseAuthService auth, required AureonBackendProfile profile}) async {
+    final token = await auth.getIdToken(forceRefresh: true);
+    final result = await _post('/v1/profiles/verify', idToken: token, body: {
+      'discoveryId': profile.discoveryId,
+      'firebaseProjectId': profile.firebaseProjectId,
+    });
+    if (result['bound'] != true) throw const AureonDiscoveryRegistryException('Master Account identity could not be verified.');
+  }
+
   Future<AureonBackendProfile> register({required AureonFirebaseAuthService auth, required String discoveryId,
     required String workerBaseUrl, required String firebaseAuthDomain, required String firebaseAppId,
     int? expectedProfileVersion}) async {
