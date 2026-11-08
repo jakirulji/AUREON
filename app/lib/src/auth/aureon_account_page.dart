@@ -106,11 +106,13 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         );
         await _profileCache.write(profile);
         widget.auth.configure(profile.firebaseConfig);
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _profile = profile;
           _discoveryId.text = profile.discoveryId;
           _status = 'Your backend configuration is saved on this device. Create/sign in to your Master Account, verify the email, then register the Discovery ID.';
-        });
+          });
+        }
       });
 
   Future<void> _discoverBackend() => _run(() async {
@@ -118,11 +120,13 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (id.isEmpty) throw StateError('Enter your AUREON Discovery ID.');
         final profile = await _registry.discover(id);
         widget.auth.configure(profile.firebaseConfig);
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _profile = profile;
           _needsBindingVerification = true;
           _status = 'Backend profile found and saved on this device. Now sign in to your Master Account.';
-        });
+          });
+        }
       });
 
   Future<void> _registerBackend() => _run(() async {
@@ -141,11 +145,13 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           firebaseAuthDomain: config.authDomain, firebaseAppId: config.appId,
           expectedProfileVersion: _profile?.registered == true ? _profile!.profileVersion : null,
         );
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _profile = profile;
           _discoveryId.text = profile.discoveryId;
           _status = 'Discovery profile registered. Save this Discovery ID for new devices.';
-        });
+          });
+        }
       });
 
   Future<void> _run(Future<void> Function() action) async {
