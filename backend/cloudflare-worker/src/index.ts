@@ -124,9 +124,6 @@ export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot 
     const mac = fromBase64Url(requiredString(item.mac, "record MAC", 64));
     if (nonce.length !== 12 || ciphertext.length < 1 || ciphertext.length > 1024 * 1024 || mac.length !== 16) throw new HttpError(400, "Credential record cryptographic fields are invalid.");
   }
-  if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_SNAPSHOT_BYTES) {
-    throw new HttpError(413, "Encrypted vault snapshot exceeds the safe D1 row limit.");
-  }
   const keyIds = new Set<string>();
   for (const envelope of input.manualKeyEnvelopes) {
     if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) throw new HttpError(400, "Invalid manual envelope.");
@@ -238,9 +235,9 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
       created_at_ms=excluded.created_at_ms,snapshot_json=excluded.snapshot_json,snapshot_sha256=excluded.snapshot_sha256,updated_at_ms=excluded.updated_at_ms
       WHERE (vault_snapshots.generation=excluded.generation-1) OR (vault_snapshots.generation=excluded.generation AND vault_snapshots.created_at_ms<excluded.created_at_ms)`)
       .bind(identity.uid, snapshot.vaultId, snapshot.generation, snapshot.createdAtEpochMs, canonical, hash, now),
-    env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM vault_snapshots WHERE user_id=? AND vault_id=? AND generation=?)")
+    env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM vault_snapshots WHERE user_id=? AND vault_id=? AND generation=? AND snapshot_sha256=? AND updated_at_ms=?)")
       .bind(base64Url(randomBytes(18)), identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, now,
-        JSON.stringify({ recordCount: snapshot.encryptedCredentialRecords.length }), identity.uid, snapshot.vaultId, snapshot.generation),
+        JSON.stringify({ recordCount: snapshot.encryptedCredentialRecords.length }), identity.uid, snapshot.vaultId, snapshot.generation, hash, now),
   ]);
   const [snapshotWrite, auditWrite] = results;
   if (!snapshotWrite || !auditWrite || !snapshotWrite.success || snapshotWrite.meta.changes !== 1 ||
