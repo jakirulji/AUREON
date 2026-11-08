@@ -210,7 +210,9 @@ class AureonFirebaseAuthService {
       throw const FormatException('Firebase authentication response is incomplete.');
     }
     final expiresIn = int.tryParse(response['expiresIn']?.toString() ?? '') ?? 3600;
-    final verified = response['emailVerified'] == true;
+    final verified = response['emailVerified'] is bool
+        ? response['emailVerified'] as bool
+        : (_session?.user.emailVerified ?? false);
     final session = AureonFirebaseSession(
       user: AureonFirebaseUser(
         localId: localId,
