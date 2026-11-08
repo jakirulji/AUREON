@@ -16,7 +16,7 @@ This directory contains the shared Flutter application layer. Android and Window
 
 ## Validation
 
-The app validation workflow runs Flutter dependency resolution, static analysis, widget tests and platform compilation for Android and Windows. It does **not** upload or retain APK/EXE artifacts. Final installable builds will be produced once the agreed implementation scope is complete.
+The app validation workflow runs Flutter dependency resolution, static analysis, widget tests and platform compilation for Android and Windows. It does **not** upload or retain APK/EXE artifacts. Final installable builds will be produced once the agreed implementation scope is complete. Firebase auth and Cloudflare client tests use fake transports in CI; no production Firebase or Cloudflare endpoint is contacted.
 
 ## Important limitations
 
