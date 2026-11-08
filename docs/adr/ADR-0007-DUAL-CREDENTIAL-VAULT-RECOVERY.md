@@ -78,6 +78,12 @@ The bundle is versioned, account/vault-bound, integrity-checked and protected ag
 - Keep E2E file-content keys in a separate client-controlled hierarchy. Neither recovery path can decrypt file content.
 - Zeroize in-memory passphrases, decrypted Manual Recovery Keys and temporary plaintext buffers as soon as practical; disable clipboard history where platform APIs permit, and never log them. Do not claim reliable secure deletion from flash storage.
 
+## Cloudflare Worker foundation (2026-11-08)
+
+A TypeScript Cloudflare Worker prototype now exists at `backend/cloudflare-worker/` with a D1 migration and validation workflow. It verifies Firebase RS256 ID tokens against Google's Secure Token JWK set, derives owner UID from the verified subject, requires verified email, and enforces a five-minute `auth_time` window for sensitive recovery routes. It supports Worker-Secret HKDF-SHA-256/AES-256-GCM DEK wrapping, encrypted snapshot storage with monotonic generation checks, single-use short-lived recovery challenges, a per-vault challenge throttle/cooldown, audit records, and P-256 ECDH/HKDF/AES-GCM device-bound DEK rewrapping.
+
+This is a backend foundation, not an integrated recovery product. The Worker currently receives the DEK over authenticated TLS during initial envelope creation, so the Worker runtime can access it in memory; this trust boundary is explicit and is not zero-knowledge or HSM-backed. The Flutter client does not yet provision/sync the Cloudflare envelope or unwrap the device-bound response. Email notification, passkey/trusted-device step-up, Cloudflare WAF/IP rate limiting, provider OAuth broker/refresh, independent backup replication, and security review remain open. No production account, D1 database, Worker Secret or deployment has been provisioned.
+
 ## Required verification
 
 1. Manual recovery on a clean device while Worker and D1 endpoints are deliberately blocked, using any one of the five keys.
