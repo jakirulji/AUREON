@@ -27,7 +27,7 @@ class _FakeTransport implements AureonVaultHttpTransport {
   final calls = <String>[];
   Map<String, Object?>? uploaded;
   Map<String, Object?>? remote;
-  bool failUpload = false;
+  bool failUpload = false;\n  final expectedDek = List<int>.generate(32, (i) => i + 1);
 
   @override
   Future<Map<String, Object?>> send({
@@ -55,6 +55,48 @@ class _FakeTransport implements AureonVaultHttpTransport {
       uploaded = body;
       remote = body;
       return {'ok': true};
+    }
+    if (method == 'POST' && uri.path.endsWith('/v1/vault/recovery/challenge')) {
+      return {'challengeId': 'challenge-1', 'challenge': 'single-use-challenge', 'generation': 1};
+    }
+    if (method == 'POST' && uri.path.endsWith('/v1/vault/recovery/rewrap')) {
+      final deviceJwk = body?['devicePublicKey'] as Map<String, Object?>;
+      final ecdh = Ecdh.p256(length: 32);
+      final serverPair = await ecdh.newKeyPair();
+      final serverPublic = await serverPair.extractPublicKey();
+      final devicePublic = EcPublicKey(
+        x: base64Url.decode(base64Url.normalize(deviceJwk['x']! as String)),
+        y: base64Url.decode(base64Url.normalize(deviceJwk['y']! as String)),
+        type: KeyPairType.p256,
+      );
+      final shared = await ecdh.sharedSecretKey(keyPair: serverPair, remotePublicKey: devicePublic);
+      final sharedBytes = await shared.extractBytes();
+      final salt = List<int>.filled(32, 7);
+      final nonce = List<int>.filled(12, 8);
+      final info = utf8.encode('AUREON|DEVICE-BOUND-VAULT-DEK|v1|vault-cloud-recovery|1');
+      final wrappingKey = await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
+        secretKey: SecretKey(sharedBytes), nonce: salt, info: info,
+      );
+      final box = await AesGcm.with256bits().encrypt(
+        expectedDek, secretKey: wrappingKey, nonce: nonce, aad: info,
+      );
+      sharedBytes.fillRange(0, sharedBytes.length, 0);
+      serverPair.destroy();
+      final combined = [...box.cipherText, ...box.mac.bytes];
+      return {'deviceBoundEnvelope': {
+        'formatVersion': 1,
+        'algorithm': 'ECDH-P256/HKDF-SHA-256/AES-256-GCM',
+        'vaultId': 'vault-cloud-recovery',
+        'generation': 1,
+        'serverEphemeralPublicKey': {
+          'kty': 'EC', 'crv': 'P-256',
+          'x': base64Url.encode(serverPublic.x).replaceAll('=', ''),
+          'y': base64Url.encode(serverPublic.y).replaceAll('=', ''),
+        },
+        'salt': base64Url.encode(salt).replaceAll('=', ''),
+        'nonce': base64Url.encode(nonce).replaceAll('=', ''),
+        'cipherText': base64Url.encode(combined).replaceAll('=', ''),
+      }};
     }
     if (method == 'GET' && uri.path.endsWith('/v1/vault/snapshot')) {
       final snapshot = remote;
@@ -145,6 +187,25 @@ void main() {
     final fetched = await client.fetchSnapshot(vaultId: keys.vaultId, idTokenProvider: tokenProvider);
     expect(fetched.vaultId, keys.vaultId);
     expect(fetched.cloudflareEnvelope, isNotNull);
+  });
+
+  test('Cloudflare recovery unwraps a P-256 device-bound DEK envelope', () async {
+    final transport = _FakeTransport();
+    final client = AureonCloudflareVaultClient(
+      baseUrl: 'https://aureon-api.example.workers.dev',
+      transport: transport,
+    );
+    final recovered = await client.recoverVaultDek(
+      vaultId: 'vault-cloud-recovery',
+      expectedGeneration: 1,
+      idTokenProvider: tokenProvider,
+    );
+    expect(recovered, transport.expectedDek);
+    recovered.fillRange(0, recovered.length, 0);
+    expect(transport.calls, [
+      'POST /v1/vault/recovery/challenge',
+      'POST /v1/vault/recovery/rewrap',
+    ]);
   });
 
   test('rejects non-HTTPS API endpoints and missing Firebase tokens', () async {
