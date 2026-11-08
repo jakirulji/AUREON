@@ -134,6 +134,108 @@ class AureonCloudflareVaultClient {
     return parsed;
   }
 
+  /// Uses a recent-auth Firebase session and a one-time challenge to obtain
+  /// a device-bound DEK envelope. The DEK is only returned after local ECDH,
+  /// HKDF and AES-GCM authentication succeed.
+  Future<Uint8List> recoverVaultDek({
+    required String vaultId,
+    required int expectedGeneration,
+    required AureonFirebaseIdTokenProvider idTokenProvider,
+  }) async {
+    final token = await _token(idTokenProvider);
+    final challengeResult = await _transport.send(
+      method: 'POST',
+      uri: _uri('/v1/vault/recovery/challenge'),
+      idToken: token,
+      body: {'vaultId': vaultId},
+    );
+    final challengeId = challengeResult['challengeId'];
+    final challenge = challengeResult['challenge'];
+    final generation = challengeResult['generation'];
+    if (challengeId is! String || challenge is! String ||
+        generation != expectedGeneration) {
+      throw const FormatException('Cloudflare recovery challenge does not match the expected vault generation.');
+    }
+
+    final ecdh = Ecdh.p256(length: 32);
+    final ephemeral = await ecdh.newKeyPair();
+    try {
+      final publicKey = await ephemeral.extractPublicKey();
+      final response = await _transport.send(
+        method: 'POST',
+        uri: _uri('/v1/vault/recovery/rewrap'),
+        idToken: token,
+        body: {
+          'vaultId': vaultId,
+          'challengeId': challengeId,
+          'challenge': challenge,
+          'devicePublicKey': {
+            'kty': 'EC',
+            'crv': 'P-256',
+            'x': _encodeBase64Url(publicKey.x),
+            'y': _encodeBase64Url(publicKey.y),
+            'ext': true,
+          },
+        },
+      );
+      final raw = response['deviceBoundEnvelope'];
+      if (raw is! Map) throw const FormatException('Cloudflare did not return a device-bound recovery envelope.');
+      final envelope = raw.cast<String, Object?>();
+      if (envelope['formatVersion'] != 1 ||
+          envelope['algorithm'] != 'ECDH-P256/HKDF-SHA-256/AES-256-GCM' ||
+          envelope['vaultId'] != vaultId ||
+          envelope['generation'] != expectedGeneration) {
+        throw const FormatException('Unsupported or mismatched device-bound recovery envelope.');
+      }
+      final serverJwk = envelope['serverEphemeralPublicKey'];
+      if (serverJwk is! Map || serverJwk['kty'] != 'EC' || serverJwk['crv'] != 'P-256') {
+        throw const FormatException('Cloudflare ephemeral public key is invalid.');
+      }
+      final serverPublic = EcPublicKey(
+        x: _decodeBase64Url(serverJwk['x'], 32),
+        y: _decodeBase64Url(serverJwk['y'], 32),
+        type: KeyPairType.p256,
+      );
+      final salt = _decodeBase64Url(envelope['salt'], 32);
+      final nonce = _decodeBase64Url(envelope['nonce'], 12);
+      final combined = _decodeBase64Url(envelope['cipherText'], 48);
+      final sharedSecret = await ecdh.sharedSecretKey(
+        keyPair: ephemeral,
+        remotePublicKey: serverPublic,
+      );
+      final sharedBytes = await sharedSecret.extractBytes();
+      try {
+        final info = utf8.encode('AUREON|DEVICE-BOUND-VAULT-DEK|v1|$vaultId|$expectedGeneration');
+        final wrappingKey = await Hkdf(
+          hmac: Hmac.sha256(),
+          outputLength: 32,
+        ).deriveKey(
+          secretKey: SecretKey(sharedBytes),
+          nonce: salt,
+          info: info,
+        );
+        final clear = await AesGcm.with256bits().decrypt(
+          SecretBox(
+            combined.sublist(0, combined.length - 16),
+            nonce: nonce,
+            mac: Mac(combined.sublist(combined.length - 16)),
+          ),
+          secretKey: wrappingKey,
+          aad: info,
+        );
+        if (clear.length != 32) {
+          clear.fillRange(0, clear.length, 0);
+          throw const FormatException('Recovered vault DEK has an invalid length.');
+        }
+        return Uint8List.fromList(clear);
+      } finally {
+        sharedBytes.fillRange(0, sharedBytes.length, 0);
+      }
+    } finally {
+      ephemeral.destroy();
+    }
+  }
+
   Future<void> uploadSnapshot({
     required VaultRecoveryBundle bundle,
     required AureonFirebaseIdTokenProvider idTokenProvider,
