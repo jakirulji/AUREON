@@ -189,6 +189,42 @@ void main() {
     expect(fetched.cloudflareEnvelope, isNotNull);
   });
 
+  test('Cloudflare sync and device-bound restore recover encrypted provider records', () async {
+    final sourceDirectory = await Directory.systemTemp.createTemp('aureon-cloudflare-source-');
+    final targetDirectory = await Directory.systemTemp.createTemp('aureon-cloudflare-target-');
+    final sourceDekStore = _MemoryDekStore();
+    final targetDekStore = _MemoryDekStore();
+    final transport = _FakeTransport();
+    addTearDown(() async {
+      if (await sourceDirectory.exists()) await sourceDirectory.delete(recursive: true);
+      if (await targetDirectory.exists()) await targetDirectory.delete(recursive: true);
+    });
+    final source = AureonCredentialVaultStore(dekStore: sourceDekStore, rootDirectory: sourceDirectory);
+    final keys = AureonRecoveryKeyService().generateKeySet(vaultId: 'vault-cloud-recovery');
+    await source.initialize(keys);
+    await source.replaceCredentialRecords(keySet: keys, credentialRecords: const [
+      {'providerAccountId': 'google-subject-1', 'provider': 'google_drive', 'refreshToken': 'vaulted-refresh-secret'},
+    ]);
+    transport.expectedDek.addAll(await sourceDekStore.read(keys.vaultId, keys.generation) ?? const []);
+    final client = AureonCloudflareVaultClient(
+      baseUrl: 'https://aureon-api.example.workers.dev',
+      transport: transport,
+    );
+    await source.syncWithCloudflare(client: client, idTokenProvider: tokenProvider);
+
+    final target = AureonCredentialVaultStore(dekStore: targetDekStore, rootDirectory: targetDirectory);
+    final restored = await target.restoreWithCloudflare(
+      vaultId: keys.vaultId,
+      client: client,
+      idTokenProvider: tokenProvider,
+    );
+    expect(restored.single['providerAccountId'], 'google-subject-1');
+    expect(restored.single['refreshToken'], 'vaulted-refresh-secret');
+    expect(await targetDekStore.read(keys.vaultId, keys.generation), hasLength(32));
+    expect(await target.loadBundle(), isNotNull);
+    expect(await target.loadPendingBundle(), isNull);
+  });
+
   test('Cloudflare recovery unwraps a P-256 device-bound DEK envelope', () async {
     final transport = _FakeTransport();
     final client = AureonCloudflareVaultClient(
