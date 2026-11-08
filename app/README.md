@@ -9,6 +9,8 @@ This directory contains the shared Flutter application layer. Android and Window
 - Selected folder bookmarks persist across launches. Android's persisted SAF read grant remains the authority to access the folder.
 - In-folder name search, sorting by name/size/modified time/file type, hidden-entry filtering, file size and modified-time metadata.
 - File open hand-off to the Android system viewer or Windows' default associated application. Windows validates that the canonical file path remains inside the selected root before opening.
+- AUREON Master Account email/password authentication via Firebase Identity Toolkit REST; email verification, saved refresh-token restoration, token refresh, password reauthentication and local sign-out. Passwords and ID tokens are not persisted.
+- Cloudflare credential-vault sync/recovery UI connected to the HTTPS client. It requires compile-time Firebase and Worker URL configuration plus a deployed Worker/D1 database.
 - Storage overview and recent-file cards still contain sample data.
 
 ## Validation
@@ -17,7 +19,7 @@ The app validation workflow runs Flutter dependency resolution, static analysis,
 
 ## Important limitations
 
-The Files screen currently browses and opens local files but does not modify them. Copy, move, rename, recycle-bin/delete, file-content preview inside AUREON, cloud account connection, upload, download and sync are not implemented yet. Android may report that no compatible viewer is installed for a particular file type. Storage overview and recent-file cards still use sample data. AUREON is not yet a finished replacement for Windows File Explorer.
+The Files screen currently browses and opens local files but does not modify them. Copy, move, rename, recycle-bin/delete, file-content preview inside AUREON, provider OAuth account connection, provider file upload/download and cross-provider sync are not implemented yet. Android may report that no compatible viewer is installed for a particular file type. Storage overview and recent-file cards still use sample data. AUREON is not yet a finished replacement for Windows File Explorer.
 
 ## Local validation
 
