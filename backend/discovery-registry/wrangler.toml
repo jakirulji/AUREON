@@ -1,0 +1,13 @@
+name = "aureon-discovery-registry"
+main = "src/index.ts"
+compatibility_date = "2026-11-08"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aureon-discovery-registry"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# Before production deployment, configure a Cloudflare Rate Limiting binding
+# named REGISTRY_RATE_LIMITER (for example 60 requests/minute per IP).
+# The Worker fails closed when this binding is absent.
