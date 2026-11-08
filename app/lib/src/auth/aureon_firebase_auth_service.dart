@@ -7,10 +7,14 @@ class AureonFirebaseAuthConfig {
   const AureonFirebaseAuthConfig({
     required this.apiKey,
     required this.projectId,
+    this.authDomain = '',
+    this.appId = '',
   });
 
   final String apiKey;
   final String projectId;
+  final String authDomain;
+  final String appId;
 
   static const fromEnvironment = AureonFirebaseAuthConfig(
     apiKey: String.fromEnvironment('AUREON_FIREBASE_API_KEY'),
@@ -162,7 +166,7 @@ class AureonFirebaseAuthService {
         _transport = transport ?? AureonIoFirebaseAuthTransport(),
         _secrets = secretStore ?? AureonPlatformAuthSecretStore();
 
-  final AureonFirebaseAuthConfig _config;
+  AureonFirebaseAuthConfig _config;
   final AureonFirebaseAuthTransport _transport;
   final AureonAuthSecretStore _secrets;
   AureonFirebaseSession? _session;
@@ -173,6 +177,16 @@ class AureonFirebaseAuthService {
   static const _emailKey = 'aureon.firebase.email.v1';
 
   bool get isConfigured => _config.isConfigured;
+  AureonFirebaseAuthConfig get config => _config;
+
+  /// Applies a discovered owner configuration before restoring a saved
+  /// refresh token. Switching Firebase projects while signed in is forbidden.
+  void configure(AureonFirebaseAuthConfig config) {
+    if (_session != null || _refreshing != null) {
+      throw StateError('Sign out before changing the Firebase project.');
+    }
+    _config = config;
+  }
   AureonFirebaseSession? get currentSession => _session;
   AureonFirebaseUser? get currentUser => _session?.user;
 
@@ -357,6 +371,8 @@ class AureonFirebaseAuthService {
 
   Future<AureonFirebaseSession> restoreSession() async {
     _requireConfiguration();
+    final active = _session;
+    if (active != null && !active.isExpiring) return active;
     final refresh = await _secrets.read(_refreshKey);
     if (refresh == null || refresh.isEmpty) {
       throw StateError('No saved AUREON session exists.');
