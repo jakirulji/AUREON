@@ -356,6 +356,9 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     if (!user.emailVerified) {
       throw StateError('Verify your AUREON account email before cloud vault sync.');
     }
+    final password = await _askAccountPassword();
+    if (password == null) return;
+    await _auth.reauthenticate(password: password);
     final bundle = await _vaultStore.syncWithCloudflare(
       client: _cloudflareClient(),
       idTokenProvider: () => _auth.getIdToken(),
