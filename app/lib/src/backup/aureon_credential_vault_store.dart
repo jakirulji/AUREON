@@ -18,8 +18,15 @@ class PlatformAureonVaultDekStore implements AureonVaultDekStore {
       : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
-  String _name(String vaultId, int generation) =>
-      'aureon.credential-vault.dek.v1.$vaultId.$generation';
+  String _name(String vaultId, int generation) {
+    if (vaultId.trim().isEmpty || generation < 1) {
+      throw ArgumentError('A valid vault ID and generation are required.');
+    }
+    // Encode the complete ID to avoid delimiter collisions and platform-specific
+    // secure-storage key-name restrictions. This is an identifier, not a secret.
+    final encodedVaultId = base64Url.encode(utf8.encode(vaultId)).replaceAll('=', '');
+    return 'aureon.credential-vault.dek.v1.$encodedVaultId.$generation';
+  }
 
   @override
   Future<List<int>?> read(String vaultId, int generation) async {
@@ -62,6 +69,14 @@ class AureonCredentialVaultStore {
   final CredentialVaultCryptoService _crypto;
 
   Future<VaultRecoveryBundle> initialize(ManualRecoveryKeySet keySet) async {
+    if (keySet.vaultId.trim().isEmpty || keySet.generation < 1 ||
+        keySet.keys.length != AureonRecoveryKeyService.keyCount) {
+      throw ArgumentError('A valid vault ID, generation and five-key recovery set are required.');
+    }
+    if (await loadBundle() != null || await loadPendingBundle() != null ||
+        await _dekStore.read(keySet.vaultId, keySet.generation) != null) {
+      throw StateError('A vault already exists for this device. Initialization cannot overwrite an existing vault.');
+    }
     final dek = _randomBytes(32);
     final bundle = await _crypto.createBundle(
       keySet: keySet,
@@ -81,6 +96,11 @@ class AureonCredentialVaultStore {
 
   Future<VaultRecoveryBundle?> _readBundle({bool pending = false}) async {
     final file = await _bundleFile(pending: pending);
+    final backup = File('${file.path}.bak');
+    if (!await file.exists() && await backup.exists()) {
+      // Recover the last known-good snapshot after an interrupted replacement.
+      await backup.rename(file.path);
+    }
     if (!await file.exists()) return null;
     final bytes = await file.readAsBytes();
     return decodeBundle(bytes);
@@ -183,9 +203,31 @@ class AureonCredentialVaultStore {
     final file = await _bundleFile(pending: pending);
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.tmp');
+    final backup = File('${file.path}.bak');
+    if (await temporary.exists()) await temporary.delete();
     await temporary.writeAsBytes(bytes, flush: true);
-    if (await file.exists()) await file.delete();
-    await temporary.rename(file.path);
+
+    // Windows does not consistently replace an existing destination on rename.
+    // Keep the old snapshot until the new file has been promoted successfully.
+    if (await backup.exists()) await backup.delete();
+    final hadPrevious = await file.exists();
+    if (hadPrevious) await file.rename(backup.path);
+    try {
+      await temporary.rename(file.path);
+    } catch (_) {
+      if (!await file.exists() && await backup.exists()) {
+        await backup.rename(file.path);
+      }
+      rethrow;
+    }
+    if (await backup.exists()) {
+      try {
+        await backup.delete();
+      } on FileSystemException {
+        // The active snapshot is already committed; a stale backup is harmless
+        // and will be cleaned/replaced during the next successful write.
+      }
+    }
   }
 
   Future<File> _bundleFile({bool pending = false}) async {
