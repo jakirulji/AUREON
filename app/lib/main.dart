@@ -1,5 +1,6 @@
 import 'package:aureon/src/auth/aureon_account_page.dart';
 import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
+import 'package:aureon/src/auth/aureon_backend_profile.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
@@ -33,6 +34,24 @@ class AureonHome extends StatefulWidget {
 class _AureonHomeState extends State<AureonHome> {
   final _auth = AureonFirebaseAuthService();
   int selected = 0;
+  final _backendProfiles = AureonBackendProfileStore();
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreBackendProfile();
+  }
+
+  Future<void> _restoreBackendProfile() async {
+    try {
+      final profile = await _backendProfiles.activeProfile();
+      if (profile != null && mounted && _auth.currentUser == null) {
+        _auth.configureProfile(profile);
+      }
+    } catch (_) {
+      // The Account page presents a repairable profile-registry error.
+    }
+  }
   static const labels = ['Home', 'Files', 'Cloud', 'Transfers', 'Account', 'Settings'];
   static const icons = [Icons.home_outlined, Icons.folder_outlined, Icons.cloud_outlined, Icons.swap_vert, Icons.person_outline, Icons.settings_outlined];
 
