@@ -32,7 +32,7 @@ class AureonBackendProfile {
       throw const FormatException('Discovery ID has an invalid format.');
     }
     final worker = Uri.tryParse(field('workerBaseUrl'));
-    if (worker == null || worker.scheme != 'https:' || worker.host.isEmpty || worker.userInfo.isNotEmpty ||
+    if (worker == null || worker.scheme != 'https' || worker.host.isEmpty || worker.userInfo.isNotEmpty ||
         worker.query.isNotEmpty || worker.fragment.isNotEmpty || (worker.path.isNotEmpty && worker.path != '/')) {
       throw const FormatException('Cloudflare Worker URL must be a valid HTTPS base URL.');
     }
