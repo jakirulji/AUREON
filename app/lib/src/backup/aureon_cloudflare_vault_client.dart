@@ -227,7 +227,9 @@ class AureonCloudflareVaultClient {
           clear.fillRange(0, clear.length, 0);
           throw const FormatException('Recovered vault DEK has an invalid length.');
         }
-        return Uint8List.fromList(clear);
+        final recoveredDek = Uint8List.fromList(clear);
+        clear.fillRange(0, clear.length, 0);
+        return recoveredDek;
       } finally {
         sharedBytes.fillRange(0, sharedBytes.length, 0);
       }
