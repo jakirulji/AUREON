@@ -16,8 +16,8 @@ class AureonBackendProfile {
   String get firebaseIssuer => 'https://securetoken.google.com/$firebaseProjectId';
   String get workerIdentity {
     final uri = Uri.parse(workerBaseUrl);
-    final port = uri.hasPort ? ':' + uri.port.toString() : '';
-    return '\${uri.scheme}://\${uri.host}$port\${uri.path == '/' ? '' : uri.path}';
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://${uri.host}$port${uri.path == '/' ? '' : uri.path}';
   }
 
   bool get isBound => boundUid != null &&
