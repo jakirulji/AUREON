@@ -9,6 +9,7 @@ import '../virtual_folders/aureon_virtual_folder_store.dart';
 import 'aureon_metadata_backup.dart';
 import 'aureon_metadata_store.dart';
 import 'aureon_recovery_key_service.dart';
+import 'aureon_credential_vault_store.dart';
 
 class AureonBackupPage extends StatefulWidget {
   const AureonBackupPage({super.key});
@@ -22,11 +23,28 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   final _metadataCodec = AureonMetadataBackupCodec();
   final _metadataStore = AureonMetadataStore();
   final _virtualFolders = AureonVirtualFolderStore();
+  final _vaultStore = AureonCredentialVaultStore();
 
   ManualRecoveryKeySet? _keySet;
+  VaultRecoveryBundle? _vaultBundle;
   bool _busy = false;
   String _status = 'Recovery key and metadata backup tools are available. Live credential-vault recovery is not connected yet.';
   List<String> _restoreConflicts = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingVaultBundle();
+  }
+
+  Future<void> _loadExistingVaultBundle() async {
+    try {
+      final bundle = await _vaultStore.loadBundle();
+      if (mounted && bundle != null) setState(() => _vaultBundle = bundle);
+    } catch (error) {
+      if (mounted) setState(() => _status = 'Local Recovery Bundle could not be read: $error');
+    }
+  }
 
   String _newVaultId() {
     final random = Random.secure();
@@ -104,9 +122,11 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   Future<void> _generateKeys() => _run(() async {
     final set = _recovery.generateKeySet(vaultId: _newVaultId());
+    final bundle = await _vaultStore.initialize(set);
     setState(() {
       _keySet = set;
-      _status = 'Five independent 256-bit recovery keys generated. Export both files and store them separately.';
+      _vaultBundle = bundle;
+      _status = 'Five independent keys generated. A random vault DEK is protected by platform secure storage and the encrypted Recovery Bundle is ready to export.';
     });
   });
 
@@ -143,14 +163,65 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     if (file == null) return;
     final passphrase = await _askPassphrase(title: 'Unlock encrypted recovery key file');
     if (passphrase == null) return;
+    final knownBundle = _vaultBundle ?? await _vaultStore.loadBundle();
     final imported = await _recovery.importEncryptedKeyFile(
       bytes: await file.readAsBytes(),
       passphrase: passphrase,
+      expectedVaultId: knownBundle?.vaultId,
     );
     setState(() {
       _keySet = imported;
-      _status = 'Encrypted key file opened. Five keys are held in memory only; this does not restore a vault without its matching Vault Recovery Bundle.';
+      _vaultBundle = knownBundle;
+      _status = knownBundle == null
+          ? 'Encrypted key file opened. Import the matching encrypted Vault Recovery Bundle to recover the vault.'
+          : 'Encrypted key file opened and vault identity matched. Restore the matching bundle to unlock this device.';
     });
+  });
+
+  Future<void> _exportVaultBundle() => _run(() async {
+    final bytes = await _vaultStore.exportBundle();
+    final uri = await FilePicker.saveFile(
+      dialogTitle: 'Export encrypted AUREON Vault Recovery Bundle',
+      fileName: 'AUREON-Vault-Recovery.aureon-vault',
+      bytes: bytes,
+    );
+    if (uri != null && mounted) {
+      setState(() => _status = 'Encrypted Vault Recovery Bundle exported. Store it outside this device and Cloudflare. It contains no plaintext recovery keys or OAuth tokens.');
+    }
+  });
+
+  Future<void> _importVaultBundle() => _run(() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['aureon-vault'],
+    );
+    if (file == null) return;
+    final bundle = await _vaultStore.importBundle(await file.readAsBytes());
+    final existingKeys = _keySet;
+    if (existingKeys != null &&
+        (existingKeys.vaultId != bundle.vaultId ||
+         existingKeys.generation != bundle.generation)) {
+      setState(() => _keySet = null);
+    }
+    setState(() {
+      _vaultBundle = bundle;
+      _status = 'Encrypted Recovery Bundle imported: vault ${bundle.vaultId}, generation ${bundle.generation}, ${bundle.encryptedCredentialRecords.length} encrypted credential records. Import its matching .key file to unlock.';
+    });
+  });
+
+  Future<void> _restoreVaultBundle() => _run(() async {
+    final keys = _keySet;
+    final bundle = _vaultBundle ?? await _vaultStore.loadBundle();
+    if (keys == null) throw StateError('Import the matching AUREON-Recovery.key file first.');
+    if (bundle == null) throw StateError('Import the matching .aureon-vault bundle first.');
+    final result = await _vaultStore.restoreWithManualKey(
+      bundle: bundle,
+      keySet: keys,
+      manualKeyId: keys.keys.first.id,
+    );
+    if (mounted) {
+      setState(() => _status = 'Manual recovery succeeded using one active key. Vault DEK is now protected in this device secure storage. Restored ${result.length} encrypted-vault credential records; provider sign-in/refresh integration is still pending.');
+    }
   });
 
   Future<AureonMetadataSnapshot> _currentSnapshot() async {
@@ -246,7 +317,18 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
             ]),
           ],
           const SizedBox(height: 8),
-          const Text('The TXT contains plaintext secrets. The .key file encrypts all five keys using Argon2id + AES-256-GCM. Keep the .key passphrase separately. A .key file alone is not the encrypted vault bundle. The live provider-credential vault, DEK provisioning, Cloudflare envelope and recovery-bundle export/import are not connected yet.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(onPressed: _busy ? null : _exportVaultBundle, icon: const Icon(Icons.inventory_2_outlined), label: const Text('Export Vault Bundle')),
+            OutlinedButton.icon(onPressed: _busy ? null : _importVaultBundle, icon: const Icon(Icons.file_open_outlined), label: const Text('Import Vault Bundle')),
+            FilledButton.tonalIcon(onPressed: _busy ? null : _restoreVaultBundle, icon: const Icon(Icons.lock_open_outlined), label: const Text('Unlock / Restore Vault')),
+          ]),
+          if (_vaultBundle != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('Bundle ready • generation ${_vaultBundle!.generation} • ${_vaultBundle!.encryptedCredentialRecords.length} encrypted credential records • Cloudflare envelope: ${_vaultBundle!.cloudflareEnvelope == null ? "not provisioned" : "present"}', style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
+            ),
+          const SizedBox(height: 8),
+          const Text('The TXT contains plaintext secrets. The .key file encrypts all five keys using Argon2id + AES-256-GCM. The separate .aureon-vault file contains encrypted credential records and wrapped-DEK envelopes, never plaintext keys or OAuth tokens. The local DEK is stored through platform secure storage. Provider OAuth/token refresh and Cloudflare recovery remain pending.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
         ],
       ),
       const SizedBox(height: 14),
