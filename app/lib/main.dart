@@ -50,11 +50,14 @@ class _AureonHomeState extends State<AureonHome> {
         try {
           await _auth.restoreSession();
           final user = await _auth.reloadUser();
-          final bound = await _backendProfiles.bindActiveProfile(user.localId);
-          _auth.acceptBoundProfile(bound);
+          try {
+            final bound = await _backendProfiles.bindActiveProfile(user.localId);
+            _auth.acceptBoundProfile(bound);
+          } catch (_) {
+            await _auth.signOut();
+          }
         } catch (_) {
-          // Sign-in is optional; identity binding is enforced again before
-          // protected account and vault actions.
+          // Temporary network failures must not erase the saved refresh token.
         }
       }
     } catch (_) {
