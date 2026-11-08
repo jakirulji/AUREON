@@ -321,7 +321,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             for (final barcode in capture.barcodes) {
               final value = barcode.rawValue?.trim();
               if (value != null && value.length >= 22 && value.length <= 128 &&
-                  RegExp(r'^[A-Za-z0-9_-]+) {
+                  RegExp(r'^[A-Za-z0-9_-]+$') {
                 Navigator.of(dialogContext).pop(value);
                 return;
               }
@@ -340,7 +340,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         final id = _profile?.accountRecoveryId;
         if (id == null || id.isEmpty) throw StateError('Register an Account Recovery ID first.');
         const header = 'AUREON ACCOUNT RECOVERY ID';
-        final contents = '$header\\n\\n$id\\n\\nThis ID is a locator only. It does not authenticate you or unlock your encrypted vault. Keep it separate from your password and vault recovery keys.\\n';
+        final contents = '$header\n\n$id\n\nThis ID is a locator only. It does not authenticate you or unlock your encrypted vault. Keep it separate from your password and vault recovery keys.\n';
         final saved = await FilePicker.platform.saveFile(
           dialogTitle: 'Save AUREON Account Recovery ID',
           fileName: 'AUREON-Account-Recovery-ID.txt',
@@ -714,7 +714,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         final id = _profile?.accountRecoveryId;
         if (id == null || id.isEmpty) throw StateError('Register an Account Recovery ID first.');
         const header = 'AUREON ACCOUNT RECOVERY ID';
-        final contents = '$header\\n\\n$id\\n\\nThis ID is a locator only. It does not authenticate you or unlock your encrypted vault. Keep it separate from your password and vault recovery keys.\\n';
+        final contents = '$header\n\n$id\n\nThis ID is a locator only. It does not authenticate you or unlock your encrypted vault. Keep it separate from your password and vault recovery keys.\n';
         final saved = await FilePicker.platform.saveFile(
           dialogTitle: 'Save AUREON Account Recovery ID',
           fileName: 'AUREON-Account-Recovery-ID.txt',
