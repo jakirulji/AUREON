@@ -206,6 +206,39 @@ class AureonCredentialVaultStore {
     }
   }
 
+  /// Restores the latest Cloudflare snapshot using the device-bound
+  /// recovery path. The downloaded bundle remains quarantined until every
+  /// encrypted credential record authenticates successfully.
+  Future<List<Map<String, Object?>>> restoreWithCloudflare({
+    required String vaultId,
+    required AureonCloudflareVaultClient client,
+    required AureonFirebaseIdTokenProvider idTokenProvider,
+  }) async {
+    final bundle = await fetchCloudflareSnapshot(
+      vaultId: vaultId,
+      client: client,
+      idTokenProvider: idTokenProvider,
+    );
+    final dek = await client.recoverVaultDek(
+      vaultId: vaultId,
+      expectedGeneration: bundle.generation,
+      idTokenProvider: idTokenProvider,
+    );
+    try {
+      final records = await _crypto.restoreBundleWithDek(
+        bundle: bundle,
+        vaultDek: dek,
+      );
+      await _writeBundle(bundle);
+      await _dekStore.write(bundle.vaultId, bundle.generation, dek);
+      final pending = await _bundleFile(pending: true);
+      if (await pending.exists()) await pending.delete();
+      return records;
+    } finally {
+      dek.fillRange(0, dek.length, 0);
+    }
+  }
+
   /// Prepares a new generation without changing the active vault. The caller
   /// must export the returned five-key set and bundle before commitRotation.
   /// The next DEK remains in memory only; abandoning the plan leaves the
