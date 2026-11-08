@@ -254,6 +254,85 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     }
   });
 
+  Future<void> _rotateRecoveryGeneration() => _run(() async {
+    final currentKeys = _keySet;
+    if (currentKeys == null) throw StateError('Import the current .key file before rotating recovery keys.');
+    final currentBundle = _vaultBundle ?? await _vaultStore.loadBundle();
+    if (currentBundle == null) throw StateError('The active Vault Recovery Bundle is missing.');
+    if (currentBundle.generation != currentKeys.generation ||
+        currentBundle.vaultId != currentKeys.vaultId) {
+      throw StateError('Current key set and active vault do not match.');
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Rotate all recovery keys?'),
+        content: const Text(
+          'AUREON will create a new vault generation and five new independent keys. '
+          'You must save the new plaintext TXT, encrypted .key and encrypted Vault Bundle. '
+          'The current generation remains active until all three exports succeed. '
+          'Old copies stored elsewhere cannot be remotely revoked.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Continue')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final passphrase = await _askPassphrase(title: 'Protect the new AUREON-Recovery.key', confirm: true);
+    if (passphrase == null) return;
+    final selectedKeyId = await _chooseManualKey(currentKeys);
+    if (selectedKeyId == null) return;
+
+    final plan = await _vaultStore.prepareRotation(
+      currentKeySet: currentKeys,
+      currentManualKeyId: selectedKeyId,
+    );
+    final encryptedKeyBytes = await _recovery.exportEncryptedKeyFile(
+      keySet: plan.keySet,
+      passphrase: passphrase,
+    );
+    final bundleBytes = Uint8List.fromList(utf8.encode(jsonEncode(plan.bundle.toJson())));
+
+    final txtUri = await FilePicker.saveFile(
+      dialogTitle: 'Save new plaintext AUREON recovery keys',
+      fileName: 'AUREON-Recovery-Keys.txt',
+      bytes: Uint8List.fromList(utf8.encode(plan.keySet.toPlainText())),
+    );
+    if (txtUri == null || !mounted) {
+      setState(() => _status = 'Rotation cancelled before commit. The previous generation remains active.');
+      return;
+    }
+    final keyUri = await FilePicker.saveFile(
+      dialogTitle: 'Save new encrypted AUREON recovery key',
+      fileName: 'AUREON-Recovery.key',
+      bytes: encryptedKeyBytes,
+    );
+    if (keyUri == null || !mounted) {
+      setState(() => _status = 'Rotation not committed. The previous generation remains active. An uncommitted TXT export may exist; keep it separate and do not use it to replace the current backup.');
+      return;
+    }
+    final bundleUri = await FilePicker.saveFile(
+      dialogTitle: 'Save new encrypted AUREON Vault Recovery Bundle',
+      fileName: 'AUREON-Vault-Recovery.aureon-vault',
+      bytes: bundleBytes,
+    );
+    if (bundleUri == null || !mounted) {
+      setState(() => _status = 'Rotation not committed. The previous generation remains active. Keep any partial new exports separate.');
+      return;
+    }
+
+    await _vaultStore.commitRotation(currentKeySet: currentKeys, plan: plan);
+    if (mounted) {
+      setState(() {
+        _keySet = plan.keySet;
+        _vaultBundle = plan.bundle;
+        _status = 'Recovery generation ${plan.keySet.generation} is now active. New TXT, .key and Vault Bundle exports were saved. Store them separately; old-generation external backups remain independently decryptable.';
+      });
+    }
+  });
+
   Future<AureonMetadataSnapshot> _currentSnapshot() async {
     final previous = await _metadataStore.load();
     final folders = await _virtualFolders.load();
@@ -354,6 +433,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
               OutlinedButton.icon(onPressed: _busy ? null : _exportPlainTextKeys, icon: const Icon(Icons.text_snippet_outlined), label: const Text('Export TXT')),
               OutlinedButton.icon(onPressed: _busy ? null : _exportEncryptedKeyFile, icon: const Icon(Icons.lock_outline), label: const Text('Export .key')),
               OutlinedButton.icon(onPressed: _busy ? null : _importEncryptedKeyFile, icon: const Icon(Icons.file_open_outlined), label: const Text('Import .key')),
+              OutlinedButton.icon(onPressed: _busy ? null : _rotateRecoveryGeneration, icon: const Icon(Icons.autorenew), label: const Text('Rotate recovery keys')),
             ]),
           ],
           const SizedBox(height: 8),
