@@ -75,6 +75,15 @@ class AureonMetadataStore {
   }
 
   Future<void> save(AureonMetadataSnapshot snapshot) async {
+    final current = await load();
+    if (snapshot.generation < current.generation) {
+      throw StateError('Refusing to roll the local metadata catalog back to an older generation.');
+    }
+    if (snapshot.generation == current.generation &&
+        current.snapshotId != 'local-empty' &&
+        jsonEncode(snapshot.toJson()) != jsonEncode(current.toJson())) {
+      throw StateError('Metadata generation already exists with different content.');
+    }
     final directory = await _directory();
     final key = await _getLocalKey();
     final nonce = _randomBytes(12);
@@ -97,9 +106,27 @@ class AureonMetadataStore {
     final slot = snapshot.generation % 2;
     final target = File('${directory.path}${Platform.pathSeparator}catalog-$slot.aureon');
     final temporary = File('${target.path}.tmp');
+    final backup = File('${target.path}.bak');
+    if (await temporary.exists()) await temporary.delete();
     await temporary.writeAsBytes(envelope, flush: true);
-    if (await target.exists()) await target.delete();
-    await temporary.rename(target.path);
+    if (await backup.exists()) await backup.delete();
+    final hadPrevious = await target.exists();
+    if (hadPrevious) await target.rename(backup.path);
+    try {
+      await temporary.rename(target.path);
+    } catch (_) {
+      if (!await target.exists() && await backup.exists()) {
+        await backup.rename(target.path);
+      }
+      rethrow;
+    }
+    if (await backup.exists()) {
+      try {
+        await backup.delete();
+      } on FileSystemException {
+        // A committed active slot plus the other generation remain recoverable.
+      }
+    }
   }
 
   Future<AureonMetadataSnapshot> createFolder(String name, {String? parentId}) async {
