@@ -26,6 +26,17 @@ class AureonStorageHostApiImpl(
         }
     }
 
+    override suspend fun listTransfers(): List<TransferSnapshot> =
+        repository.listTransfers().map { job ->
+            TransferSnapshot(
+                operationId = job.operationId,
+                status = job.status,
+                acknowledgedBytes = job.acknowledgedBytes,
+                totalBytes = job.totalBytes,
+                remoteVerified = job.remoteVerified
+            )
+        }
+
     override suspend fun pauseTransfer(operationId: String) {
         repository.pause(operationId, nowEpochMs())
     }

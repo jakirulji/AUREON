@@ -21,6 +21,8 @@ class TransferCheckpointRepository(private val dao: TransferJobDao) {
         return dao.getById(operationId)
     }
 
+    suspend fun listTransfers(): List<TransferJobEntity> = dao.listRecent()
+
     suspend fun markUploading(operationId: String, nowEpochMs: Long) {
         require(operationId.isNotBlank())
         check(dao.markUploading(operationId, nowEpochMs) == 1) {

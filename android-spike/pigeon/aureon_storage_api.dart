@@ -14,6 +14,9 @@ abstract class AureonStorageHostApi {
   TransferSnapshot? getTransfer(String operationId);
 
   @async
+  List<TransferSnapshot> listTransfers();
+
+  @async
   void pauseTransfer(String operationId);
 
   @async

@@ -17,6 +17,9 @@ interface TransferJobDao {
     @Query("SELECT * FROM transfer_jobs WHERE operationId = :operationId LIMIT 1")
     suspend fun getById(operationId: String): TransferJobEntity?
 
+    @Query("SELECT * FROM transfer_jobs ORDER BY updatedAtEpochMs DESC LIMIT 100")
+    suspend fun listRecent(): List<TransferJobEntity>
+
     @Query(
         """
         UPDATE transfer_jobs

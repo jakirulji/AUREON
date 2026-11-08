@@ -63,6 +63,28 @@ class AureonStorageHostApiTest {
     }
 
     @Test
+    fun listTransfersReturnsRecentMetadataWithoutExposingSourceOrSessionEnvelopes() = runBlocking {
+        database.transferJobDao().insert(
+            testJob().copy(updatedAtEpochMs = 3000L)
+        )
+        database.transferJobDao().insert(
+            testJob().copy(
+                operationId = "operation-older",
+                sourceReferenceEnvelope = byteArrayOf(99, 98, 97),
+                uploadSessionEnvelope = byteArrayOf(96, 95, 94),
+                updatedAtEpochMs = 2000L
+            )
+        )
+
+        val snapshots = api.listTransfers()
+
+        assertEquals(listOf("operation-host-api", "operation-older"),
+            snapshots.map { it.operationId })
+        assertEquals(listOf("uploading", "uploading"), snapshots.map { it.status })
+        assertEquals(400L, snapshots.first().acknowledgedBytes)
+    }
+
+    @Test
     fun pauseAndResumeCommandsPersistStateTransitions() = runBlocking {
         database.transferJobDao().insert(testJob())
 
