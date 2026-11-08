@@ -17,12 +17,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('encrypted backup restores exact AUREON organization on a fresh device store', () async {
-    final sourceDirectory = await Directory.systemTemp.createTemp('aureon-source-');
     final targetDirectory = await Directory.systemTemp.createTemp('aureon-target-');
-    final sourceKeyStore = _MemoryMetadataKeyStore();
     final targetKeyStore = _MemoryMetadataKeyStore();
     addTearDown(() async {
-      if (await sourceDirectory.exists()) await sourceDirectory.delete(recursive: true);
       if (await targetDirectory.exists()) await targetDirectory.delete(recursive: true);
     });
 
