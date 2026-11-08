@@ -56,6 +56,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       _profile = await _profileCache.read();
       if (_profile != null) {
         _discoveryId.text = _profile!.discoveryId;
+        // Discovery lookup may have happened immediately before the app was
+        // closed. Re-arm the owner-binding check after process restart so a
+        // cached locator can never silently bypass Firebase issuer + UID
+        // verification on the next interactive sign-in.
+        _needsBindingVerification = _profile!.registered;
         if (!widget.auth.isConfigured) widget.auth.configure(_profile!.firebaseConfig);
       }
     } catch (_) {
