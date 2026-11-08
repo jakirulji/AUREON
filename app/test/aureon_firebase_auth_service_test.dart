@@ -144,6 +144,24 @@ void main() {
     expect(transport.calls.last.body['email'], 'owner@example.com');
   });
 
+
+  test('cold-start restore rotates the saved refresh token without asking for password', () async {
+    secrets.values['aureon.firebase.refresh_token.v1'] = 'persisted-refresh';
+    secrets.values['aureon.firebase.email.v1'] = 'owner@example.com';
+    transport.responses.add({
+      'id_token': 'restored-id-token',
+      'refresh_token': 'restored-rotated-refresh',
+      'user_id': 'user-123',
+      'expires_in': '3600',
+    });
+    final restored = await auth.restoreSession();
+    expect(restored.user.localId, 'user-123');
+    expect(restored.user.email, 'owner@example.com');
+    expect(restored.idToken, 'restored-id-token');
+    expect(secrets.values['aureon.firebase.refresh_token.v1'], 'restored-rotated-refresh');
+    expect(transport.calls.single.body.containsKey('password'), isFalse);
+  });
+
   test('sign-out removes persisted refresh token and local session', () async {
     transport.responses.add(signInResponse());
     await auth.signIn(email: 'owner@example.com', password: 'correct horse');
