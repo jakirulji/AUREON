@@ -160,7 +160,7 @@ class AureonPlatformAuthSecretStore implements AureonAuthSecretStore {
 /// DPAPI-backed secure storage. Passwords and ID tokens are never persisted.
 class AureonFirebaseAuthService {
   AureonFirebaseAuthService({
-    AureonFirebaseAuthConfig config = AureonFirebaseAuthConfig.fromEnvironment,
+    AureonFirebaseAuthConfig config = const AureonFirebaseAuthConfig(apiKey: '', projectId: ''),
     AureonFirebaseAuthTransport? transport,
     AureonAuthSecretStore? secretStore,
   })  : _config = config,
@@ -172,6 +172,7 @@ class AureonFirebaseAuthService {
   final AureonAuthSecretStore _secrets;
   AureonFirebaseSession? _session;
   Future<AureonFirebaseSession>? _refreshing;
+  AureonBackendProfile? _activeBackendProfile;
 
   String get _scope => base64Url.encode(utf8.encode(_config.projectId)).replaceAll('=', '');
   String get _activeUidKey => 'aureon.firebase.$_scope.active_uid.v2';
@@ -179,14 +180,29 @@ class AureonFirebaseAuthService {
   String _emailKey(String uid) => 'aureon.firebase.$_scope.$uid.email.v2';
 
   AureonFirebaseAuthConfig get config => _config;
+  AureonBackendProfile? get activeBackendProfile => _activeBackendProfile;
 
   /// Switch projects only while signed out. Each project/account has a
   /// separate secure-storage namespace, preventing cross-project token reuse.
+  void configureProfile(AureonBackendProfile profile) {
+    profile.validate();
+    configure(AureonFirebaseAuthConfig.fromProfile(profile));
+    _activeBackendProfile = profile;
+  }
+
+  void acceptBoundProfile(AureonBackendProfile profile) {
+    if (currentUser == null || profile.boundUid != currentUser!.localId || !profile.isBound) {
+      throw StateError('Backend profile is not bound to the currently signed-in Master Account.');
+    }
+    _activeBackendProfile = profile;
+  }
+
   void configure(AureonFirebaseAuthConfig config) {
     if (_session != null || _refreshing != null) {
       throw StateError('Sign out before changing the Firebase backend profile.');
     }
     _config = config;
+    _activeBackendProfile = null;
   }
 
   bool get isConfigured => _config.isConfigured;
