@@ -21,6 +21,62 @@ class TransferCheckpointRepository(private val dao: TransferJobDao) {
         return dao.getById(operationId)
     }
 
+    suspend fun markUploading(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.markUploading(operationId, nowEpochMs) == 1) {
+            "Only a queued transfer can start uploading"
+        }
+    }
+
+    suspend fun waitForNetwork(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.waitForNetwork(operationId, nowEpochMs) == 1) {
+            "Transfer cannot enter network wait from its current state"
+        }
+    }
+
+    suspend fun waitForAuth(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.waitForAuth(operationId, nowEpochMs) == 1) {
+            "Transfer cannot enter authentication wait from its current state"
+        }
+    }
+
+    suspend fun waitForQuota(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.waitForQuota(operationId, nowEpochMs) == 1) {
+            "Transfer cannot enter quota wait from its current state"
+        }
+    }
+
+    suspend fun scheduleRetry(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.scheduleRetry(operationId, nowEpochMs) == 1) {
+            "Transfer cannot enter retry wait from its current state"
+        }
+    }
+
+    suspend fun requeue(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.requeue(operationId, nowEpochMs) == 1) {
+            "Only a condition-waiting transfer can be requeued"
+        }
+    }
+
+    suspend fun beginFinalization(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.beginFinalization(operationId, nowEpochMs) == 1) {
+            "Finalization requires an uploading transfer with all bytes acknowledged"
+        }
+    }
+
+    suspend fun beginVerification(operationId: String, nowEpochMs: Long) {
+        require(operationId.isNotBlank())
+        check(dao.beginVerification(operationId, nowEpochMs) == 1) {
+            "Only a finalizing transfer can enter remote verification"
+        }
+    }
+
     suspend fun pause(operationId: String, nowEpochMs: Long) {
         require(operationId.isNotBlank())
         check(dao.pause(operationId, nowEpochMs) == 1) {

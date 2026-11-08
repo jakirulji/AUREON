@@ -153,6 +153,8 @@ class TransferPersistenceTest {
         )
 
         assertFalse(repository.canOfferSourceCleanup("operation-cleanup"))
+        repository.beginFinalization("operation-cleanup", 1800)
+        repository.beginVerification("operation-cleanup", 1900)
         repository.confirmRemoteVerification("operation-cleanup", 2000)
         assertTrue(repository.canOfferSourceCleanup("operation-cleanup"))
         database.close()
@@ -170,6 +172,73 @@ class TransferPersistenceTest {
 
         assertTrue(error is IllegalStateException)
         assertFalse(repository.canOfferSourceCleanup("operation-incomplete"))
+        database.close()
+    }
+
+    @Test
+    fun transferLifecycleRequiresUploadThenFinalizeThenVerifyInOrder() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+        repository.enqueue(testJob("operation-lifecycle", acknowledgedBytes = 0, totalBytes = 1000))
+
+        repository.markUploading("operation-lifecycle", 1600)
+        repository.acknowledge("operation-lifecycle", 1000, 1700)
+        repository.beginFinalization("operation-lifecycle", 1800)
+        assertEquals("finalizing", repository.getTransfer("operation-lifecycle")?.status)
+
+        repository.beginVerification("operation-lifecycle", 1900)
+        assertEquals("verifying", repository.getTransfer("operation-lifecycle")?.status)
+        repository.confirmRemoteVerification("operation-lifecycle", 2000)
+
+        val verified = repository.getTransfer("operation-lifecycle")
+        assertEquals("verified", verified?.status)
+        assertTrue(verified?.remoteVerified == true)
+        assertEquals(2000L, verified?.verifiedAtEpochMs)
+        database.close()
+    }
+
+    @Test
+    fun finalizationAndVerificationCannotBeSkippedOrStartedEarly() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+        repository.enqueue(testJob("operation-order", acknowledgedBytes = 400, totalBytes = 1000))
+
+        assertTrue(runCatching { repository.beginFinalization("operation-order", 1600) }.isFailure)
+        assertTrue(runCatching { repository.beginVerification("operation-order", 1700) }.isFailure)
+        assertTrue(runCatching { repository.confirmRemoteVerification("operation-order", 1800) }.isFailure)
+        assertEquals("uploading", repository.getTransfer("operation-order")?.status)
+        database.close()
+    }
+
+    @Test
+    fun conditionWaitCanOnlyRequeueAfterTheConditionIsResolved() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+        repository.enqueue(testJob("operation-network", acknowledgedBytes = 256, totalBytes = 1000))
+
+        repository.waitForNetwork("operation-network", 1600)
+        assertEquals(RecoveryAction.HOLD_FOR_NETWORK,
+            repository.recoveryPlan().single().action)
+        assertTrue(runCatching { repository.markUploading("operation-network", 1700) }.isFailure)
+
+        repository.requeue("operation-network", 1800)
+        assertEquals("queued", repository.getTransfer("operation-network")?.status)
+        assertEquals(256L, repository.getTransfer("operation-network")?.acknowledgedBytes)
+        repository.markUploading("operation-network", 1900)
+        assertEquals("uploading", repository.getTransfer("operation-network")?.status)
+        database.close()
+    }
+
+    @Test
+    fun pauseCanBeAppliedToWaitingTransferAndResumeReturnsItToQueue() = runBlocking {
+        val database = openDatabase()
+        val repository = TransferCheckpointRepository(database.transferJobDao())
+        repository.enqueue(testJob("operation-pause-wait", acknowledgedBytes = 256, totalBytes = 1000))
+        repository.waitForAuth("operation-pause-wait", 1600)
+        repository.pause("operation-pause-wait", 1700)
+        assertEquals("paused", repository.getTransfer("operation-pause-wait")?.status)
+        repository.resume("operation-pause-wait", 1800)
+        assertEquals("queued", repository.getTransfer("operation-pause-wait")?.status)
         database.close()
     }
 

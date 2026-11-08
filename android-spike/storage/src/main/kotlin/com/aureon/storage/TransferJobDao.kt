@@ -20,6 +20,105 @@ interface TransferJobDao {
     @Query(
         """
         UPDATE transfer_jobs
+        SET status = 'uploading',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status = 'queued'
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun markUploading(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'waiting_for_network',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status IN ('queued', 'uploading', 'waiting_for_network', 'waiting_for_auth', 'waiting_for_quota', 'retry_wait')
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun waitForNetwork(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'waiting_for_auth',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status IN ('queued', 'uploading', 'finalizing', 'verifying')
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun waitForAuth(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'waiting_for_quota',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status IN ('queued', 'uploading')
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun waitForQuota(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'retry_wait',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status IN ('queued', 'uploading', 'finalizing', 'verifying',
+                         'waiting_for_network', 'waiting_for_auth', 'waiting_for_quota')
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun scheduleRetry(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'queued',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status IN ('waiting_for_network', 'waiting_for_auth', 'waiting_for_quota', 'retry_wait')
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun requeue(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'finalizing',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status = 'uploading'
+          AND remoteVerified = 0
+          AND totalBytes IS NOT NULL
+          AND acknowledgedBytes >= totalBytes
+        """
+    )
+    suspend fun beginFinalization(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
+        SET status = 'verifying',
+            updatedAtEpochMs = :updatedAtEpochMs
+        WHERE operationId = :operationId
+          AND status = 'finalizing'
+          AND remoteVerified = 0
+        """
+    )
+    suspend fun beginVerification(operationId: String, updatedAtEpochMs: Long): Int
+
+    @Query(
+        """
+        UPDATE transfer_jobs
         SET status = 'paused',
             updatedAtEpochMs = :updatedAtEpochMs
         WHERE operationId = :operationId
@@ -66,7 +165,7 @@ interface TransferJobDao {
             verifiedAtEpochMs = :verifiedAtEpochMs,
             updatedAtEpochMs = :verifiedAtEpochMs
         WHERE operationId = :operationId
-          AND status IN ('uploading', 'paused')
+          AND status = 'verifying'
           AND totalBytes IS NOT NULL
           AND acknowledgedBytes >= totalBytes
         """
