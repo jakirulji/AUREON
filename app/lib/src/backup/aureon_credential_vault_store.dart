@@ -54,10 +54,18 @@ class PlatformAureonVaultDekStore implements AureonVaultDekStore {
   }
 }
 
-class AureonVaultRotationResult {
-  const AureonVaultRotationResult({required this.keySet, required this.bundle});
+class AureonVaultRotationPlan {
+  const AureonVaultRotationPlan({
+    required this.keySet,
+    required this.bundle,
+    required this.previousGeneration,
+    required this.nextDek,
+  });
   final ManualRecoveryKeySet keySet;
   final VaultRecoveryBundle bundle;
+  final int previousGeneration;
+  // Kept in memory only until the user has exported the new key set and bundle.
+  final List<int> nextDek;
 }
 
 /// Owns the device-protected DEK and portable encrypted Recovery Bundle.
@@ -193,11 +201,11 @@ class AureonCredentialVaultStore {
     return records;
   }
 
-  /// Rotates the vault DEK and all five manual recovery keys to a new
-  /// generation. The caller must export the returned key set and bundle.
-  /// Historical exported bundles remain recoverable with their old keys;
-  /// this method cannot revoke copies outside this device.
-  Future<AureonVaultRotationResult> rotateGeneration({
+  /// Prepares a new generation without changing the active vault. The caller
+  /// must export the returned five-key set and bundle before commitRotation.
+  /// The next DEK remains in memory only; abandoning the plan leaves the
+  /// current generation fully usable.
+  Future<AureonVaultRotationPlan> prepareRotation({
     required ManualRecoveryKeySet currentKeySet,
     required String currentManualKeyId,
   }) async {
@@ -226,20 +234,39 @@ class AureonCredentialVaultStore {
       vaultDek: nextDek,
       credentialRecords: records,
     );
-
-    // Stage and verify the next generation before replacing the active bundle.
-    await _writeBundle(nextBundle, pending: true);
-    await _dekStore.write(nextKeys.vaultId, nextKeys.generation, nextDek);
-    await _crypto.restoreBundle(
-      bundle: nextBundle,
+    return AureonVaultRotationPlan(
       keySet: nextKeys,
-      manualKeyId: nextKeys.keys.first.id,
+      bundle: nextBundle,
+      previousGeneration: current.generation,
+      nextDek: nextDek,
     );
-    await _writeBundle(nextBundle);
-    final pending = await _bundleFile(pending: true);
-    if (await pending.exists()) await pending.delete();
+  }
+
+  /// Commits only after the caller has exported the new recovery files.
+  /// Old-generation exported copies remain decryptable; AUREON cannot revoke
+  /// offline copies outside its control.
+  Future<void> commitRotation({
+    required ManualRecoveryKeySet currentKeySet,
+    required AureonVaultRotationPlan plan,
+  }) async {
+    final current = await loadBundle();
+    if (current == null || current.vaultId != currentKeySet.vaultId ||
+        current.generation != plan.previousGeneration ||
+        currentKeySet.generation != plan.previousGeneration ||
+        plan.keySet.vaultId != current.vaultId ||
+        plan.keySet.generation != current.generation + 1 ||
+        plan.nextDek.length != 32) {
+      throw const StateError('Vault changed while rotation was being prepared. Start the rotation again.');
+    }
+    await _dekStore.write(plan.keySet.vaultId, plan.keySet.generation, plan.nextDek);
+    // Verify the generated bundle and the newly wrapped DEK before promotion.
+    await _crypto.restoreBundle(
+      bundle: plan.bundle,
+      keySet: plan.keySet,
+      manualKeyId: plan.keySet.keys.first.id,
+    );
+    await _writeBundle(plan.bundle);
     await _dekStore.delete(current.vaultId, current.generation);
-    return AureonVaultRotationResult(keySet: nextKeys, bundle: nextBundle);
   }
 
   Future<VaultRecoveryBundle> replaceCredentialRecords({
