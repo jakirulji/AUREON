@@ -73,8 +73,14 @@ class AureonCredentialVaultStore {
     return bundle;
   }
 
-  Future<VaultRecoveryBundle?> loadBundle() async {
-    final file = await _bundleFile();
+  Future<VaultRecoveryBundle?> loadBundle() => _readBundle();
+
+  /// An imported bundle remains quarantined until a matching manual key
+  /// successfully authenticates its wrapped DEK and decrypts every record.
+  Future<VaultRecoveryBundle?> loadPendingBundle() => _readBundle(pending: true);
+
+  Future<VaultRecoveryBundle?> _readBundle({bool pending = false}) async {
+    final file = await _bundleFile(pending: pending);
     if (!await file.exists()) return null;
     final bytes = await file.readAsBytes();
     return decodeBundle(bytes);
@@ -104,7 +110,9 @@ class AureonCredentialVaultStore {
         throw StateError('Recovery Bundle generation and timestamp collide with different content. Refusing ambiguous import.');
       }
     }
-    await _writeBundle(bundle);
+    // Do not replace the trusted active snapshot with an unauthenticated file.
+    // Keep it pending until restoreWithManualKey verifies the DEK and records.
+    await _writeBundle(bundle, pending: true);
     return bundle;
   }
 
@@ -145,6 +153,8 @@ class AureonCredentialVaultStore {
     // Persist only through the platform secure-storage adapter, never in prefs/files.
     await _dekStore.write(bundle.vaultId, bundle.generation, dek);
     await _writeBundle(bundle);
+    final pending = await _bundleFile(pending: true);
+    if (await pending.exists()) await pending.delete();
     return records;
   }
 
@@ -165,12 +175,12 @@ class AureonCredentialVaultStore {
     return bundle;
   }
 
-  Future<void> _writeBundle(VaultRecoveryBundle bundle) async {
+  Future<void> _writeBundle(VaultRecoveryBundle bundle, {bool pending = false}) async {
     final bytes = utf8.encode(jsonEncode(bundle.toJson()));
     if (bytes.length > maxBundleBytes) {
       throw StateError('Vault Recovery Bundle exceeds the supported size.');
     }
-    final file = await _bundleFile();
+    final file = await _bundleFile(pending: pending);
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.tmp');
     await temporary.writeAsBytes(bytes, flush: true);
@@ -178,9 +188,10 @@ class AureonCredentialVaultStore {
     await temporary.rename(file.path);
   }
 
-  Future<File> _bundleFile() async {
+  Future<File> _bundleFile({bool pending = false}) async {
     final root = _rootDirectory ?? await getApplicationSupportDirectory();
-    return File('${root.path}${Platform.pathSeparator}credential-vault.aureon-vault');
+    final suffix = pending ? '.pending' : '';
+    return File('${root.path}${Platform.pathSeparator}credential-vault.aureon-vault$suffix');
   }
 
   List<int> _randomBytes(int length) =>
