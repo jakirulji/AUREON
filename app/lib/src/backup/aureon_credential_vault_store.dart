@@ -83,8 +83,11 @@ class AureonCredentialVaultStore {
       vaultDek: dek,
       credentialRecords: const [],
     );
-    await _dekStore.write(keySet.vaultId, keySet.generation, dek);
+    // Commit the portable encrypted recovery data first. If secure-storage
+    // initialization fails or the process stops here, the manual key can still
+    // restore the DEK; an orphaned DEK must never block future recovery.
     await _writeBundle(bundle);
+    await _dekStore.write(keySet.vaultId, keySet.generation, dek);
     return bundle;
   }
 
@@ -170,9 +173,10 @@ class AureonCredentialVaultStore {
       keySet: keySet,
       manualKeyId: manualKeyId,
     );
-    // Persist only through the platform secure-storage adapter, never in prefs/files.
-    await _dekStore.write(bundle.vaultId, bundle.generation, dek);
+    // Promote authenticated ciphertext before switching the device DEK. If
+    // secure storage fails, the pending copy remains available for a retry.
     await _writeBundle(bundle);
+    await _dekStore.write(bundle.vaultId, bundle.generation, dek);
     final pending = await _bundleFile(pending: true);
     if (await pending.exists()) await pending.delete();
     return records;
