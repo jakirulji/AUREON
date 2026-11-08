@@ -5,7 +5,15 @@ class TransferCheckpointRepository(private val dao: TransferJobDao) {
         require(job.operationId.isNotBlank())
         require(job.providerAccountId.isNotBlank())
         require(job.acknowledgedBytes >= 0)
-        dao.upsert(job)
+        require(job.totalBytes == null || job.acknowledgedBytes <= job.totalBytes) {
+            "Acknowledged bytes cannot exceed the declared transfer size"
+        }
+        require(!job.remoteVerified && job.verifiedAtEpochMs == null) {
+            "A new transfer cannot be enqueued as remotely verified"
+        }
+        // INSERT/ABORT makes operation identity immutable, including under
+        // concurrent enqueue attempts. A retry cannot overwrite a checkpoint.
+        dao.insert(job)
     }
 
     suspend fun getTransfer(operationId: String): TransferJobEntity? {
@@ -30,7 +38,7 @@ class TransferCheckpointRepository(private val dao: TransferJobDao) {
     suspend fun acknowledge(operationId: String, bytes: Long, nowEpochMs: Long) {
         require(bytes >= 0)
         check(dao.updateAcknowledgedBytes(operationId, bytes, nowEpochMs) == 1) {
-            "Transfer checkpoint rejected by current state or size invariant"
+            "Transfer checkpoint rejected: progress cannot regress or exceed total size"
         }
     }
 
