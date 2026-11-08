@@ -299,27 +299,41 @@ async function issueChallenge(request: Request, env: Env, identity: FirebaseIden
   const row = await env.DB.prepare("SELECT generation FROM vault_snapshots WHERE user_id=? AND vault_id=?")
     .bind(identity.uid, vaultId).first<{ generation: number }>();
   if (!row) throw new HttpError(404, "Vault not found.");
+
   const now = Date.now();
-  const cooldown = await env.DB.prepare("SELECT next_allowed_at_ms FROM recovery_cooldowns WHERE user_id=? AND vault_id=?")
-    .bind(identity.uid, vaultId).first<{ next_allowed_at_ms: number }>();
-  if (cooldown && cooldown.next_allowed_at_ms > now) throw new HttpError(429, "Recovery cooldown is active.");
-  const recent = await env.DB.prepare("SELECT COUNT(*) AS count FROM recovery_challenges WHERE user_id=? AND vault_id=? AND created_at_ms>?")
-    .bind(identity.uid, vaultId, now - 10 * 60 * 1000).first<{ count: number }>();
-  if ((recent?.count ?? 0) >= 3) throw new HttpError(429, "Too many recovery challenges; try again later.");
-  const challengeId = base64Url(randomBytes(18)), challenge = base64Url(randomBytes(32)), hash = await sha256Hex(challenge);
+  const challengeId = base64Url(randomBytes(18));
+  const challenge = base64Url(randomBytes(32));
+  const hash = await sha256Hex(challenge);
+  // Enforce the three-per-ten-minute limit and recovery cooldown inside the
+  // INSERT itself. Separate read-then-write checks are raceable under parallel
+  // requests and could otherwise issue more than the configured challenge cap.
   const results = await env.DB.batch([
-    env.DB.prepare("INSERT INTO recovery_challenges (challenge_id,user_id,vault_id,generation,challenge_sha256,expires_at_ms,created_at_ms) VALUES (?,?,?,?,?,?,?)")
-      .bind(challengeId, identity.uid, vaultId, row.generation, hash, now + CHALLENGE_TTL_MS, now),
+    env.DB.prepare(`INSERT INTO recovery_challenges
+      (challenge_id,user_id,vault_id,generation,challenge_sha256,expires_at_ms,created_at_ms)
+      SELECT ?,?,?,?,?,?,?
+      WHERE (SELECT COUNT(*) FROM recovery_challenges
+        WHERE user_id=? AND vault_id=? AND created_at_ms>?) < 3
+      AND NOT EXISTS (SELECT 1 FROM recovery_cooldowns
+        WHERE user_id=? AND vault_id=? AND next_allowed_at_ms>?)`)
+      .bind(challengeId, identity.uid, vaultId, row.generation, hash,
+        now + CHALLENGE_TTL_MS, now, identity.uid, vaultId,
+        now - 10 * 60 * 1000, identity.uid, vaultId, now),
     env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM recovery_challenges WHERE challenge_id=? AND user_id=? AND vault_id=?)")
       .bind(base64Url(randomBytes(18)), identity.uid, vaultId, "vault.recovery.challenge_issued", row.generation, now, "{}",
         challengeId, identity.uid, vaultId),
   ]);
   const [challengeWrite, auditWrite] = results;
-  if (!challengeWrite || !auditWrite || !challengeWrite.success || challengeWrite.meta.changes !== 1 ||
-      !auditWrite.success || auditWrite.meta.changes !== 1) throw new HttpError(503, "Challenge/audit transaction failed.");
+  if (!challengeWrite || !challengeWrite.success) {
+    throw new HttpError(503, "Challenge creation failed.");
+  }
+  if (challengeWrite.meta.changes !== 1) {
+    throw new HttpError(429, "Recovery challenge limit or cooldown is active.");
+  }
+  if (!auditWrite || !auditWrite.success || auditWrite.meta.changes !== 1) {
+    throw new HttpError(503, "Challenge audit persistence failed; operation aborted.");
+  }
   return json({ challengeId, challenge, generation: row.generation, expiresAtEpochMs: now + CHALLENGE_TTL_MS });
 }
-
 async function recoverVault(request: Request, env: Env, identity: FirebaseIdentity): Promise<Response> {
   const body = await readJson(request), vaultId = requiredString(body.vaultId, "vaultId");
   const challengeId = requiredString(body.challengeId, "challengeId"), challenge = requiredString(body.challenge, "challenge", 128);
