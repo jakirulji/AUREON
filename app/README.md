@@ -11,7 +11,9 @@ This directory contains the shared Flutter application layer. Android and Window
 - File open hand-off to the Android system viewer or Windows' default associated application; Windows validates root containment.
 - Verified same-root file copy, safe parent-folder move, and Trash/restore flows. Android uses provider-native Trash when supported or an AUREON-managed folder; Windows uses the Recycle Bin. No silent permanent-delete fallback.
 - AUREON Master Account email/password authentication via Firebase Identity Toolkit REST; secure refresh-token persistence, automatic cold-start restoration, token refresh, password reauthentication and local sign-out. Passwords and ID tokens are not persisted.
-- Shared Discovery Registry client and local public backend-profile cache. New devices resolve the user's Firebase/Worker config by Discovery ID and verify Firebase issuer + UID after login. Normal launches use the local cache and do not spend Registry requests.
+- Shared Discovery Registry client and local public backend-profile cache. New devices resolve the user's Firebase/Worker config by Discovery ID. Firebase issuer + UID binding is checked after interactive login and after cold-start session restoration.
+- If Registry verification is temporarily unavailable, the in-memory session is locked while the rotated refresh token is retained for a later retry. A definitive account-binding mismatch signs the device out.
+- Registered Discovery IDs can be copied or displayed as QR codes. The QR contains only the locator; the new device must still authenticate with the matching Firebase Master Account. QR camera scanning/deep-link import is not implemented yet, so the ID is entered manually on the new device.
 - Cloudflare credential-vault sync/recovery UI connected to the HTTPS client. It requires compile-time Firebase and Worker URL configuration plus a deployed Worker/D1 database.
 - Storage overview and recent-file cards still contain sample data.
 
@@ -33,4 +35,7 @@ Generate the desired platform scaffolding, then run:
 - `flutter analyze`
 - `flutter test`
 - `flutter build apk --debug` or `flutter build windows --release` when platform compilation is needed.
-\n## Owner configuration\n\nSee [Firebase and Cloudflare owner setup](../docs/OWNER-SETUP-FIREBASE-CLOUDFLARE.md) for the Spark/Workers/D1 setup and compile-time configuration.\n
+
+## Owner configuration
+
+See [Firebase and Cloudflare owner setup](../docs/OWNER-SETUP-FIREBASE-CLOUDFLARE.md) for the Spark/Workers/D1 setup and compile-time configuration.
