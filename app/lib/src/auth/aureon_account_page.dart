@@ -171,10 +171,10 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (workerUrl.isEmpty || config.authDomain.isEmpty || config.appId.isEmpty) {
           throw StateError('This first-device build needs AUREON_CLOUDFLARE_API_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
         }
-        final isFirstRegistration = _profile?.registered != true;
+        final firstRegistration = _profile?.registered != true;
         var id = _profile?.discoveryId ?? AureonDiscoveryRegistryClient.generateDiscoveryId();
         AureonBackendProfile? profile;
-        for (var attempt = 0; attempt < (isFirstRegistration ? 5 : 1); attempt++) {
+        for (var attempt = 0; attempt < (firstRegistration ? 5 : 1); attempt++) {
           try {
             profile = await _registry.register(
               auth: widget.auth, discoveryId: id, workerBaseUrl: workerUrl,
@@ -183,16 +183,16 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             );
             break;
           } on AureonDiscoveryRegistryException catch (error) {
-            if (!isFirstRegistration || error.statusCode != 409 || attempt == 4) rethrow;
+            if (!firstRegistration || error.statusCode != 409 || attempt == 4) rethrow;
             id = AureonDiscoveryRegistryClient.generateDiscoveryId();
           }
         }
         if (profile == null) throw StateError('Could not reserve a unique Account Recovery ID. Please retry.');
         if (mounted) {
           setState(() {
-          _profile = profile;
-          _discoveryId.text = profile!.discoveryId;
-          _status = 'Your unique Account Recovery ID is registered. Save it or its QR for new devices.';
+            _profile = profile;
+            _discoveryId.text = profile!.discoveryId;
+            _status = 'Your unique Account Recovery ID is registered. Save it or its QR for new devices.';
           });
         }
       });
@@ -317,7 +317,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
               onDetect: (capture) {
                 for (final barcode in capture.barcodes) {
                   final value = barcode.rawValue?.trim();
-                  if (value != null && RegExp(r'^[A-Za-z0-9_-]{22,128}
+                  if (value != null && value.length >= 22 && value.length <= 128 &&
+                      RegExp(r'^[A-Za-z0-9_-]+
     final id = _profile?.discoveryId;
     if (id == null || id.isEmpty) return;
     await showDialog<void>(
