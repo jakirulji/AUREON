@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -120,7 +119,7 @@ class AureonIoFirebaseAuthTransport implements AureonFirebaseAuthTransport {
       final error = decoded['error'];
       final message = error is Map ? error['message'] : null;
       final code = message is String ? message : 'AUTH_REQUEST_FAILED';
-      throw AureonFirebaseAuthException(code, _friendlyError(code));
+      throw AureonFirebaseAuthException(code, AureonFirebaseAuthService._friendlyError(code));
     }
     return decoded;
   }
