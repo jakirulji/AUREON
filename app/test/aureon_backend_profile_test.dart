@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../lib/src/auth/aureon_backend_profile.dart';
+import 'package:aureon/src/auth/aureon_backend_profile.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
