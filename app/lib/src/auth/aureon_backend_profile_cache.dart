@@ -88,6 +88,8 @@ class AureonDiscoveryRegistryClient {
   final HttpClient _http;
   final AureonBackendProfileCache _cache;
 
+  void close() => _http.close(force: true);
+
   Uri _endpoint(String path) {
     final base = Uri.tryParse(_registryUrl);
     if (base == null || base.scheme != 'https' || base.host.isEmpty) {
