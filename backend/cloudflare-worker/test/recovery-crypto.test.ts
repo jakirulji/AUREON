@@ -91,5 +91,11 @@ describe("Cloudflare vault envelope cryptographic interoperability", () => {
     const newEnvelope = await createCloudflareEnvelope(dek.slice(), "vault-key-version", 2, rotatedEnv);
     expect(oldEnvelope.rootKeyVersion).toBe(1);
     expect(newEnvelope.rootKeyVersion).toBe(2);
+    const device = await crypto.subtle.generateKey(
+      { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"],
+    );
+    const publicJwk = await crypto.subtle.exportKey("jwk", device.publicKey);
+    await expect(unwrapAndRewrap(oldEnvelope, "vault-key-version", 1, publicJwk, rotatedEnv)).resolves.toBeDefined();
+    await expect(unwrapAndRewrap(newEnvelope, "vault-key-version", 2, publicJwk, rotatedEnv)).resolves.toBeDefined();
   });
 });
