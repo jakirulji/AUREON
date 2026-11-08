@@ -1,1 +1,1 @@
-Temporary validation-only marker. The Worker implementation is on the base branch; this file exists solely to exercise the pull-request validation workflow and is not part of the product design.
+Temporary validation marker. The current main-branch Cloudflare Worker foundation is being exercised by the PR validation workflow. This file is not product documentation.
