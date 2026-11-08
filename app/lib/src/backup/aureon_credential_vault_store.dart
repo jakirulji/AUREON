@@ -346,13 +346,17 @@ class AureonCredentialVaultStore {
       dek.fillRange(0, dek.length, 0);
       throw StateError('The active vault bundle and recovery key set do not match.');
     }
-    final bundle = await _crypto.createBundle(
-      keySet: keySet,
-      vaultDek: dek,
-      credentialRecords: credentialRecords,
-      cloudflareEnvelope: current.cloudflareEnvelope,
-    );
-    dek.fillRange(0, dek.length, 0);
+    late final VaultRecoveryBundle bundle;
+    try {
+      bundle = await _crypto.createBundle(
+        keySet: keySet,
+        vaultDek: dek,
+        credentialRecords: credentialRecords,
+        cloudflareEnvelope: current.cloudflareEnvelope,
+      );
+    } finally {
+      dek.fillRange(0, dek.length, 0);
+    }
     await _writeBundle(bundle);
     return bundle;
   }
