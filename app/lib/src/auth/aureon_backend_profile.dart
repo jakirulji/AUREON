@@ -17,7 +17,7 @@ class AureonBackendProfile {
   String get workerIdentity {
     final uri = Uri.parse(workerBaseUrl);
     final port = uri.hasPort ? ':' + uri.port.toString() : '';
-    return uri.scheme + '://' + uri.host + port + (uri.path == '/' ? '' : uri.path);
+    return '\${uri.scheme}://\${uri.host}$port\${uri.path == '/' ? '' : uri.path}';
   }
 
   bool get isBound => boundUid != null &&
@@ -56,6 +56,10 @@ class AureonBackendProfile {
       boundWorkerIdentity: json['boundWorkerIdentity'] as String?,
     );
     profile.validate();
+    final bindingParts = [profile.boundUid, profile.boundIssuer, profile.boundWorkerIdentity];
+    if (bindingParts.any((part) => part != null) && bindingParts.any((part) => part == null)) {
+      throw const FormatException('Backend profile identity binding is incomplete.');
+    }
     if (profile.boundUid != null && !profile.isBound) {
       throw const FormatException('Backend profile identity binding is inconsistent.');
     }
