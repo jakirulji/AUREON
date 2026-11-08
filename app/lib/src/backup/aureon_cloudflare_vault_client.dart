@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:webcrypto/webcrypto.dart' as webcrypto;
 
 import 'aureon_recovery_key_service.dart';
 
@@ -157,11 +158,9 @@ class AureonCloudflareVaultClient {
       throw const FormatException('Cloudflare recovery challenge does not match the expected vault generation.');
     }
 
-    final ecdh = Ecdh.p256(length: 32);
-    final ephemeral = await ecdh.newKeyPair();
-    try {
-      final publicKey = await ephemeral.extractPublicKey();
-      final response = await _transport.send(
+    final ephemeral = await webcrypto.EcdhPrivateKey.generateKey(webcrypto.EllipticCurve.p256);
+    final publicJwk = await ephemeral.publicKey.exportJsonWebKey();
+    final response = await _transport.send(
         method: 'POST',
         uri: _uri('/v1/vault/recovery/rewrap'),
         idToken: token,
@@ -169,13 +168,7 @@ class AureonCloudflareVaultClient {
           'vaultId': vaultId,
           'challengeId': challengeId,
           'challenge': challenge,
-          'devicePublicKey': {
-            'kty': 'EC',
-            'crv': 'P-256',
-            'x': _encodeBase64Url(publicKey.x),
-            'y': _encodeBase64Url(publicKey.y),
-            'ext': true,
-          },
+          'devicePublicKey': publicJwk,
         },
       );
       final raw = response['deviceBoundEnvelope'];
@@ -191,19 +184,14 @@ class AureonCloudflareVaultClient {
       if (serverJwk is! Map || serverJwk['kty'] != 'EC' || serverJwk['crv'] != 'P-256') {
         throw const FormatException('Cloudflare ephemeral public key is invalid.');
       }
-      final serverPublic = EcPublicKey(
-        x: _decodeBase64Url(serverJwk['x'], 32),
-        y: _decodeBase64Url(serverJwk['y'], 32),
-        type: KeyPairType.p256,
+      final serverPublic = await webcrypto.EcdhPublicKey.importJsonWebKey(
+        serverJwk.cast<String, dynamic>(),
+        webcrypto.EllipticCurve.p256,
       );
       final salt = _decodeBase64Url(envelope['salt'], 32);
       final nonce = _decodeBase64Url(envelope['nonce'], 12);
       final combined = _decodeBase64Url(envelope['cipherText'], 48);
-      final sharedSecret = await ecdh.sharedSecretKey(
-        keyPair: ephemeral,
-        remotePublicKey: serverPublic,
-      );
-      final sharedBytes = await sharedSecret.extractBytes();
+      final sharedBytes = await ephemeral.privateKey.deriveBits(256, serverPublic);
       try {
         final info = utf8.encode('AUREON|DEVICE-BOUND-VAULT-DEK|v1|$vaultId|$expectedGeneration');
         final wrappingKey = await Hkdf(
@@ -233,9 +221,6 @@ class AureonCloudflareVaultClient {
       } finally {
         sharedBytes.fillRange(0, sharedBytes.length, 0);
       }
-    } finally {
-      ephemeral.destroy();
-    }
   }
 
   Future<void> uploadSnapshot({
