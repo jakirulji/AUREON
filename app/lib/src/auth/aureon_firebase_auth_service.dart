@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'aureon_backend_profile.dart';
+
 class AureonFirebaseAuthConfig {
   const AureonFirebaseAuthConfig({
     required this.apiKey,
@@ -11,6 +13,9 @@ class AureonFirebaseAuthConfig {
 
   final String apiKey;
   final String projectId;
+
+  factory AureonFirebaseAuthConfig.fromProfile(AureonBackendProfile profile) =>
+      AureonFirebaseAuthConfig(apiKey: profile.firebaseApiKey, projectId: profile.firebaseProjectId);
 
   static const fromEnvironment = AureonFirebaseAuthConfig(
     apiKey: String.fromEnvironment('AUREON_FIREBASE_API_KEY'),
@@ -162,14 +167,27 @@ class AureonFirebaseAuthService {
         _transport = transport ?? AureonIoFirebaseAuthTransport(),
         _secrets = secretStore ?? AureonPlatformAuthSecretStore();
 
-  final AureonFirebaseAuthConfig _config;
+  AureonFirebaseAuthConfig _config;
   final AureonFirebaseAuthTransport _transport;
   final AureonAuthSecretStore _secrets;
   AureonFirebaseSession? _session;
   Future<AureonFirebaseSession>? _refreshing;
 
-  static const _refreshKey = 'aureon.firebase.refresh_token.v1';
-  static const _emailKey = 'aureon.firebase.email.v1';
+  String get _scope => base64Url.encode(utf8.encode(_config.projectId)).replaceAll('=', '');
+  String get _activeUidKey => 'aureon.firebase.$_scope.active_uid.v2';
+  String _refreshKey(String uid) => 'aureon.firebase.$_scope.$uid.refresh_token.v2';
+  String _emailKey(String uid) => 'aureon.firebase.$_scope.$uid.email.v2';
+
+  AureonFirebaseAuthConfig get config => _config;
+
+  /// Switch projects only while signed out. Each project/account has a
+  /// separate secure-storage namespace, preventing cross-project token reuse.
+  void configure(AureonFirebaseAuthConfig config) {
+    if (_session != null || _refreshing != null) {
+      throw StateError('Sign out before changing the Firebase backend profile.');
+    }
+    _config = config;
+  }
 
   bool get isConfigured => _config.isConfigured;
   AureonFirebaseSession? get currentSession => _session;
@@ -190,7 +208,7 @@ class AureonFirebaseAuthService {
   void _requireConfiguration() {
     if (!isConfigured) {
       throw StateError(
-        'Firebase is not configured. Build with AUREON_FIREBASE_API_KEY and AUREON_FIREBASE_PROJECT_ID.',
+        'Firebase is not configured. Add your own Firebase backend profile in AUREON Account settings.',
       );
     }
   }
@@ -221,8 +239,9 @@ class AureonFirebaseAuthService {
       expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
     );
     _session = session;
-    await _secrets.write(_refreshKey, refreshToken);
-    await _secrets.write(_emailKey, email);
+    await _secrets.write(_refreshKey(localId), refreshToken);
+    await _secrets.write(_emailKey(localId), email);
+    await _secrets.write(_activeUidKey, localId);
     return session;
   }
 
@@ -321,10 +340,10 @@ class AureonFirebaseAuthService {
     _requireConfiguration();
     var session = _session;
     if (session == null) {
-      final refresh = await _secrets.read(_refreshKey);
-      if (refresh == null || refresh.isEmpty) {
-        throw StateError('Sign in to AUREON first.');
-      }
+      final uid = await _secrets.read(_activeUidKey);
+      if (uid == null || uid.isEmpty) throw StateError('Sign in to AUREON first.');
+      final refresh = await _secrets.read(_refreshKey(uid));
+      if (refresh == null || refresh.isEmpty) throw StateError('Sign in to AUREON first.');
       session = await _refreshSession(refresh);
     } else if (forceRefresh || session.isExpiring) {
       session = await _refreshSession(session.refreshToken);
@@ -334,10 +353,10 @@ class AureonFirebaseAuthService {
 
   Future<AureonFirebaseSession> restoreSession() async {
     _requireConfiguration();
-    final refresh = await _secrets.read(_refreshKey);
-    if (refresh == null || refresh.isEmpty) {
-      throw StateError('No saved AUREON session exists.');
-    }
+    final uid = await _secrets.read(_activeUidKey);
+    if (uid == null || uid.isEmpty) throw StateError('No saved AUREON session exists.');
+    final refresh = await _secrets.read(_refreshKey(uid));
+    if (refresh == null || refresh.isEmpty) throw StateError('No saved AUREON session exists.');
     return _refreshSession(refresh);
   }
 
@@ -363,7 +382,11 @@ class AureonFirebaseAuthService {
     if (idToken is! String || nextRefresh is! String || localId is! String) {
       throw const FormatException('Firebase refresh response is incomplete.');
     }
-    final email = await _secrets.read(_emailKey) ?? '';
+    final uid = _session?.user.localId ?? await _secrets.read(_activeUidKey);
+    if (uid == null || uid != localId) {
+      throw StateError('Firebase refresh returned a different account. Sign in again.');
+    }
+    final email = await _secrets.read(_emailKey(uid)) ?? '';
     final previouslyVerified = _session?.user.emailVerified ?? false;
     final session = AureonFirebaseSession(
       user: AureonFirebaseUser(localId: localId, email: email, emailVerified: previouslyVerified),
@@ -374,14 +397,19 @@ class AureonFirebaseAuthService {
       ),
     );
     _session = session;
-    await _secrets.write(_refreshKey, nextRefresh);
+    await _secrets.write(_refreshKey(localId), nextRefresh);
+    await _secrets.write(_activeUidKey, localId);
     return session;
   }
 
   Future<void> signOut() async {
+    final uid = _session?.user.localId ?? await _secrets.read(_activeUidKey);
     _session = null;
-    await _secrets.delete(_refreshKey);
-    await _secrets.delete(_emailKey);
+    if (uid != null && uid.isNotEmpty) {
+      await _secrets.delete(_refreshKey(uid));
+      await _secrets.delete(_emailKey(uid));
+    }
+    await _secrets.delete(_activeUidKey);
   }
 
   static String _friendlyError(String code) {
