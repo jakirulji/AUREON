@@ -121,7 +121,7 @@ jobs:
         run: flutter test
       - name: Compile Android debug APK (no artifact upload)
         working-directory: ${{ runner.temp }}/aureon-android
-        run: flutter build apk --debug
+        run: flutter build apk --debug --verbose
 
       - name: Run Android native transfer bridge integration test
         uses: reactivecircus/android-emulator-runner@v2
