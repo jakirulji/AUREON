@@ -84,6 +84,11 @@ class AureonCloudflareVaultClient {
   final AureonVaultHttpTransport _transport;
   static final _sha256 = Sha256();
 
+  void close() {
+    final transport = _transport;
+    if (transport is AureonHttpVaultTransport) transport.close();
+  }
+
   static Uri _validateBaseUrl(String value) {
     final uri = Uri.tryParse(value.trim());
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
