@@ -15,6 +15,11 @@ class _MemoryDekStore implements AureonVaultDekStore {
       values[_id(vaultId, generation)]?.toList();
 
   @override
+  Future<void> delete(String vaultId, int generation) async {
+    values.remove(_id(vaultId, generation));
+  }
+
+  @override
   Future<void> write(String vaultId, int generation, List<int> dek) async {
     if (failWrites) throw StateError('Simulated secure-storage failure.');
     values[_id(vaultId, generation)] = dek.toList();
@@ -67,6 +72,56 @@ void main() {
     expect(restoredDek, isNotNull);
     expect(restoredDek, hasLength(32));
     expect(await target.loadBundle(), isNotNull);
+  });
+
+  test('generation rotation re-encrypts records and removes the old device DEK', () async {
+    final directory = await Directory.systemTemp.createTemp('aureon-vault-rotation-');
+    final dekStore = _MemoryDekStore();
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final service = AureonCredentialVaultStore(
+      dekStore: dekStore,
+      rootDirectory: directory,
+    );
+    final recovery = AureonRecoveryKeyService();
+    final oldKeys = recovery.generateKeySet(vaultId: 'vault-generation-rotation');
+    await service.initialize(oldKeys);
+    final oldBundle = await service.replaceCredentialRecords(
+      keySet: oldKeys,
+      credentialRecords: const [
+        {
+          'providerAccountId': 'google-account-1',
+          'provider': 'google_drive',
+          'refreshToken': 'test-refresh-secret',
+        },
+      ],
+    );
+
+    final rotated = await service.rotateGeneration(
+      currentKeySet: oldKeys,
+      currentManualKeyId: oldKeys.keys.first.id,
+    );
+
+    expect(rotated.keySet.generation, oldKeys.generation + 1);
+    expect(rotated.bundle.generation, oldBundle.generation + 1);
+    expect(rotated.bundle.encryptedCredentialRecords, hasLength(1));
+    expect(await dekStore.read(oldKeys.vaultId, oldKeys.generation), isNull);
+    expect(await dekStore.read(rotated.keySet.vaultId, rotated.keySet.generation), hasLength(32));
+    final restored = await CredentialVaultCryptoService().restoreBundle(
+      bundle: rotated.bundle,
+      keySet: rotated.keySet,
+      manualKeyId: rotated.keySet.keys.last.id,
+    );
+    expect(restored.single['refreshToken'], 'test-refresh-secret');
+    await expectLater(
+      CredentialVaultCryptoService().restoreBundle(
+        bundle: rotated.bundle,
+        keySet: oldKeys,
+        manualKeyId: oldKeys.keys.first.id,
+      ),
+      throwsFormatException,
+    );
   });
 
   test('bundle remains recoverable if device secure storage fails during initialization', () async {
