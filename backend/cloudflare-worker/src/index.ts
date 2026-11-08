@@ -282,14 +282,17 @@ async function recoverVault(request: Request, env: Env, identity: FirebaseIdenti
   const body = await readJson(request), vaultId = requiredString(body.vaultId, "vaultId");
   const challengeId = requiredString(body.challengeId, "challengeId"), challenge = requiredString(body.challenge, "challenge", 128);
   if (!body.devicePublicKey || typeof body.devicePublicKey !== "object" || Array.isArray(body.devicePublicKey)) throw new HttpError(400, "A device-generated ephemeral public key is required.");
-  const row = await env.DB.prepare("SELECT generation,snapshot_json FROM vault_snapshots WHERE user_id=? AND vault_id=?")
-    .bind(identity.uid, vaultId).first<{ generation: number; snapshot_json: string }>();
+  const row = await env.DB.prepare("SELECT generation,snapshot_json,snapshot_sha256 FROM vault_snapshots WHERE user_id=? AND vault_id=?")
+    .bind(identity.uid, vaultId).first<{ generation: number; snapshot_json: string; snapshot_sha256: string }>();
   if (!row) throw new HttpError(404, "Vault not found.");
+  if (await sha256Hex(row.snapshot_json) !== row.snapshot_sha256) {
+    throw new HttpError(503, "Stored encrypted snapshot integrity check failed.");
+  }
   const challengeRow = await env.DB.prepare("SELECT generation,challenge_sha256,expires_at_ms FROM recovery_challenges WHERE challenge_id=? AND user_id=? AND vault_id=?")
     .bind(challengeId, identity.uid, vaultId).first<{ generation: number; challenge_sha256: string; expires_at_ms: number }>();
   if (!challengeRow || challengeRow.expires_at_ms < Date.now() || challengeRow.generation !== row.generation ||
       challengeRow.challenge_sha256 !== await sha256Hex(challenge)) throw new HttpError(401, "Recovery challenge is invalid, expired, or already consumed.");
-  const snapshot = JSON.parse(row.snapshot_json) as VaultSnapshot;
+  const snapshot = validateSnapshot(JSON.parse(row.snapshot_json) as Record<string, unknown>);
   const deviceBoundEnvelope = await unwrapAndRewrap(snapshot.cloudflareEnvelope, vaultId, row.generation, body.devicePublicKey as JsonWebKey, env);
   const now = Date.now();
   const results = await env.DB.batch([
