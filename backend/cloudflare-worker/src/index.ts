@@ -169,7 +169,7 @@ async function deriveRootKey(env: Env, keyVersion: number, salt: Uint8Array, vau
     info: new TextEncoder().encode(`AUREON|CREDENTIAL-VAULT|CLOUDFLARE-WRAP|v1|${vaultId}|${generation}`) },
     material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
-async function createCloudflareEnvelope(dek: Uint8Array, vaultId: string, generation: number, env: Env) {
+export async function createCloudflareEnvelope(dek: Uint8Array, vaultId: string, generation: number, env: Env) {
   if (dek.length !== 32) throw new HttpError(400, "Vault DEK must be exactly 32 bytes.");
   const rootKeyVersion = activeRootVersion(env);
   const salt = randomBytes(32), nonce = randomBytes(12), key = await deriveRootKey(env, rootKeyVersion, salt, vaultId, generation);
@@ -177,7 +177,7 @@ async function createCloudflareEnvelope(dek: Uint8Array, vaultId: string, genera
   const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: asArrayBuffer(nonce), additionalData: asArrayBuffer(aad), tagLength: 128 }, key, asArrayBuffer(dek)));
   return { formatVersion: 1, rootKeyVersion, algorithm: "HKDF-SHA-256/AES-256-GCM", salt: base64Url(salt), nonce: base64Url(nonce), cipherText: base64Url(encrypted) };
 }
-async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: string, generation: number, deviceJwk: JsonWebKey, env: Env) {
+export async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: string, generation: number, deviceJwk: JsonWebKey, env: Env) {
   if (envelope.formatVersion !== 1 || envelope.algorithm !== "HKDF-SHA-256/AES-256-GCM") throw new HttpError(409, "Unsupported Cloudflare envelope version.");
   const rootKeyVersion = positiveInteger(envelope.rootKeyVersion, "Cloudflare rootKeyVersion");
   const salt = fromBase64Url(requiredString(envelope.salt, "Cloudflare salt"));
@@ -223,7 +223,7 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
   const existing = await env.DB.prepare("SELECT generation,created_at_ms FROM vault_snapshots WHERE user_id=? AND vault_id=?")
     .bind(identity.uid, snapshot.vaultId).first<{ generation: number; created_at_ms: number }>();
   if (existing && (snapshot.generation < existing.generation ||
-      snapshot.generation > existing.generation + 1 ||
+      snapshot.generation > existing.generation ||
       (snapshot.generation === existing.generation && snapshot.createdAtEpochMs <= existing.created_at_ms))) {
     throw new HttpError(409, "Stale snapshot: generation or snapshot timestamp did not advance.");
   }
@@ -232,7 +232,7 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
     env.DB.prepare(`INSERT INTO vault_snapshots (user_id,vault_id,generation,created_at_ms,snapshot_json,snapshot_sha256,updated_at_ms)
       VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET generation=excluded.generation,
       created_at_ms=excluded.created_at_ms,snapshot_json=excluded.snapshot_json,snapshot_sha256=excluded.snapshot_sha256,updated_at_ms=excluded.updated_at_ms
-      WHERE (vault_snapshots.generation=excluded.generation-1) OR (vault_snapshots.generation=excluded.generation AND vault_snapshots.created_at_ms<excluded.created_at_ms)`)
+      WHERE (vault_snapshots.generation<excluded.generation) OR (vault_snapshots.generation=excluded.generation AND vault_snapshots.created_at_ms<excluded.created_at_ms)`)
       .bind(identity.uid, snapshot.vaultId, snapshot.generation, snapshot.createdAtEpochMs, canonical, hash, now),
     env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM vault_snapshots WHERE user_id=? AND vault_id=? AND generation=? AND snapshot_sha256=? AND updated_at_ms=?)")
       .bind(base64Url(randomBytes(18)), identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, now,
