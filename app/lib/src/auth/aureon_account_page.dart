@@ -287,6 +287,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     }
   }
 
+
   Future<void> _scanDiscoveryQr() async {
     final scannedId = await showDialog<String>(
       context: context,
@@ -556,7 +557,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
 }
 ).hasMatch(value)) {
                     Navigator.of(dialogContext).pop(value);
-                    break;
+                    return;
                   }
                 }
               },
