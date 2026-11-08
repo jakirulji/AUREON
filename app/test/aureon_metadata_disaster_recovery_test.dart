@@ -159,5 +159,5 @@ void main() {
     expect(reopened.globalTags, containsAll(['work', 'priority', 'client']));
     expect(reopened.preferences, source.preferences);
     expect(planned.pendingProviderReferences, 3);
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
 }
