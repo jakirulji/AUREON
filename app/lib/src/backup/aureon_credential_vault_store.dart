@@ -43,6 +43,7 @@ class PlatformAureonVaultDekStore implements AureonVaultDekStore {
 }
 
 /// Owns the device-protected DEK and portable encrypted Recovery Bundle.
+/// Bundle import is monotonic: older generations and other vault IDs are rejected.
 /// Manual Recovery Keys are never persisted by this class.
 class AureonCredentialVaultStore {
   AureonCredentialVaultStore({
