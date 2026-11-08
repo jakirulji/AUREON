@@ -307,7 +307,13 @@ class AureonFirebaseAuthService {
   }) async {
     final user = currentUser;
     if (user == null) throw StateError('Sign in before reauthentication.');
-    return signIn(email: user.email, password: password);
+    final expectedUid = user.localId;
+    final refreshed = await signIn(email: user.email, password: password);
+    if (refreshed.user.localId != expectedUid) {
+      await signOut();
+      throw StateError('Reauthentication returned a different Firebase account. Sign in again and retry.');
+    }
+    return refreshed;
   }
 
   Future<String> getIdToken({bool forceRefresh = false}) async {
