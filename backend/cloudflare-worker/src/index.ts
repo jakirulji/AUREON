@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 interface Env {
   DB: D1Database;
   FIREBASE_PROJECT_ID: string;
-  AUREON_VAULT_ROOT_SECRET: string;
+  AUREON_VAULT_ROOT_SECRET_V1?: string;\n  AUREON_VAULT_ROOT_SECRET_V2?: string;\n  AUREON_VAULT_ACTIVE_ROOT_VERSION: string;
 }
 interface FirebaseIdentity { uid: string; email: string; authTime: number }
 interface VaultSnapshot {
@@ -143,18 +143,20 @@ async function deriveRootKey(env: Env, salt: Uint8Array, vaultId: string, genera
 }
 async function createCloudflareEnvelope(dek: Uint8Array, vaultId: string, generation: number, env: Env) {
   if (dek.length !== 32) throw new HttpError(400, "Vault DEK must be exactly 32 bytes.");
-  const salt = randomBytes(32), nonce = randomBytes(12), key = await deriveRootKey(env, salt, vaultId, generation);
+  const rootKeyVersion = activeRootVersion(env);
+  const salt = randomBytes(32), nonce = randomBytes(12), key = await deriveRootKey(env, rootKeyVersion, salt, vaultId, generation);
   const aad = new TextEncoder().encode(`AUREON|CLOUDFLARE-ENVELOPE|v1|${vaultId}|${generation}`);
   const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, dek));
-  return { formatVersion: 1, algorithm: "HKDF-SHA-256/AES-256-GCM", salt: base64Url(salt), nonce: base64Url(nonce), cipherText: base64Url(encrypted) };
+  return { formatVersion: 1, rootKeyVersion, algorithm: "HKDF-SHA-256/AES-256-GCM", salt: base64Url(salt), nonce: base64Url(nonce), cipherText: base64Url(encrypted) };
 }
 async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: string, generation: number, deviceJwk: JsonWebKey, env: Env) {
   if (envelope.formatVersion !== 1 || envelope.algorithm !== "HKDF-SHA-256/AES-256-GCM") throw new HttpError(409, "Unsupported Cloudflare envelope version.");
+  const rootKeyVersion = positiveInteger(envelope.rootKeyVersion, "Cloudflare rootKeyVersion");
   const salt = fromBase64Url(requiredString(envelope.salt, "Cloudflare salt"));
   const nonce = fromBase64Url(requiredString(envelope.nonce, "Cloudflare nonce"));
   const ciphertext = fromBase64Url(requiredString(envelope.cipherText, "Cloudflare ciphertext", 128));
   if (salt.length !== 32 || nonce.length !== 12 || ciphertext.length !== 48) throw new HttpError(409, "Cloudflare envelope is malformed.");
-  const rootKey = await deriveRootKey(env, salt, vaultId, generation);
+  const rootKey = await deriveRootKey(env, rootKeyVersion, salt, vaultId, generation);
   const aad = new TextEncoder().encode(`AUREON|CLOUDFLARE-ENVELOPE|v1|${vaultId}|${generation}`);
   let dek: Uint8Array;
   try { dek = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, rootKey, ciphertext)); }
@@ -204,6 +206,14 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
   if (!snapshotWrite || !auditWrite || !snapshotWrite.success || snapshotWrite.meta.changes !== 1 ||
       !auditWrite.success || auditWrite.meta.changes !== 1) throw new HttpError(409, "Vault update or audit failed; transaction was rolled back.");
   return json({ vaultId: snapshot.vaultId, generation: snapshot.generation, snapshotSha256: hash, storedAtEpochMs: now });
+}
+async function getSnapshot(request: Request, env: Env, identity: FirebaseIdentity): Promise<Response> {
+  const vaultId = requiredString(new URL(request.url).searchParams.get("vaultId"), "vaultId");
+  const row = await env.DB.prepare("SELECT generation,created_at_ms,snapshot_json,snapshot_sha256,updated_at_ms FROM vault_snapshots WHERE user_id=? AND vault_id=?")
+    .bind(identity.uid, vaultId).first<{ generation: number; created_at_ms: number; snapshot_json: string; snapshot_sha256: string; updated_at_ms: number }>();
+  if (!row) throw new HttpError(404, "Vault not found.");
+  return json({ snapshot: JSON.parse(row.snapshot_json), snapshotSha256: row.snapshot_sha256,
+    generation: row.generation, createdAtEpochMs: row.created_at_ms, updatedAtEpochMs: row.updated_at_ms });
 }
 async function issueChallenge(request: Request, env: Env, identity: FirebaseIdentity): Promise<Response> {
   const vaultId = requiredString((await readJson(request)).vaultId, "vaultId");
@@ -256,7 +266,7 @@ export default {
     try {
       if (url.pathname === "/health/live" && request.method === "GET") return json({ status: "ok" });
       if (url.pathname === "/health/ready" && request.method === "GET") {
-        const configured = env.FIREBASE_PROJECT_ID !== "REPLACE_WITH_FIREBASE_PROJECT_ID" && Boolean(env.AUREON_VAULT_ROOT_SECRET);
+        const configured = env.FIREBASE_PROJECT_ID !== "REPLACE_WITH_FIREBASE_PROJECT_ID" && Boolean(env.AUREON_VAULT_ACTIVE_ROOT_VERSION) && Boolean(env.AUREON_VAULT_ROOT_SECRET_V1 || env.AUREON_VAULT_ROOT_SECRET_V2);
         const db = await env.DB.prepare("SELECT 1 AS ok").first<{ ok: number }>();
         return json({ ready: configured && db?.ok === 1 }, configured && db?.ok === 1 ? 200 : 503);
       }
@@ -271,6 +281,7 @@ export default {
           return json({ envelope });
         } finally { dek.fill(0); }
       }
+      if (url.pathname === "/v1/vault/snapshot" && request.method === "GET") return await getSnapshot(request, env, identity);
       if (url.pathname === "/v1/vault/snapshot" && request.method === "PUT") return await uploadSnapshot(request, env, identity);
       if (url.pathname === "/v1/vault/recovery/challenge" && request.method === "POST") return await issueChallenge(request, env, identity);
       if (url.pathname === "/v1/vault/recovery/rewrap" && request.method === "POST") return await recoverVault(request, env, identity);
