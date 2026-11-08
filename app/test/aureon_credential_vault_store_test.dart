@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _MemoryDekStore implements AureonVaultDekStore {
   final Map<String, List<int>> values = {};
+  bool failWrites = false;
   String _id(String vaultId, int generation) => '$vaultId:$generation';
 
   @override
@@ -15,6 +16,7 @@ class _MemoryDekStore implements AureonVaultDekStore {
 
   @override
   Future<void> write(String vaultId, int generation, List<int> dek) async {
+    if (failWrites) throw StateError('Simulated secure-storage failure.');
     values[_id(vaultId, generation)] = dek.toList();
   }
 }
@@ -65,6 +67,35 @@ void main() {
     expect(restoredDek, isNotNull);
     expect(restoredDek, hasLength(32));
     expect(await target.loadBundle(), isNotNull);
+  });
+
+  test('bundle remains recoverable if device secure storage fails during initialization', () async {
+    final directory = await Directory.systemTemp.createTemp('aureon-vault-secure-store-failure-');
+    final dekStore = _MemoryDekStore()..failWrites = true;
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final service = AureonCredentialVaultStore(
+      dekStore: dekStore,
+      rootDirectory: directory,
+    );
+    final keys = AureonRecoveryKeyService().generateKeySet(
+      vaultId: 'vault-secure-store-failure',
+    );
+
+    await expectLater(service.initialize(keys), throwsStateError);
+    final savedBundle = await service.loadBundle();
+    expect(savedBundle, isNotNull);
+    expect(await dekStore.read(keys.vaultId, keys.generation), isNull);
+
+    dekStore.failWrites = false;
+    final restored = await service.restoreWithManualKey(
+      bundle: savedBundle!,
+      keySet: keys,
+      manualKeyId: keys.keys.first.id,
+    );
+    expect(restored, isEmpty);
+    expect(await dekStore.read(keys.vaultId, keys.generation), hasLength(32));
   });
 
   test('initialization cannot silently replace an existing vault or DEK', () async {
