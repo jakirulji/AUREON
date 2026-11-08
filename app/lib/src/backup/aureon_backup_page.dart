@@ -29,10 +29,11 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   final _metadataStore = AureonMetadataStore();
   final _virtualFolders = AureonVirtualFolderStore();
   final _vaultStore = AureonCredentialVaultStore();
-  final _fallbackAuth = AureonFirebaseAuthService();
+  AureonFirebaseAuthService? _fallbackAuth;
   static const _cloudflareApiUrl = String.fromEnvironment('AUREON_CLOUDFLARE_API_URL');
 
-  AureonFirebaseAuthService get _auth => widget.auth ?? _fallbackAuth;
+  AureonFirebaseAuthService get _auth =>
+      widget.auth ?? (_fallbackAuth ??= AureonFirebaseAuthService());
 
   ManualRecoveryKeySet? _keySet;
   VaultRecoveryBundle? _vaultBundle;
