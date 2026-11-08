@@ -81,9 +81,15 @@ jobs:
           if not agp_line or not kotlin_line:
               raise SystemExit("Could not determine Android Gradle Plugin/Kotlin versions from generated Flutter host.")
           agp_version = agp_line.split('version "')[1].split('"')[0]
-          kotlin_version = kotlin_line.split('version "')[1].split('"')[0]
+          # Room 2.8.5's KAPT metadata reader supports Kotlin metadata up to 2.3.
+          # Flutter stable may generate a newer Kotlin plugin (2.4.x), which
+          # makes Room annotation processing fail before Kotlin compilation.
+          # Keep this temporary validation host aligned with the tested
+          # Android storage spike toolchain until Room's processor supports it.
+          kotlin_version = "2.3.10"
+          pinned_kotlin_line = re.sub(r'version ".*?"', f'version "{kotlin_version}"', kotlin_line)
           source = source.replace(agp_line, agp_line + f'\n    id("com.android.library") version "{agp_version}" apply false', 1)
-          source = source.replace(kotlin_line, kotlin_line + f'\n    id("org.jetbrains.kotlin.kapt") version "{kotlin_version}" apply false', 1)
+          source = source.replace(kotlin_line, pinned_kotlin_line + f'\n    id("org.jetbrains.kotlin.kapt") version "{kotlin_version}" apply false', 1)
           source += '\ninclude(":aureon_storage")\nproject(":aureon_storage").projectDir = file("aureon_storage")\n'
           settings.write_text(source)
           app_gradle = root / 'app' / 'build.gradle.kts'
