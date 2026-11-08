@@ -23,10 +23,10 @@ Create a D1 database, replace the placeholder database_id and Firebase project I
 
 - npx wrangler d1 create aureon-metadata
 - npx wrangler d1 migrations apply aureon-metadata --remote
-- npx wrangler secret put AUREON_VAULT_ROOT_SECRET
+- npx wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
 - npx wrangler deploy
 
-Generate the Worker root secret offline as 32 random bytes and encode it base64url. Keep an encrypted offline emergency copy under owner control. Never commit it or send it through chat. A Worker Secret is not KMS/HSM; compromise of the Worker deployment/account can expose the server-assisted recovery capability.
+Generate each versioned Worker root secret offline as 32 random bytes and encode it base64url. The active version is selected by AUREON_VAULT_ACTIVE_ROOT_VERSION. During rotation, provision V2 and switch the active version to 2 while retaining V1 until all V1 envelopes have been rewrapped and verified. Keep an encrypted offline emergency copy under owner control. Never commit it or send it through chat. A Worker Secret is not KMS/HSM; compromise of the Worker deployment/account can expose the server-assisted recovery capability.
 
 ## Security limitations / release gates
 
