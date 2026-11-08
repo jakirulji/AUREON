@@ -27,7 +27,7 @@ class _FakeTransport implements AureonVaultHttpTransport {
   final calls = <String>[];
   Map<String, Object?>? uploaded;
   Map<String, Object?>? remote;
-  bool failUpload = false;\n  final expectedDek = List<int>.generate(32, (i) => i + 1);
+  bool failUpload = false;\n  List<int> expectedDek = List<int>.generate(32, (i) => i + 1);
 
   @override
   Future<Map<String, Object?>> send({
@@ -205,7 +205,7 @@ void main() {
     await source.replaceCredentialRecords(keySet: keys, credentialRecords: const [
       {'providerAccountId': 'google-subject-1', 'provider': 'google_drive', 'refreshToken': 'vaulted-refresh-secret'},
     ]);
-    transport.expectedDek.addAll(await sourceDekStore.read(keys.vaultId, keys.generation) ?? const []);
+    transport.expectedDek = await sourceDekStore.read(keys.vaultId, keys.generation) ?? const [];
     final client = AureonCloudflareVaultClient(
       baseUrl: 'https://aureon-api.example.workers.dev',
       transport: transport,
