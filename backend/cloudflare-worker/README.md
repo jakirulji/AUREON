@@ -38,3 +38,6 @@ Generate each Worker root secret offline as 32 random bytes and encode it base64
 - D1 is the online generation authority, not an independent backup. Export/copy encrypted snapshots to an independent failure domain before production.
 - Production deployment requires owner-created Firebase/Cloudflare accounts, MFA, reviewed D1 migrations, secret backup/rotation runbooks, privacy/retention policy and independent security review.
 - Never store E2E file-content keys or file bytes in this service.
+
+
+The D1 monotonicity guard explicitly permits forward generation jumps (for example, multiple offline rotations before first sync) and rejects lower generations or stale timestamps within the same generation. This rule is covered by the Worker unit tests.
