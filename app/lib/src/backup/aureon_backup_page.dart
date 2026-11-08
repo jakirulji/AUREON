@@ -28,7 +28,6 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   ManualRecoveryKeySet? _keySet;
   VaultRecoveryBundle? _vaultBundle;
   bool _busy = false;
-  bool _vaultLoading = true;
   String _status = 'Recovery key and metadata backup tools are available. Live credential-vault recovery is not connected yet.';
   List<String> _restoreConflicts = const [];
 
@@ -44,8 +43,6 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
       if (mounted && bundle != null) setState(() => _vaultBundle = bundle);
     } catch (error) {
       if (mounted) setState(() => _status = 'Local Recovery Bundle could not be read: $error');
-    } finally {
-      if (mounted) setState(() => _vaultLoading = false);
     }
   }
 
@@ -304,7 +301,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
         children: [
           if (_keySet == null && _vaultBundle == null)
             FilledButton.icon(
-              onPressed: _busy || _vaultLoading ? null : _generateKeys,
+              onPressed: _busy ? null : _generateKeys,
               icon: const Icon(Icons.key_outlined),
               label: const Text('Generate five recovery keys'),
             )
