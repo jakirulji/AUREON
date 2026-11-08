@@ -88,6 +88,12 @@ void main() {
     transport.responses
       ..add(signInResponse())
       ..add({
+        'id_token': 'lookup-id-token',
+        'refresh_token': 'lookup-refresh',
+        'user_id': 'user-123',
+        'expires_in': '3600',
+      })
+      ..add({
         'users': [
           {'localId': 'user-123', 'email': 'owner@example.com', 'emailVerified': true}
         ]
