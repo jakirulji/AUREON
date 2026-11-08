@@ -91,8 +91,9 @@ void main() {
   });
 
   test('concurrent callers share one refresh-token rotation', () async {
-    secrets.values['aureon.firebase.refresh_token.v1'] = 'old-refresh';
-    secrets.values['aureon.firebase.email.v1'] = 'owner@example.com';
+    secrets.values[activeUidKey] = 'user-123';
+    secrets.values[refreshKey] = 'old-refresh';
+    secrets.values[emailKey] = 'owner@example.com';
     transport.responses.add({
       'id_token': 'single-flight-id-token',
       'refresh_token': 'single-flight-refresh',
@@ -102,7 +103,7 @@ void main() {
     final tokens = await Future.wait([auth.getIdToken(), auth.getIdToken()]);
     expect(tokens, ['single-flight-id-token', 'single-flight-id-token']);
     expect(transport.calls, hasLength(1));
-    expect(secrets.values['aureon.firebase.refresh_token.v1'], 'single-flight-refresh');
+    expect(secrets.values[refreshKey], 'single-flight-refresh');
   });
 
   test('email verification lookup refreshes account claim source', () async {
