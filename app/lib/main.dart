@@ -75,12 +75,15 @@ class _AureonHomeState extends State<AureonHome> {
         ),
       const Spacer(),
       const Divider(color: Color(0xFF26334A)),
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: CircleAvatar(backgroundColor: const Color(0xFF243A4A), child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined, color: const Color(0xFF64E6C2))),
-        title: Text(_auth.currentUser?.email ?? 'Local profile', style: const TextStyle(fontSize: 12)),
-        subtitle: Text(_auth.currentUser == null ? 'Not signed in' : (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'), style: const TextStyle(fontSize: 11)),
-        onTap: () => setState(() => selected = 4),
+      Material(
+        color: Colors.transparent,
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(backgroundColor: const Color(0xFF243A4A), child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined, color: const Color(0xFF64E6C2))),
+          title: Text(_auth.currentUser?.email ?? 'Local profile', style: const TextStyle(fontSize: 12)),
+          subtitle: Text(_auth.currentUser == null ? 'Not signed in' : (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'), style: const TextStyle(fontSize: 11)),
+          onTap: () => setState(() => selected = 4),
+        ),
       ),
     ]),
   );
