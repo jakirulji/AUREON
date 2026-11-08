@@ -46,7 +46,7 @@ class AureonStorageHostApiTest {
 
     @Test
     fun hostApiReturnsOnlyTransferSnapshotMetadata() = runBlocking {
-        database.transferJobDao().upsert(testJob())
+        database.transferJobDao().insert(testJob())
 
         val snapshot = api.getTransfer("operation-host-api")
 
@@ -64,7 +64,7 @@ class AureonStorageHostApiTest {
 
     @Test
     fun pauseAndResumeCommandsPersistStateTransitions() = runBlocking {
-        database.transferJobDao().upsert(testJob())
+        database.transferJobDao().insert(testJob())
 
         api.pauseTransfer("operation-host-api")
         assertEquals("paused", database.transferJobDao().getById("operation-host-api")?.status)
@@ -75,7 +75,7 @@ class AureonStorageHostApiTest {
 
     @Test
     fun verifiedTransferCannotBePausedOrResumed() = runBlocking {
-        database.transferJobDao().upsert(
+        database.transferJobDao().insert(
             testJob().copy(status = "verified", remoteVerified = true, verifiedAtEpochMs = 8000L)
         )
 
