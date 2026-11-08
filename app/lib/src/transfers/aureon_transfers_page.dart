@@ -57,9 +57,9 @@ class _AureonTransfersPageState extends State<AureonTransfersPage> {
     body: RefreshIndicator(
       onRefresh: _refresh,
       child: _loading
-          ? const ListView(
-              physics: AlwaysScrollableScrollPhysics(),
-              children: [
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
                 SizedBox(height: 220),
                 Center(child: CircularProgressIndicator()),
               ],
@@ -105,7 +105,7 @@ class _AureonTransfersPageState extends State<AureonTransfersPage> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
                       itemCount: _transfers.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (context, index) => const SizedBox(height: 10),
                       itemBuilder: (context, index) => _transferCard(_transfers[index]),
                     ),
     ),
