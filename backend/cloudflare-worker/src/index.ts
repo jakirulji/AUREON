@@ -223,7 +223,6 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
   const existing = await env.DB.prepare("SELECT generation,created_at_ms FROM vault_snapshots WHERE user_id=? AND vault_id=?")
     .bind(identity.uid, snapshot.vaultId).first<{ generation: number; created_at_ms: number }>();
   if (existing && (snapshot.generation < existing.generation ||
-      snapshot.generation > existing.generation ||
       (snapshot.generation === existing.generation && snapshot.createdAtEpochMs <= existing.created_at_ms))) {
     throw new HttpError(409, "Stale snapshot: generation or snapshot timestamp did not advance.");
   }
