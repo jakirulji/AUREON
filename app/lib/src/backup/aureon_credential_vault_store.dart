@@ -229,12 +229,19 @@ class AureonCredentialVaultStore {
         bundle: bundle,
         vaultDek: dek,
       );
+      final previousDek = await _dekStore.read(bundle.vaultId, bundle.generation);
       await _dekStore.write(bundle.vaultId, bundle.generation, dek);
       try {
         await _writeBundle(bundle);
       } catch (_) {
-        await _dekStore.delete(bundle.vaultId, bundle.generation);
+        if (previousDek == null) {
+          await _dekStore.delete(bundle.vaultId, bundle.generation);
+        } else {
+          await _dekStore.write(bundle.vaultId, bundle.generation, previousDek);
+        }
         rethrow;
+      } finally {
+        previousDek?.fillRange(0, previousDek.length, 0);
       }
       final pending = await _bundleFile(pending: true);
       if (await pending.exists()) await pending.delete();
