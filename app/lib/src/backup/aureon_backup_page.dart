@@ -39,7 +39,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   Future<void> _loadExistingVaultBundle() async {
     try {
-      final bundle = await _vaultStore.loadBundle();
+      final bundle = await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
       if (mounted && bundle != null) setState(() => _vaultBundle = bundle);
     } catch (error) {
       if (mounted) setState(() => _status = 'Local Recovery Bundle could not be read: $error');
@@ -121,7 +121,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   }
 
   Future<void> _generateKeys() => _run(() async {
-    final existing = _vaultBundle ?? await _vaultStore.loadBundle();
+    final existing = _vaultBundle ?? await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
     if (existing != null) {
       setState(() => _vaultBundle = existing);
       throw StateError('A local vault already exists. Import its matching .key file instead of creating a new vault.');
@@ -168,7 +168,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     if (file == null) return;
     final passphrase = await _askPassphrase(title: 'Unlock encrypted recovery key file');
     if (passphrase == null) return;
-    final knownBundle = _vaultBundle ?? await _vaultStore.loadBundle();
+    final knownBundle = _vaultBundle ?? await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
     final imported = await _recovery.importEncryptedKeyFile(
       bytes: await file.readAsBytes(),
       passphrase: passphrase,
@@ -214,18 +214,43 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     });
   });
 
+  Future<String?> _chooseManualKey(ManualRecoveryKeySet keys) => showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Choose a recovery key'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < keys.keys.length; i++)
+            ListTile(
+              leading: CircleAvatar(radius: 13, child: Text('${i + 1}', style: const TextStyle(fontSize: 11))),
+              title: Text(keys.keys[i].id, style: const TextStyle(fontSize: 12)),
+              subtitle: const Text('Use this one key to unlock the vault'),
+              onTap: () => Navigator.pop(dialogContext, keys.keys[i].id),
+            ),
+        ],
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))],
+    ),
+  );
+
   Future<void> _restoreVaultBundle() => _run(() async {
     final keys = _keySet;
-    final bundle = _vaultBundle ?? await _vaultStore.loadBundle();
+    final bundle = _vaultBundle ?? await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
     if (keys == null) throw StateError('Import the matching AUREON-Recovery.key file first.');
     if (bundle == null) throw StateError('Import the matching .aureon-vault bundle first.');
+    if (keys.vaultId != bundle.vaultId || keys.generation != bundle.generation) {
+      throw StateError('The selected key file and Recovery Bundle do not match.');
+    }
+    final selectedKeyId = await _chooseManualKey(keys);
+    if (selectedKeyId == null) return;
     final result = await _vaultStore.restoreWithManualKey(
       bundle: bundle,
       keySet: keys,
-      manualKeyId: keys.keys.first.id,
+      manualKeyId: selectedKeyId,
     );
     if (mounted) {
-      setState(() => _status = 'Manual recovery succeeded using one active key. Vault DEK is now protected in this device secure storage. Restored ${result.length} encrypted-vault credential records; provider sign-in/refresh integration is still pending.');
+      setState(() => _status = 'Manual recovery succeeded using the selected active key. The imported bundle passed authentication and is now promoted to the active local snapshot; the vault DEK is protected in device secure storage. Restored ${result.length} encrypted-vault credential records; provider sign-in/refresh integration is still pending.');
     }
   });
 
