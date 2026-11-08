@@ -34,6 +34,9 @@ Example local build command (replace values locally; never commit them into sour
 flutter build apk --release \
   --dart-define=AUREON_FIREBASE_API_KEY="$AUREON_FIREBASE_API_KEY" \
   --dart-define=AUREON_FIREBASE_PROJECT_ID="$AUREON_FIREBASE_PROJECT_ID" \
+  --dart-define=AUREON_FIREBASE_AUTH_DOMAIN="$AUREON_FIREBASE_AUTH_DOMAIN" \\
+  --dart-define=AUREON_FIREBASE_APP_ID="$AUREON_FIREBASE_APP_ID" \\
+  --dart-define=AUREON_DISCOVERY_REGISTRY_URL="$AUREON_DISCOVERY_REGISTRY_URL" \\
   --dart-define=AUREON_CLOUDFLARE_API_URL="$AUREON_CLOUDFLARE_API_URL"
 ~~~
 
@@ -41,7 +44,7 @@ On the first configured device, the user signs in, verifies the email, then sele
 
 The current CI preview intentionally builds with no owner configuration. Account and Cloudflare actions remain disabled in that preview; a green preview build does not mean the live service has been configured.
 
-For GitHub Actions release builds, add the three values as repository Actions variables (the Firebase API key and project ID are public configuration; the Worker URL is also not a secret). Wire them into the final release workflow's --dart-define arguments only when the release workflow is prepared. Do not put the Worker root secret or Firebase service-account credentials into Dart defines.
+For GitHub Actions release builds, add these public configuration values as repository Actions variables (the Firebase API key and project ID are public configuration; the Worker URL is also not a secret). Wire them into the final release workflow's --dart-define arguments only when the release workflow is prepared. Do not put the Worker root secret or Firebase service-account credentials into Dart defines.
 
 ## 3. Cloudflare Workers + D1 (no paid domain required)
 
