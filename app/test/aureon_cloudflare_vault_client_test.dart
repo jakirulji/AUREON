@@ -28,7 +28,8 @@ class _FakeTransport implements AureonVaultHttpTransport {
   final calls = <String>[];
   Map<String, Object?>? uploaded;
   Map<String, Object?>? remote;
-  bool failUpload = false;\n  List<int> expectedDek = List<int>.generate(32, (i) => i + 1);
+  bool failUpload = false;
+  List<int> expectedDek = List<int>.generate(32, (i) => i + 1);
 
   @override
   Future<Map<String, Object?>> send({
