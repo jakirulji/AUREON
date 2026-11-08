@@ -5,6 +5,7 @@ import 'package:aureon/src/backup/aureon_cloudflare_vault_client.dart';
 import 'package:aureon/src/backup/aureon_credential_vault_store.dart';
 import 'package:aureon/src/backup/aureon_recovery_key_service.dart';
 import 'package:cryptography/cryptography.dart';
+import 'package:webcrypto/webcrypto.dart' as webcrypto;
 import 'package:flutter_test/flutter_test.dart';
 
 class _MemoryDekStore implements AureonVaultDekStore {
@@ -61,16 +62,13 @@ class _FakeTransport implements AureonVaultHttpTransport {
     }
     if (method == 'POST' && uri.path.endsWith('/v1/vault/recovery/rewrap')) {
       final deviceJwk = body?['devicePublicKey'] as Map<String, Object?>;
-      final ecdh = Ecdh.p256(length: 32);
-      final serverPair = await ecdh.newKeyPair();
-      final serverPublic = await serverPair.extractPublicKey();
-      final devicePublic = EcPublicKey(
-        x: base64Url.decode(base64Url.normalize(deviceJwk['x']! as String)),
-        y: base64Url.decode(base64Url.normalize(deviceJwk['y']! as String)),
-        type: KeyPairType.p256,
+      final serverPair = await webcrypto.EcdhPrivateKey.generateKey(webcrypto.EllipticCurve.p256);
+      final serverPublicJwk = await serverPair.publicKey.exportJsonWebKey();
+      final devicePublic = await webcrypto.EcdhPublicKey.importJsonWebKey(
+        deviceJwk.cast<String, dynamic>(),
+        webcrypto.EllipticCurve.p256,
       );
-      final shared = await ecdh.sharedSecretKey(keyPair: serverPair, remotePublicKey: devicePublic);
-      final sharedBytes = await shared.extractBytes();
+      final sharedBytes = await serverPair.privateKey.deriveBits(256, devicePublic);
       final salt = List<int>.filled(32, 7);
       final nonce = List<int>.filled(12, 8);
       final info = utf8.encode('AUREON|DEVICE-BOUND-VAULT-DEK|v1|vault-cloud-recovery|1');
@@ -81,7 +79,7 @@ class _FakeTransport implements AureonVaultHttpTransport {
         expectedDek, secretKey: wrappingKey, nonce: nonce, aad: info,
       );
       sharedBytes.fillRange(0, sharedBytes.length, 0);
-      serverPair.destroy();
+
       final combined = [...box.cipherText, ...box.mac.bytes];
       return {'deviceBoundEnvelope': {
         'formatVersion': 1,
@@ -90,8 +88,8 @@ class _FakeTransport implements AureonVaultHttpTransport {
         'generation': 1,
         'serverEphemeralPublicKey': {
           'kty': 'EC', 'crv': 'P-256',
-          'x': base64Url.encode(serverPublic.x).replaceAll('=', ''),
-          'y': base64Url.encode(serverPublic.y).replaceAll('=', ''),
+          'x': serverPublicJwk['x'],
+          'y': serverPublicJwk['y'],
         },
         'salt': base64Url.encode(salt).replaceAll('=', ''),
         'nonce': base64Url.encode(nonce).replaceAll('=', ''),
