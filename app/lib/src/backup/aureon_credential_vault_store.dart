@@ -87,6 +87,22 @@ class AureonCredentialVaultStore {
 
   Future<VaultRecoveryBundle> importBundle(List<int> bytes) async {
     final bundle = decodeBundle(bytes);
+    final current = await loadBundle();
+    if (current != null) {
+      if (current.vaultId != bundle.vaultId) {
+        throw StateError('A different vault is already present on this device. Switching vaults requires an explicit separate workflow.');
+      }
+      if (bundle.generation < current.generation ||
+          (bundle.generation == current.generation &&
+           bundle.createdAtEpochMs < current.createdAtEpochMs)) {
+        throw StateError('This Recovery Bundle is older than the local vault snapshot. It was not imported to prevent rollback.');
+      }
+      if (bundle.generation == current.generation &&
+          bundle.createdAtEpochMs == current.createdAtEpochMs &&
+          jsonEncode(bundle.toJson()) != jsonEncode(current.toJson())) {
+        throw StateError('Recovery Bundle generation and timestamp collide with different content. Refusing ambiguous import.');
+      }
+    }
     await _writeBundle(bundle);
     return bundle;
   }
