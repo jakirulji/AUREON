@@ -170,7 +170,7 @@ async function createCloudflareEnvelope(dek: Uint8Array, vaultId: string, genera
   const rootKeyVersion = activeRootVersion(env);
   const salt = randomBytes(32), nonce = randomBytes(12), key = await deriveRootKey(env, rootKeyVersion, salt, vaultId, generation);
   const aad = new TextEncoder().encode(`AUREON|CLOUDFLARE-ENVELOPE|v1|${vaultId}|${generation}`);
-  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: asArrayBuffer(aad), tagLength: 128 }, key, asArrayBuffer(dek)));
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: asArrayBuffer(nonce), additionalData: asArrayBuffer(aad), tagLength: 128 }, key, asArrayBuffer(dek)));
   return { formatVersion: 1, rootKeyVersion, algorithm: "HKDF-SHA-256/AES-256-GCM", salt: base64Url(salt), nonce: base64Url(nonce), cipherText: base64Url(encrypted) };
 }
 async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: string, generation: number, deviceJwk: JsonWebKey, env: Env) {
