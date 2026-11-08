@@ -81,7 +81,7 @@ class AureonCloudflareVaultClient {
 
   final Uri _baseUri;
   final AureonVaultHttpTransport _transport;
-  static const _sha256 = Sha256();
+  static final _sha256 = Sha256();
 
   static Uri _validateBaseUrl(String value) {
     final uri = Uri.tryParse(value.trim());
