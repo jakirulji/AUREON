@@ -45,8 +45,17 @@ class _AureonHomeState extends State<AureonHome> {
   Future<void> _restoreBackendProfile() async {
     try {
       final profile = await _backendProfiles.activeProfile();
-      if (profile != null && mounted && _auth.currentUser == null) {
+      if (profile != null && mounted) {
         _auth.configureProfile(profile);
+        try {
+          await _auth.restoreSession();
+          final user = await _auth.reloadUser();
+          final bound = await _backendProfiles.bindActiveProfile(user.localId);
+          _auth.acceptBoundProfile(bound);
+        } catch (_) {
+          // Sign-in is optional; identity binding is enforced again before
+          // protected account and vault actions.
+        }
       }
     } catch (_) {
       // The Account page presents a repairable profile-registry error.
