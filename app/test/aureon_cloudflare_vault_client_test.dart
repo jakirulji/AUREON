@@ -14,11 +14,13 @@ class _MemoryDekStore implements AureonVaultDekStore {
   Future<List<int>?> read(String vaultId, int generation) async =>
       values[_key(vaultId, generation)]?.toList();
   @override
-  Future<void> write(String vaultId, int generation, List<int> dek) async =>
-      values[_key(vaultId, generation)] = dek.toList();
+  Future<void> write(String vaultId, int generation, List<int> dek) async {
+    values[_key(vaultId, generation)] = dek.toList();
+  }
   @override
-  Future<void> delete(String vaultId, int generation) async =>
-      values.remove(_key(vaultId, generation));
+  Future<void> delete(String vaultId, int generation) async {
+    values.remove(_key(vaultId, generation));
+  }
 }
 
 class _FakeTransport implements AureonVaultHttpTransport {
