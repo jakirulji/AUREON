@@ -122,11 +122,31 @@ class VaultRecoveryBundle {
   }
 
   void _validateBundle() {
-    if (vaultId.trim().isEmpty || generation < 1 || manualKeyEnvelopes.length != 5 ||
+    if (vaultId.trim().isEmpty || generation < 1 || createdAtEpochMs < 1 ||
+        manualKeyEnvelopes.length != 5 ||
         manualKeyEnvelopes.map((entry) => entry.keyId).toSet().length != 5) {
-      throw const FormatException('Vault Recovery Bundle requires a vault ID, positive generation and five unique manual envelopes.');
+      throw const FormatException('Vault Recovery Bundle requires a vault ID, positive generation/timestamp and five unique manual envelopes.');
     }
-    for (final record in encryptedCredentialRecords) { _rejectPlaintextSecrets(record); }
+    if (encryptedCredentialRecords.length > 10000) {
+      throw const FormatException('Vault Recovery Bundle contains too many credential records.');
+    }
+    final accountIds = <String>{};
+    for (final record in encryptedCredentialRecords) {
+      _rejectPlaintextSecrets(record);
+      final accountId = record['providerAccountId'];
+      if (record['formatVersion'] != 1 || record['recordVersion'] != 1 ||
+          record['cipher'] != 'AES-256-GCM' ||
+          accountId is! String || accountId.trim().isEmpty ||
+          !accountIds.add(accountId)) {
+        throw const FormatException('Invalid or duplicate encrypted provider credential record.');
+      }
+      _decodeBase64(_requiredString(record, 'nonce'), expectedLength: 12);
+      final cipherText = _decodeBase64(_requiredString(record, 'cipherText'));
+      if (cipherText.isEmpty || cipherText.length > 1024 * 1024) {
+        throw const FormatException('Encrypted provider credential record size is invalid.');
+      }
+      _decodeBase64(_requiredString(record, 'mac'), expectedLength: 16);
+    }
     if (cloudflareEnvelope != null) _rejectPlaintextSecrets(cloudflareEnvelope);
   }
 
