@@ -142,6 +142,14 @@ void main() {
     expect(uploadedText, contains('cipherText'));
     expect((await store.loadBundle())?.cloudflareEnvelope, isNotNull);
     expect(local.generation, synced.generation);
+
+    await store.replaceCredentialRecords(keySet: keys, credentialRecords: const [
+      {'providerAccountId': 'google-subject-1', 'provider': 'google_drive', 'refreshToken': 'rotated-secret'},
+    ]);
+    final updated = await store.syncWithCloudflare(client: client, idTokenProvider: tokenProvider);
+    expect(updated.cloudflareEnvelope, synced.cloudflareEnvelope);
+    expect(transport.calls.where((call) => call.startsWith('POST')).length, 1);
+    expect(transport.calls.where((call) => call.startsWith('PUT')).length, 2);
   });
 
   test('failed upload preserves the locally provisioned envelope for retry', () async {
