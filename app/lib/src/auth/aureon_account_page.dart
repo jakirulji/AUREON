@@ -73,11 +73,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         final session = _createMode
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
+        final user = await widget.auth.reloadUser();
         _password.clear();
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
-              : 'Signed in as ${session.user.email}. ${session.user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
+              : 'Signed in as ${user.email}. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
         }
       });
 
@@ -210,7 +211,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
                 ? null
                 : () => _run(() async {
                       await widget.auth.signOut();
-                      if (mounted) setState(() => _status = 'Signed out. This device session was removed.');
+                      if (mounted) setState(() => _status = 'Signed out locally on this device. Firebase server-side refresh-token revocation is not performed by this action.');
                     }),
             icon: const Icon(Icons.logout),
             label: const Text('Sign out'),
