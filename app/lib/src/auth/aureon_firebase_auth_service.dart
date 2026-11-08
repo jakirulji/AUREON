@@ -192,6 +192,13 @@ class AureonFirebaseAuthService {
   AureonFirebaseSession? get currentSession => _session;
   AureonFirebaseUser? get currentUser => _session?.user;
 
+  /// Hides the in-memory session while retaining the rotated refresh token.
+  /// Used when online owner-binding verification is temporarily unavailable.
+  void lockSession() {
+    _sessionEpoch++;
+    _session = null;
+  }
+
   Uri _identityUri(String method) => Uri.https(
         'identitytoolkit.googleapis.com',
         '/v1/$method',
