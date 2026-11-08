@@ -179,7 +179,7 @@ class TransferPersistenceTest {
     fun transferLifecycleRequiresUploadThenFinalizeThenVerifyInOrder() = runBlocking {
         val database = openDatabase()
         val repository = TransferCheckpointRepository(database.transferJobDao())
-        repository.enqueue(testJob("operation-lifecycle", acknowledgedBytes = 0, totalBytes = 1000))
+        repository.enqueue(testJob("operation-lifecycle", acknowledgedBytes = 0, totalBytes = 1000).copy(status = "queued"))
 
         repository.markUploading("operation-lifecycle", 1600)
         repository.acknowledge("operation-lifecycle", 1000, 1700)
