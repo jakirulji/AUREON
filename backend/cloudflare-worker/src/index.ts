@@ -138,6 +138,9 @@ export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot 
         fromBase64Url(requiredString(item.cipherText, "manual ciphertext")).length !== 32 ||
         fromBase64Url(requiredString(item.mac, "manual MAC")).length !== 16) throw new HttpError(400, "Manual envelope cryptographic fields are invalid.");
   }
+  if (new TextEncoder().encode(JSON.stringify(input)).length > MAX_SNAPSHOT_BYTES) {
+    throw new HttpError(413, "Encrypted vault snapshot exceeds the safe D1 row limit.");
+  }
   rejectPlaintextSecrets(input.cloudflareEnvelope);
   const cloudflare = input.cloudflareEnvelope as Record<string, unknown>;
   const rootKeyVersion = positiveInteger(cloudflare.rootKeyVersion, "Cloudflare rootKeyVersion");
@@ -220,10 +223,14 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
     throw new HttpError(503, "The root secret required by this vault envelope is not configured.");
   }
   const canonical = JSON.stringify(snapshot), hash = await sha256Hex(canonical);
-  const existing = await env.DB.prepare("SELECT generation FROM vault_snapshots WHERE user_id=? AND vault_id=?")
-    .bind(identity.uid, snapshot.vaultId).first<{ generation: number }>();
+  const existing = await env.DB.prepare("SELECT generation,created_at_ms FROM vault_snapshots WHERE user_id=? AND vault_id=?")
+    .bind(identity.uid, snapshot.vaultId).first<{ generation: number; created_at_ms: number }>();
   if (!existing && snapshot.generation !== 1) throw new HttpError(409, "Initial vault generation must be 1.");
-  if (existing && snapshot.generation !== existing.generation + 1) throw new HttpError(409, "Vault generation must advance exactly once.");
+  if (existing && (snapshot.generation < existing.generation ||
+      snapshot.generation > existing.generation + 1 ||
+      (snapshot.generation === existing.generation && snapshot.createdAtEpochMs <= existing.created_at_ms))) {
+    throw new HttpError(409, "Stale snapshot: generation or snapshot timestamp did not advance.");
+  }
   const now = Date.now();
   const results = await env.DB.batch([
     env.DB.prepare(`INSERT INTO vault_snapshots (user_id,vault_id,generation,created_at_ms,snapshot_json,snapshot_sha256,updated_at_ms)
