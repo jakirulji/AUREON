@@ -47,7 +47,7 @@ async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-async function authenticate(request: Request, env: Env): Promise<FirebaseIdentity> {
+async function authenticate(request: Request, env: Env, requireRecentAuth = false): Promise<FirebaseIdentity> {
   const match = /^Bearer ([^\s]+)$/.exec(request.headers.get("authorization") ?? "");
   if (!match) throw new HttpError(401, "A Firebase ID token is required.");
   let payload: JWTPayload;
@@ -63,7 +63,7 @@ async function authenticate(request: Request, env: Env): Promise<FirebaseIdentit
   if (!uid || !email || payload.email_verified !== true || !authTime) {
     throw new HttpError(403, "A verified Firebase email account is required.");
   }
-  if (Math.floor(Date.now() / 1000) - authTime > RECENT_AUTH_SECONDS) {
+  if (requireRecentAuth && Math.floor(Date.now() / 1000) - authTime > RECENT_AUTH_SECONDS) {
     throw new HttpError(401, "Recent reauthentication is required.");
   }
   return { uid, email, authTime };
@@ -96,7 +96,7 @@ function rejectPlaintextSecrets(value: unknown, path = "root"): void {
     rejectPlaintextSecrets(child, `${path}.${key}`);
   }
 }
-function validateSnapshot(input: Record<string, unknown>): VaultSnapshot {
+export function validateSnapshot(input: Record<string, unknown>): VaultSnapshot {
   if (input.format !== "AUREON-VAULT-RECOVERY-BUNDLE" || input.formatVersion !== 1) throw new HttpError(400, "Unsupported vault bundle format.");
   const vaultId = requiredString(input.vaultId, "vaultId");
   const generation = positiveInteger(input.generation, "generation");
@@ -175,9 +175,12 @@ async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: strin
       salt: base64Url(wrapSalt), nonce: base64Url(wrapNonce), cipherText: base64Url(wrapped) };
   } finally { dek.fill(0); }
 }
+function auditStatement(env: Env, userId: string, vaultId: string | null, eventType: string, generation: number | null, details: Record<string, unknown> = {}) {
+  return env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) VALUES (?,?,?,?,?,?,?)")
+    .bind(base64Url(randomBytes(18)), userId, vaultId, eventType, generation, Date.now(), JSON.stringify(details));
+}
 async function audit(env: Env, userId: string, vaultId: string | null, eventType: string, generation: number | null, details: Record<string, unknown> = {}) {
-  const result = await env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) VALUES (?,?,?,?,?,?,?)")
-    .bind(base64Url(randomBytes(18)), userId, vaultId, eventType, generation, Date.now(), JSON.stringify(details)).run();
+  const result = await auditStatement(env, userId, vaultId, eventType, generation, details).run();
   if (!result.success) throw new HttpError(503, "Security audit persistence failed; operation aborted.");
 }
 async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIdentity): Promise<Response> {
@@ -187,13 +190,15 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
   if (!existing && snapshot.generation !== 1) throw new HttpError(409, "Initial vault generation must be 1.");
   if (existing && snapshot.generation !== existing.generation + 1) throw new HttpError(409, "Vault generation must advance exactly once.");
   const now = Date.now();
-  const write = await env.DB.prepare(`INSERT INTO vault_snapshots (user_id,vault_id,generation,created_at_ms,snapshot_json,snapshot_sha256,updated_at_ms)
-    VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET generation=excluded.generation,
-    created_at_ms=excluded.created_at_ms,snapshot_json=excluded.snapshot_json,snapshot_sha256=excluded.snapshot_sha256,updated_at_ms=excluded.updated_at_ms
-    WHERE vault_snapshots.generation=excluded.generation-1`)
-    .bind(identity.uid, snapshot.vaultId, snapshot.generation, snapshot.createdAtEpochMs, canonical, hash, now).run();
-  if (!write.success || write.meta.changes !== 1) throw new HttpError(409, "Vault changed concurrently; reload and reconcile.");
-  await audit(env, identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, { recordCount: snapshot.encryptedCredentialRecords.length });
+  const results = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO vault_snapshots (user_id,vault_id,generation,created_at_ms,snapshot_json,snapshot_sha256,updated_at_ms)
+      VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET generation=excluded.generation,
+      created_at_ms=excluded.created_at_ms,snapshot_json=excluded.snapshot_json,snapshot_sha256=excluded.snapshot_sha256,updated_at_ms=excluded.updated_at_ms
+      WHERE vault_snapshots.generation=excluded.generation-1`)
+      .bind(identity.uid, snapshot.vaultId, snapshot.generation, snapshot.createdAtEpochMs, canonical, hash, now),
+    auditStatement(env, identity.uid, snapshot.vaultId, "vault.snapshot.updated", snapshot.generation, { recordCount: snapshot.encryptedCredentialRecords.length }),
+  ]);
+  if (!results[0]?.success || results[0].meta.changes !== 1 || !results[1]?.success) throw new HttpError(409, "Vault update or audit failed; transaction was rolled back.");
   return json({ vaultId: snapshot.vaultId, generation: snapshot.generation, snapshotSha256: hash, storedAtEpochMs: now });
 }
 async function issueChallenge(request: Request, env: Env, identity: FirebaseIdentity): Promise<Response> {
@@ -224,19 +229,19 @@ async function recoverVault(request: Request, env: Env, identity: FirebaseIdenti
   const snapshot = JSON.parse(row.snapshot_json) as VaultSnapshot;
   const deviceBoundEnvelope = await unwrapAndRewrap(snapshot.cloudflareEnvelope, vaultId, row.generation, body.devicePublicKey as JsonWebKey, env);
   const now = Date.now();
-  const consume = await env.DB.prepare("DELETE FROM recovery_challenges WHERE challenge_id=? AND challenge_sha256=?").bind(challengeId, challengeRow.challenge_sha256).run();
-  if (!consume.success || consume.meta.changes !== 1) throw new HttpError(409, "Recovery challenge was already consumed.");
-  await env.DB.prepare("INSERT INTO recovery_cooldowns (user_id,vault_id,next_allowed_at_ms) VALUES (?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET next_allowed_at_ms=excluded.next_allowed_at_ms")
-    .bind(identity.uid, vaultId, now + RECOVERY_COOLDOWN_MS).run();
-  await audit(env, identity.uid, vaultId, "vault.recovery.completed", row.generation, { method: "cloudflare-device-bound" });
+  const results = await env.DB.batch([
+    env.DB.prepare("DELETE FROM recovery_challenges WHERE challenge_id=? AND challenge_sha256=?").bind(challengeId, challengeRow.challenge_sha256),
+    env.DB.prepare("INSERT INTO recovery_cooldowns (user_id,vault_id,next_allowed_at_ms) VALUES (?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET next_allowed_at_ms=excluded.next_allowed_at_ms")
+      .bind(identity.uid, vaultId, now + RECOVERY_COOLDOWN_MS),
+    auditStatement(env, identity.uid, vaultId, "vault.recovery.completed", row.generation, { method: "cloudflare-device-bound" }),
+  ]);
+  if (!results[0]?.success || results[0].meta.changes !== 1 || !results[1]?.success || !results[2]?.success) throw new HttpError(409, "Recovery completion/audit transaction failed.");
   return json({ vaultId, generation: row.generation, deviceBoundEnvelope });
 }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: {
-      "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
-      "access-control-allow-headers": "authorization,content-type" } });
+    if (request.method === "OPTIONS") return new Response(null, { status: 204 });
     try {
       if (url.pathname === "/health/live" && request.method === "GET") return json({ status: "ok" });
       if (url.pathname === "/health/ready" && request.method === "GET") {
@@ -244,7 +249,8 @@ export default {
         const db = await env.DB.prepare("SELECT 1 AS ok").first<{ ok: number }>();
         return json({ ready: configured && db?.ok === 1 }, configured && db?.ok === 1 ? 200 : 503);
       }
-      const identity = await authenticate(request, env);
+      const sensitive = url.pathname === "/v1/vault/envelope" || url.pathname === "/v1/vault/recovery/challenge" || url.pathname === "/v1/vault/recovery/rewrap";
+      const identity = await authenticate(request, env, sensitive);
       if (url.pathname === "/v1/vault/envelope" && request.method === "POST") {
         const body = await readJson(request), vaultId = requiredString(body.vaultId, "vaultId");
         const generation = positiveInteger(body.generation, "generation"), dek = fromBase64Url(requiredString(body.dek, "dek", 128));
