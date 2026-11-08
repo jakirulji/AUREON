@@ -17,6 +17,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Recovery & backups'), findsOneWidget);
     expect(find.text('Generate five recovery keys'), findsOneWidget);
+
+    // The metadata section is below the vault and Cloudflare sections in a
+    // lazy ListView. Scroll it into the viewport before asserting its actions.
+    await tester.scrollUntilVisible(
+      find.text('Create encrypted metadata backup'),
+      find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Create encrypted metadata backup'), findsOneWidget);
     expect(find.text('Restore metadata backup'), findsOneWidget);
   });
