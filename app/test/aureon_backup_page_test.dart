@@ -17,6 +17,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Recovery & backups'), findsOneWidget);
     expect(find.text('Generate five recovery keys'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Create encrypted metadata backup'),
+      320,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Create encrypted metadata backup'), findsOneWidget);
     expect(find.text('Restore metadata backup'), findsOneWidget);
   });
