@@ -4,7 +4,7 @@ import 'package:aureon/src/auth/aureon_backend_profile_cache.dart';
 
 void main() {
   const profile = AureonBackendProfile(
-    discoveryId: '0123456789abcdefghijklmnopqrstuv0123456789',
+    accountRecoveryId: '0123456789abcdefghijklmnopqrstuv0123456789',
     firebaseApiKey: 'AIzaSyExamplePublicFirebaseClientKey',
     firebaseProjectId: 'owner-project-123',
     firebaseAuthDomain: 'owner-project-123.firebaseapp.com',
@@ -32,6 +32,15 @@ void main() {
     expect(draft.profileVersion, 0);
   });
 
+  test('legacy cached Discovery ID migrates to Account Recovery ID', () {
+    final legacy = AureonBackendProfile.fromJson({
+      ...profile.toJson(),
+      'accountRecoveryId': null,
+      'discoveryId': profile.accountRecoveryId,
+    });
+    expect(legacy.accountRecoveryId, profile.accountRecoveryId);
+  });
+
   test('profile parser rejects insecure Worker URLs', () {
     expect(
       () => AureonBackendProfile.fromJson({
@@ -46,7 +55,7 @@ void main() {
     expect(
       () => AureonBackendProfile.fromJson({
         ...profile.toJson(),
-        'discoveryId': 'email@example.com',
+        'accountRecoveryId': 'email@example.com',
       }),
       throwsFormatException,
     );

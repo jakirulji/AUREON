@@ -40,7 +40,7 @@ flutter build apk --release \
   --dart-define=AUREON_CLOUDFLARE_API_URL="$AUREON_CLOUDFLARE_API_URL"
 ~~~
 
-On the first device, the user enters their own Firebase public configuration and Cloudflare Worker URL in Account setup, then creates/signs in to the Master Account and verifies the email. They then select **Create / register Discovery ID**. AUREON generates a random 256-bit locator and registers only public Firebase config + the user's Worker origin. Keep the ID for new devices. On a new device, enter that ID first; AUREON discovers and caches the profile, then verifies Firebase issuer + UID after sign-in. Later launches use the local profile cache and secure refresh token; they do not call the shared registry again. Sign-out clears the local refresh token but deliberately preserves the public backend profile.
+On the first device, the user enters their own Firebase public configuration and Cloudflare Worker URL in Account setup, then creates/signs in to the Master Account and verifies the email. They then select **Create / register Account Recovery ID**. AUREON generates a random 256-bit locator and registers only public Firebase config + the user's Worker origin. Keep the ID for new devices. On a new device, enter that ID first; AUREON discovers and caches the profile, then verifies Firebase issuer + UID after sign-in. Later launches use the local profile cache and secure refresh token; they do not call the shared registry again. Sign-out clears the local refresh token but deliberately preserves the public backend profile.
 
 The current CI preview intentionally builds with no owner configuration. Account and Cloudflare actions remain disabled in that preview; a green preview build does not mean the live service has been configured.
 
@@ -85,7 +85,7 @@ The wrangler.toml database ID and Firebase project ID are placeholders until the
 
 ## 4. Shared Discovery Registry (maintainer-owned, free-tier target)
 
-The Registry is separate from every user's Firebase/Cloudflare backend. It stores only an opaque Discovery ID hash, public Firebase client configuration, Worker origin, and Firebase issuer/UID binding. It never stores passwords, tokens, Worker secrets, provider credentials, vault keys, files or file metadata.
+The Registry is separate from every user's Firebase/Cloudflare backend. It stores only an opaque Account Recovery ID hash, public Firebase client configuration, Worker origin, and Firebase issuer/UID binding. It never stores passwords, tokens, Worker secrets, provider credentials, vault keys, files or file metadata.
 
 1. In the maintainer-owned Cloudflare account, create one D1 database named `aureon-discovery-registry`.
 2. Set its database ID in `backend/discovery-registry/wrangler.toml`.

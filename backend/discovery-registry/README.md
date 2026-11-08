@@ -1,6 +1,6 @@
 # AUREON Discovery Registry
 
-This is the small shared bootstrap directory. It stores only public Firebase client configuration, the user's Worker origin, a SHA-256 hash of the opaque Discovery ID, and the Firebase issuer/UID ownership binding. It is not a user-data backend.
+This is the small shared bootstrap directory. It stores only public Firebase client configuration, the user's Worker origin, a SHA-256 hash of the opaque Account Recovery ID, and the Firebase issuer/UID ownership binding. It is not a user-data backend.
 
 ## Free-tier deployment
 
@@ -14,7 +14,7 @@ No paid domain or paid plan is required for the initial target. Do not enable bi
 
 ## API
 
-- `POST /v1/profiles/lookup`: public lookup by opaque Discovery ID; returns only public bootstrap configuration.
+- `POST /v1/profiles/lookup`: public lookup by opaque Account Recovery ID; returns only public bootstrap configuration.
 - `POST /v1/profiles`: register or update a profile; requires a verified Firebase ID token. Updates require the expected profile version.
 - `POST /v1/profiles/verify`: after new-device Firebase login, verifies that token issuer + UID match the profile binding.
 - `DELETE /v1/profiles`: removes the profile after Firebase identity verification.

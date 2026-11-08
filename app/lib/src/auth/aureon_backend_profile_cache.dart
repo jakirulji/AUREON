@@ -7,17 +7,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'aureon_firebase_auth_service.dart';
 
 class AureonBackendProfile {
-  const AureonBackendProfile({required this.discoveryId, required this.firebaseApiKey,
+  const AureonBackendProfile({required this.accountRecoveryId, required this.firebaseApiKey,
     required this.firebaseProjectId, required this.firebaseAuthDomain, required this.firebaseAppId,
     required this.workerBaseUrl, required this.profileVersion, this.registered = true});
-  final String discoveryId, firebaseApiKey, firebaseProjectId, firebaseAuthDomain, firebaseAppId, workerBaseUrl;
+  final String accountRecoveryId, firebaseApiKey, firebaseProjectId, firebaseAuthDomain, firebaseAppId, workerBaseUrl;
   final int profileVersion;
   final bool registered;
 
   AureonFirebaseAuthConfig get firebaseConfig => AureonFirebaseAuthConfig(
     apiKey: firebaseApiKey, projectId: firebaseProjectId, authDomain: firebaseAuthDomain, appId: firebaseAppId);
 
-  Map<String, Object?> toJson() => {'discoveryId': discoveryId, 'firebaseApiKey': firebaseApiKey,
+  Map<String, Object?> toJson() => {'accountRecoveryId': accountRecoveryId, 'firebaseApiKey': firebaseApiKey,
     'firebaseProjectId': firebaseProjectId, 'firebaseAuthDomain': firebaseAuthDomain,
     'firebaseAppId': firebaseAppId, 'workerBaseUrl': workerBaseUrl, 'profileVersion': profileVersion, 'registered': registered};
 
@@ -27,9 +27,11 @@ class AureonBackendProfile {
       if (value is! String || value.trim().isEmpty) throw FormatException('Backend profile field $key is missing.');
       return value.trim();
     }
-    final id = field('discoveryId');
+    final rawId = json['accountRecoveryId'] ?? json['discoveryId'];
+    if (rawId is! String || rawId.trim().isEmpty) throw const FormatException('Account Recovery ID is missing.');
+    final id = rawId.trim();
     if (id.length < 22 || id.length > 128 || !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(id)) {
-      throw const FormatException('Discovery ID has an invalid format.');
+      throw const FormatException('Account Recovery ID has an invalid format.');
     }
     final worker = Uri.tryParse(field('workerBaseUrl'));
     if (worker == null || worker.scheme != 'https' || worker.host.isEmpty || worker.userInfo.isNotEmpty ||
@@ -39,7 +41,7 @@ class AureonBackendProfile {
     final version = json['profileVersion'];
     final registered = json['registered'] != false;
     if (version is! int || version < 0 || (registered && version < 1)) throw const FormatException('Backend profile version is invalid.');
-    return AureonBackendProfile(discoveryId: id, firebaseApiKey: field('firebaseApiKey'),
+    return AureonBackendProfile(accountRecoveryId: id, firebaseApiKey: field('firebaseApiKey'),
       firebaseProjectId: field('firebaseProjectId'), firebaseAuthDomain: field('firebaseAuthDomain'),
       firebaseAppId: field('firebaseAppId'), workerBaseUrl: worker.origin, profileVersion: version, registered: registered);
   }
@@ -120,13 +122,13 @@ class AureonDiscoveryRegistryClient {
     return decoded.cast<String, Object?>();
   }
 
-  Future<AureonBackendProfile> discover(String discoveryId) async {
-    final id = discoveryId.trim();
-    final result = await _post('/v1/profiles/lookup', body: {'discoveryId': id});
+  Future<AureonBackendProfile> discover(String accountRecoveryId) async {
+    final id = accountRecoveryId.trim();
+    final result = await _post('/v1/profiles/lookup', body: {'accountRecoveryId': id});
     final value = result['profile'];
     if (value is! Map) throw const FormatException('Discovery profile is missing.');
     final profile = AureonBackendProfile.fromJson(value.cast<String, Object?>());
-    if (profile.discoveryId != id) throw const FormatException('Discovery returned a mismatched profile.');
+    if (profile.accountRecoveryId != id) throw const FormatException('Account Recovery lookup returned a mismatched profile.');
     await _cache.write(profile);
     return profile;
   }
@@ -134,13 +136,13 @@ class AureonDiscoveryRegistryClient {
   Future<void> verifyBinding({required AureonFirebaseAuthService auth, required AureonBackendProfile profile}) async {
     final token = await auth.getIdToken(forceRefresh: true);
     final result = await _post('/v1/profiles/verify', idToken: token, body: {
-      'discoveryId': profile.discoveryId,
+      'accountRecoveryId': profile.accountRecoveryId,
       'firebaseProjectId': profile.firebaseProjectId,
     });
     if (result['bound'] != true) throw const AureonDiscoveryRegistryException('Master Account identity could not be verified.');
   }
 
-  Future<AureonBackendProfile> register({required AureonFirebaseAuthService auth, required String discoveryId,
+  Future<AureonBackendProfile> register({required AureonFirebaseAuthService auth, required String accountRecoveryId,
     required String workerBaseUrl, required String firebaseAuthDomain, required String firebaseAppId,
     int? expectedProfileVersion}) async {
     final config = auth.config;
@@ -153,17 +155,17 @@ class AureonDiscoveryRegistryClient {
     }
     final token = await auth.getIdToken(forceRefresh: true);
     final result = await _post('/v1/profiles', idToken: token, body: {
-      'discoveryId': discoveryId, 'firebaseProjectId': config.projectId, 'firebaseApiKey': config.apiKey,
+      'accountRecoveryId': accountRecoveryId, 'firebaseProjectId': config.projectId, 'firebaseApiKey': config.apiKey,
       'firebaseAuthDomain': firebaseAuthDomain, 'firebaseAppId': firebaseAppId, 'workerBaseUrl': worker.origin,
       'expectedProfileVersion': ?expectedProfileVersion,
     });
-    final profile = AureonBackendProfile(discoveryId: discoveryId, firebaseApiKey: config.apiKey,
+    final profile = AureonBackendProfile(accountRecoveryId: accountRecoveryId, firebaseApiKey: config.apiKey,
       firebaseProjectId: config.projectId, firebaseAuthDomain: firebaseAuthDomain, firebaseAppId: firebaseAppId,
       workerBaseUrl: worker.origin, profileVersion: result['profileVersion'] as int? ?? 1, registered: true);
     await _cache.write(profile);
     return profile;
   }
 
-  static String generateDiscoveryId() => base64UrlEncode(
+  static String generateAccountRecoveryId() => base64UrlEncode(
     List<int>.generate(32, (_) => Random.secure().nextInt(256))).replaceAll('=', '');
 }

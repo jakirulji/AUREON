@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { validateDiscoveryId, validateProfile } from "../src/index";
+import { validateAccountRecoveryId, validateProfile } from "../src/index";
 
 describe("discovery profile validation", () => {
   it("accepts an opaque high-entropy locator", () => {
-    expect(validateDiscoveryId("0123456789abcdefghijklmnopqrstuv0123456789")).toHaveLength(42);
+    expect(validateAccountRecoveryId("0123456789abcdefghijklmnopqrstuv0123456789")).toHaveLength(42);
   });
   it("rejects email-like and undersized locators", () => {
-    expect(() => validateDiscoveryId("owner@example.com")).toThrow();
-    expect(() => validateDiscoveryId("short")).toThrow();
+    expect(() => validateAccountRecoveryId("owner@example.com")).toThrow();
+    expect(() => validateAccountRecoveryId("short")).toThrow();
   });
   it("accepts only HTTPS Worker origins", () => {
     const profile = validateProfile({

@@ -6,7 +6,7 @@ interface Env {
   REGISTRY_RATE_LIMITER?: RateLimitBinding;
 }
 interface PublicProfile {
-  discoveryId: string;
+  accountRecoveryId: string;
   firebaseProjectId: string;
   firebaseApiKey: string;
   firebaseAuthDomain: string;
@@ -31,9 +31,9 @@ function requiredString(value: unknown, field: string, min = 1, max = 512): stri
   }
   return value.trim();
 }
-export function validateDiscoveryId(value: unknown): string {
-  const id = requiredString(value, "Discovery ID", 22, 128);
-  if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new HttpError(400, "Invalid Discovery ID.");
+export function validateAccountRecoveryId(value: unknown): string {
+  const id = requiredString(value, "Account Recovery ID", 22, 128);
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new HttpError(400, "Invalid Account Recovery ID.");
   return id;
 }
 async function readJson(request: Request): Promise<Record<string, unknown>> {
@@ -50,7 +50,7 @@ async function sha256Hex(value: string): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-export function validateProfile(body: Record<string, unknown>, discoveryId: string): PublicProfile {
+export function validateProfile(body: Record<string, unknown>, accountRecoveryId: string): PublicProfile {
   const firebaseProjectId = requiredString(body.firebaseProjectId, "Firebase project ID", 1, 128);
   if (!/^[a-z0-9-]+$/.test(firebaseProjectId)) throw new HttpError(400, "Invalid Firebase project ID.");
   const firebaseApiKey = requiredString(body.firebaseApiKey, "Firebase API key", 20, 256);
@@ -63,7 +63,7 @@ export function validateProfile(body: Record<string, unknown>, discoveryId: stri
       (worker.pathname !== "/" && worker.pathname !== "")) {
     throw new HttpError(400, "Cloudflare Worker URL must be an HTTPS origin without path, credentials, query or fragment.");
   }
-  return { discoveryId, firebaseProjectId, firebaseApiKey, firebaseAuthDomain,
+  return { accountRecoveryId, firebaseProjectId, firebaseApiKey, firebaseAuthDomain,
     firebaseAppId, workerBaseUrl: worker.origin, profileVersion: 1 };
 }
 async function authenticate(request: Request, projectId: string): Promise<OwnerIdentity> {
@@ -90,28 +90,28 @@ async function rateLimit(request: Request, env: Env): Promise<void> {
 }
 async function lookup(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
-  const id = validateDiscoveryId(body.discoveryId);
+  const id = validateAccountRecoveryId(body.accountRecoveryId);
   const hash = await sha256Hex(id);
-  const row = await env.DB.prepare("SELECT firebase_project_id,firebase_api_key,firebase_auth_domain,firebase_app_id,worker_base_url,profile_version FROM discovery_profiles WHERE discovery_id_hash=?")
+  const row = await env.DB.prepare("SELECT firebase_project_id,firebase_api_key,firebase_auth_domain,firebase_app_id,worker_base_url,profile_version FROM discovery_profiles WHERE account_recovery_id_hash=?")
     .bind(hash).first<{ firebase_project_id: string; firebase_api_key: string; firebase_auth_domain: string; firebase_app_id: string; worker_base_url: string; profile_version: number }>();
   if (!row) return response({ error: "profile_not_found" }, 404);
   return response({ profile: {
-    discoveryId: id, firebaseProjectId: row.firebase_project_id, firebaseApiKey: row.firebase_api_key,
+    accountRecoveryId: id, firebaseProjectId: row.firebase_project_id, firebaseApiKey: row.firebase_api_key,
     firebaseAuthDomain: row.firebase_auth_domain, firebaseAppId: row.firebase_app_id,
     workerBaseUrl: row.worker_base_url, profileVersion: row.profile_version,
   } });
 }
 async function register(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
-  const id = validateDiscoveryId(body.discoveryId);
+  const id = validateAccountRecoveryId(body.accountRecoveryId);
   const profile = validateProfile(body, id);
   const identity = await authenticate(request, profile.firebaseProjectId);
   const hash = await sha256Hex(id), now = Date.now();
-  const existing = await env.DB.prepare("SELECT firebase_issuer,firebase_uid,profile_version FROM discovery_profiles WHERE discovery_id_hash=?")
+  const existing = await env.DB.prepare("SELECT firebase_issuer,firebase_uid,profile_version FROM discovery_profiles WHERE account_recovery_id_hash=?")
     .bind(hash).first<{ firebase_issuer: string; firebase_uid: string; profile_version: number }>();
   if (!existing) {
     try {
-      const result = await env.DB.prepare("INSERT INTO discovery_profiles (discovery_id_hash,firebase_project_id,firebase_api_key,firebase_auth_domain,firebase_app_id,worker_base_url,firebase_issuer,firebase_uid,profile_version,created_at_ms,updated_at_ms) VALUES (?,?,?,?,?,?,?,?,1,?,?)")
+      const result = await env.DB.prepare("INSERT INTO discovery_profiles (account_recovery_id_hash,firebase_project_id,firebase_api_key,firebase_auth_domain,firebase_app_id,worker_base_url,firebase_issuer,firebase_uid,profile_version,created_at_ms,updated_at_ms) VALUES (?,?,?,?,?,?,?,?,1,?,?)")
         .bind(hash, profile.firebaseProjectId, profile.firebaseApiKey, profile.firebaseAuthDomain, profile.firebaseAppId,
           profile.workerBaseUrl, identity.issuer, identity.uid, now, now).run();
       if (!result.success || result.meta.changes !== 1) {
@@ -126,14 +126,14 @@ async function register(request: Request, env: Env): Promise<Response> {
     return response({ registered: true, profileVersion: 1 }, 201);
   }
   if (existing.firebase_issuer !== identity.issuer || existing.firebase_uid !== identity.uid) {
-    throw new HttpError(409, "Discovery ID is already bound to another Master Account.");
+    throw new HttpError(409, "Account Recovery ID is already bound to another Master Account.");
   }
   const expected = body.expectedProfileVersion;
   if (!Number.isSafeInteger(expected) || expected !== existing.profile_version) {
     throw new HttpError(409, "Profile changed on another device. Refresh it before updating.");
   }
   const nextVersion = existing.profile_version + 1;
-  const result = await env.DB.prepare("UPDATE discovery_profiles SET firebase_project_id=?,firebase_api_key=?,firebase_auth_domain=?,firebase_app_id=?,worker_base_url=?,profile_version=?,updated_at_ms=? WHERE discovery_id_hash=? AND firebase_issuer=? AND firebase_uid=? AND profile_version=?")
+  const result = await env.DB.prepare("UPDATE discovery_profiles SET firebase_project_id=?,firebase_api_key=?,firebase_auth_domain=?,firebase_app_id=?,worker_base_url=?,profile_version=?,updated_at_ms=? WHERE account_recovery_id_hash=? AND firebase_issuer=? AND firebase_uid=? AND profile_version=?")
     .bind(profile.firebaseProjectId, profile.firebaseApiKey, profile.firebaseAuthDomain, profile.firebaseAppId,
       profile.workerBaseUrl, nextVersion, now, hash, identity.issuer, identity.uid, existing.profile_version).run();
   if (!result.success || result.meta.changes !== 1) throw new HttpError(409, "Profile update conflicted; reload and retry.");
@@ -141,24 +141,24 @@ async function register(request: Request, env: Env): Promise<Response> {
 }
 async function verifyBinding(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
-  const id = validateDiscoveryId(body.discoveryId);
+  const id = validateAccountRecoveryId(body.accountRecoveryId);
   const projectId = requiredString(body.firebaseProjectId, "Firebase project ID", 1, 128);
   const identity = await authenticate(request, projectId);
   const hash = await sha256Hex(id);
-  const row = await env.DB.prepare("SELECT firebase_issuer,firebase_uid FROM discovery_profiles WHERE discovery_id_hash=?")
+  const row = await env.DB.prepare("SELECT firebase_issuer,firebase_uid FROM discovery_profiles WHERE account_recovery_id_hash=?")
     .bind(hash).first<{ firebase_issuer: string; firebase_uid: string }>();
   if (!row || row.firebase_issuer !== identity.issuer || row.firebase_uid !== identity.uid) {
-    throw new HttpError(403, "Master Account does not match this Discovery ID.");
+    throw new HttpError(403, "Master Account does not match this Account Recovery ID.");
   }
   return response({ bound: true });
 }
 async function unregister(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
-  const id = validateDiscoveryId(body.discoveryId);
+  const id = validateAccountRecoveryId(body.accountRecoveryId);
   const projectId = requiredString(body.firebaseProjectId, "Firebase project ID", 1, 128);
   const identity = await authenticate(request, projectId);
   const hash = await sha256Hex(id);
-  const result = await env.DB.prepare("DELETE FROM discovery_profiles WHERE discovery_id_hash=? AND firebase_issuer=? AND firebase_uid=?")
+  const result = await env.DB.prepare("DELETE FROM discovery_profiles WHERE account_recovery_id_hash=? AND firebase_issuer=? AND firebase_uid=?")
     .bind(hash, identity.issuer, identity.uid).run();
   if (!result.success) throw new HttpError(503, "Profile removal failed.");
   return response({ removed: result.meta.changes === 1 });

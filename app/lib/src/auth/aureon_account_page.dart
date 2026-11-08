@@ -19,7 +19,7 @@ class AureonAccountPage extends StatefulWidget {
 class _AureonAccountPageState extends State<AureonAccountPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _discoveryId = TextEditingController();
+  final _accountRecoveryId = TextEditingController();
   final _firebaseApiKey = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_API_KEY'));
   final _firebaseProjectId = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_PROJECT_ID'));
   final _firebaseAuthDomain = TextEditingController(text: const String.fromEnvironment('AUREON_FIREBASE_AUTH_DOMAIN'));
@@ -44,7 +44,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   void dispose() {
     _email.dispose();
     _password.dispose();
-    _discoveryId.dispose();
+    _accountRecoveryId.dispose();
     _firebaseApiKey.dispose();
     _firebaseProjectId.dispose();
     _firebaseAuthDomain.dispose();
@@ -58,7 +58,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     try {
       _profile = await _profileCache.read();
       if (_profile != null) {
-        _discoveryId.text = _profile!.discoveryId;
+        _accountRecoveryId.text = _profile!.accountRecoveryId;
         _firebaseApiKey.text = _profile!.firebaseApiKey;
         _firebaseProjectId.text = _profile!.firebaseProjectId;
         _firebaseAuthDomain.text = _profile!.firebaseAuthDomain;
@@ -89,7 +89,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         } on AureonDiscoveryRegistryException catch (error) {
           if (error.statusCode == 403) {
             await widget.auth.signOut();
-            if (mounted) setState(() => _status = 'This saved session does not match this Discovery ID. Sign in with the correct Master Account.');
+            if (mounted) setState(() => _status = 'This saved session does not match this Account Recovery ID. Sign in with the correct Master Account.');
             return;
           }
           widget.auth.lockSession();
@@ -127,7 +127,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           throw StateError('Enter your Cloudflare Worker HTTPS origin, without a path.');
         }
         final profile = AureonBackendProfile(
-          discoveryId: AureonDiscoveryRegistryClient.generateDiscoveryId(),
+          accountRecoveryId: AureonDiscoveryRegistryClient.generateAccountRecoveryId(),
           firebaseApiKey: apiKey,
           firebaseProjectId: projectId,
           firebaseAuthDomain: authDomain,
@@ -141,15 +141,15 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (mounted) {
           setState(() {
           _profile = profile;
-          _discoveryId.text = profile.discoveryId;
-          _status = 'Your backend configuration is saved on this device. Create/sign in to your Master Account, verify the email, then register the Discovery ID.';
+          _accountRecoveryId.text = profile.accountRecoveryId;
+          _status = 'Your backend configuration is saved on this device. Create/sign in to your Master Account, verify the email, then register the Account Recovery ID.';
           });
         }
       });
 
   Future<void> _discoverBackend() => _run(() async {
-        final id = _discoveryId.text.trim();
-        if (id.isEmpty) throw StateError('Enter your AUREON Discovery ID.');
+        final id = _accountRecoveryId.text.trim();
+        if (id.isEmpty) throw StateError('Enter your AUREON Account Recovery ID.');
         final profile = await _registry.discover(id);
         widget.auth.configure(profile.firebaseConfig);
         if (mounted) {
@@ -172,26 +172,26 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           throw StateError('This first-device build needs AUREON_CLOUDFLARE_API_URL, AUREON_FIREBASE_AUTH_DOMAIN and AUREON_FIREBASE_APP_ID.');
         }
         final firstRegistration = _profile?.registered != true;
-        var id = _profile?.discoveryId ?? AureonDiscoveryRegistryClient.generateDiscoveryId();
+        var id = _profile?.accountRecoveryId ?? AureonDiscoveryRegistryClient.generateAccountRecoveryId();
         AureonBackendProfile? profile;
         for (var attempt = 0; attempt < (firstRegistration ? 5 : 1); attempt++) {
           try {
             profile = await _registry.register(
-              auth: widget.auth, discoveryId: id, workerBaseUrl: workerUrl,
+              auth: widget.auth, accountRecoveryId: id, workerBaseUrl: workerUrl,
               firebaseAuthDomain: config.authDomain, firebaseAppId: config.appId,
               expectedProfileVersion: _profile?.registered == true ? _profile!.profileVersion : null,
             );
             break;
           } on AureonDiscoveryRegistryException catch (error) {
             if (!firstRegistration || error.statusCode != 409 || attempt == 4) rethrow;
-            id = AureonDiscoveryRegistryClient.generateDiscoveryId();
+            id = AureonDiscoveryRegistryClient.generateAccountRecoveryId();
           }
         }
         if (profile == null) throw StateError('Could not reserve a unique Account Recovery ID. Please retry.');
         if (mounted) {
           setState(() {
             _profile = profile;
-            _discoveryId.text = profile!.discoveryId;
+            _accountRecoveryId.text = profile!.accountRecoveryId;
             _status = 'Your unique Account Recovery ID is registered. Save it or its QR for new devices.';
           });
         }
@@ -231,7 +231,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           } on AureonDiscoveryRegistryException catch (error) {
             if (error.statusCode == 403) {
               await widget.auth.signOut();
-              throw StateError('This Firebase account does not match the Discovery ID. Login was blocked.');
+              throw StateError('This Firebase account does not match the Account Recovery ID. Login was blocked.');
             }
             widget.auth.lockSession();
             throw StateError('Owner verification is temporarily unavailable. Your saved refresh token was preserved; reconnect and sign in again.');
@@ -325,12 +325,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       ),
     );
     if (!mounted || scannedId == null) return;
-    _discoveryId.text = scannedId;
+    _accountRecoveryId.text = scannedId;
     await _discoverBackend();
   }
 
   Future<void> _showDiscoveryQr() async {
-    final id = _profile?.discoveryId;
+    final id = _profile?.accountRecoveryId;
     if (id == null || id.isEmpty) return;
     await showDialog<void>(
       context: context,
@@ -392,8 +392,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         const SizedBox(height: 18),
         if (needsBackendSetup) ...[
           _notice(Icons.settings_suggest_outlined, 'Find your Master Account backend',
-            'On a new device, enter the Discovery ID from a device where AUREON is already configured. The ID finds your public Firebase and Worker configuration; it is not a password.'),
-          TextField(controller: _discoveryId, autocorrect: false, decoration: const InputDecoration(
+            'On a new device, enter the Account Recovery ID from a device where AUREON is already configured. The ID finds your public Firebase and Worker configuration; it is not a password.'),
+          TextField(controller: _accountRecoveryId, autocorrect: false, decoration: const InputDecoration(
             labelText: 'AUREON Account Recovery ID', border: OutlineInputBorder())),
           const SizedBox(height: 10),
           if (defaultTargetPlatform == TargetPlatform.android)
@@ -477,7 +477,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
               crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('AUREON Account Recovery ID', style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
-                SelectableText(_profile!.discoveryId, style: const TextStyle(fontSize: 12)),
+                SelectableText(_profile!.accountRecoveryId, style: const TextStyle(fontSize: 12)),
                 Wrap(
                   alignment: WrapAlignment.end,
                   spacing: 8,
@@ -488,7 +488,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
                       label: const Text('Show QR'),
                     ),
                     TextButton.icon(
-                      onPressed: () => Clipboard.setData(ClipboardData(text: _profile!.discoveryId)),
+                      onPressed: () => Clipboard.setData(ClipboardData(text: _profile!.accountRecoveryId)),
                       icon: const Icon(Icons.copy),
                       label: const Text('Copy ID'),
                     ),
