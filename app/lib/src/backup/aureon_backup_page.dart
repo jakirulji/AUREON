@@ -359,10 +359,16 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     final password = await _askAccountPassword();
     if (password == null) return;
     await _auth.reauthenticate(password: password);
-    final bundle = await _vaultStore.syncWithCloudflare(
-      client: _cloudflareClient(),
-      idTokenProvider: () => _auth.getIdToken(),
-    );
+    final client = _cloudflareClient();
+    late final VaultRecoveryBundle bundle;
+    try {
+      bundle = await _vaultStore.syncWithCloudflare(
+        client: client,
+        idTokenProvider: () => _auth.getIdToken(),
+      );
+    } finally {
+      client.close();
+    }
     if (mounted) {
       setState(() {
         _vaultBundle = bundle;
@@ -430,11 +436,17 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     final known = _vaultBundle ?? await _vaultStore.loadPendingBundle() ?? await _vaultStore.loadBundle();
     final vaultId = await _askVaultId(known?.vaultId ?? '');
     if (vaultId == null || vaultId.isEmpty) return;
-    final records = await _vaultStore.restoreWithCloudflare(
-      vaultId: vaultId,
-      client: _cloudflareClient(),
-      idTokenProvider: () => _auth.getIdToken(),
-    );
+    final client = _cloudflareClient();
+    late final List<Map<String, Object?>> records;
+    try {
+      records = await _vaultStore.restoreWithCloudflare(
+        vaultId: vaultId,
+        client: client,
+        idTokenProvider: () => _auth.getIdToken(),
+      );
+    } finally {
+      client.close();
+    }
     final restored = await _vaultStore.loadBundle();
     if (mounted) {
       setState(() {
