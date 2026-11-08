@@ -1,5 +1,6 @@
 import 'package:aureon/src/auth/aureon_account_page.dart';
 import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
+import 'package:aureon/src/auth/aureon_backend_profile_cache.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
@@ -32,7 +33,32 @@ class AureonHome extends StatefulWidget {
 
 class _AureonHomeState extends State<AureonHome> {
   final _auth = AureonFirebaseAuthService();
+  final _profileCache = AureonBackendProfileCache();
   int selected = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _restorePersistentSession();
+  }
+
+  Future<void> _restorePersistentSession() async {
+    try {
+      // Load the owner-bound Firebase project before touching the saved
+      // refresh token. The cached profile avoids a registry lookup at startup.
+      final profile = await _profileCache.read();
+      if (profile != null) {
+        _auth.configure(profile.firebaseConfig);
+      }
+      if (_auth.isConfigured) {
+        await _auth.restoreSession();
+      }
+    } catch (_) {
+      // Keep the refresh token and cached public profile on transient network
+      // failures. The Account page can retry when connectivity returns.
+    }
+    if (mounted) setState(() {});
+  }
   static const labels = ['Home', 'Files', 'Cloud', 'Transfers', 'Account', 'Settings'];
   static const icons = [Icons.home_outlined, Icons.folder_outlined, Icons.cloud_outlined, Icons.swap_vert, Icons.person_outline, Icons.settings_outlined];
 

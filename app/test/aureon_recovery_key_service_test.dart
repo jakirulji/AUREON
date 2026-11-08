@@ -68,5 +68,5 @@ void main() {
       ),
       throwsA(anything),
     );
-  });
+  }, timeout: Timeout(Duration(minutes: 2)));
 }

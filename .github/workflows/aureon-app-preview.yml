@@ -41,6 +41,15 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Cache Gradle wrapper and dependency artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper/dists
+          key: gradle-linux-9.3.1-all-${{ hashFiles('app/pubspec.yaml') }}
+          restore-keys: |
+            gradle-linux-
       - name: Prepare local Dart packages
         shell: bash
         run: |
@@ -51,6 +60,8 @@ jobs:
         shell: bash
         run: |
           flutter create --empty --platforms=android --project-name aureon --org com.aureon "$RUNNER_TEMP/aureon-android"
+          sed -i 's#services.gradle.org/distributions#downloads.gradle.org/distributions#' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"
+          grep -q 'distributionUrl=https\\://downloads.gradle.org/distributions/gradle-9.3.1-all.zip' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties" || { echo "Gradle wrapper URL rewrite did not apply"; cat "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"; exit 1; }
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 24/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
@@ -78,7 +89,24 @@ jobs:
         run: flutter test
       - name: Compile Android debug APK (no artifact upload)
         working-directory: ${{ runner.temp }}/aureon-android
-        run: flutter build apk --debug
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            log_file="$RUNNER_TEMP/aureon-android-build.log"
+            if flutter build apk --debug 2>&1 | tee "$log_file"; then
+              exit 0
+            fi
+            if ! grep -Eqi 'Received status code (429|5[0-9][0-9])|Server returned HTTP response code: (429|5[0-9][0-9])|HTTP (429|5[0-9][0-9])|timed out|Temporary failure|Connection reset|Could not GET|UnknownHostException|Temporary failure in name resolution' "$log_file"; then
+              echo "Android build failed for a non-network reason; not retrying."
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android build exhausted three attempts after transient dependency-download failures."
+              exit 1
+            fi
+            echo "Transient dependency download failure; retrying Android build (attempt $((attempt + 1))/3) after 20 seconds."
+            sleep 20
+          done
 
   windows-validation:
     name: Analyze, test and compile Windows
