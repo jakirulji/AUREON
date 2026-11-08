@@ -222,7 +222,6 @@ async function uploadSnapshot(request: Request, env: Env, identity: FirebaseIden
   const canonical = JSON.stringify(snapshot), hash = await sha256Hex(canonical);
   const existing = await env.DB.prepare("SELECT generation,created_at_ms FROM vault_snapshots WHERE user_id=? AND vault_id=?")
     .bind(identity.uid, snapshot.vaultId).first<{ generation: number; created_at_ms: number }>();
-  if (!existing && snapshot.generation !== 1) throw new HttpError(409, "Initial vault generation must be 1.");
   if (existing && (snapshot.generation < existing.generation ||
       snapshot.generation > existing.generation + 1 ||
       (snapshot.generation === existing.generation && snapshot.createdAtEpochMs <= existing.created_at_ms))) {
