@@ -264,7 +264,7 @@ class CredentialVaultCryptoService {
       envelope: matchingEnvelopes.single,
     );
     try {
-      return restoreBundleWithDek(bundle: bundle, vaultDek: dek);
+      return await restoreBundleWithDek(bundle: bundle, vaultDek: dek);
     } finally {
       dek.fillRange(0, dek.length, 0);
     }
