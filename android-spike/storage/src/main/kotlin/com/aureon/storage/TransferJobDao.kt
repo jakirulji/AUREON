@@ -35,7 +35,7 @@ interface TransferJobDao {
         SET status = 'waiting_for_network',
             updatedAtEpochMs = :updatedAtEpochMs
         WHERE operationId = :operationId
-          AND status IN ('queued', 'uploading', 'waiting_for_network', 'waiting_for_auth', 'waiting_for_quota', 'retry_wait')
+          AND status IN ('queued', 'uploading')
           AND remoteVerified = 0
         """
     )
@@ -122,7 +122,7 @@ interface TransferJobDao {
         SET status = 'paused',
             updatedAtEpochMs = :updatedAtEpochMs
         WHERE operationId = :operationId
-          AND status IN ('queued', 'uploading')
+          AND status IN ('queued', 'uploading', 'waiting_for_network', 'waiting_for_auth', 'waiting_for_quota', 'retry_wait')
           AND remoteVerified = 0
         """
     )
