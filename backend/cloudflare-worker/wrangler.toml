@@ -1,0 +1,17 @@
+name = "aureon-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-08"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = "REPLACE_WITH_FIREBASE_PROJECT_ID"
+ENVIRONMENT = "development"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aureon-metadata"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# Configure with wrangler secret put AUREON_VAULT_ROOT_SECRET.
+# Value: base64url-encoded 32-byte random secret. Never commit secret values.
