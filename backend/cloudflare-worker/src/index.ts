@@ -45,6 +45,11 @@ function fromBase64Url(value: string): Uint8Array {
   return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
 }
 function randomBytes(length: number): Uint8Array { return crypto.getRandomValues(new Uint8Array(length)); }
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return copy;
+}
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -154,7 +159,7 @@ async function deriveRootKey(env: Env, keyVersion: number, salt: Uint8Array, vau
   if (!secret) throw new HttpError(503, "Required historical vault recovery root key is unavailable.");
   const root = fromBase64Url(secret);
   if (root.length !== 32) throw new HttpError(503, "Vault recovery service is not configured.");
-  const material = await crypto.subtle.importKey("raw", root, "HKDF", false, ["deriveKey"]);
+  const material = await crypto.subtle.importKey("raw", asArrayBuffer(root), "HKDF", false, ["deriveKey"]);
   root.fill(0);
   return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt,
     info: new TextEncoder().encode(`AUREON|CREDENTIAL-VAULT|CLOUDFLARE-WRAP|v1|${vaultId}|${generation}`) },
@@ -165,7 +170,7 @@ async function createCloudflareEnvelope(dek: Uint8Array, vaultId: string, genera
   const rootKeyVersion = activeRootVersion(env);
   const salt = randomBytes(32), nonce = randomBytes(12), key = await deriveRootKey(env, rootKeyVersion, salt, vaultId, generation);
   const aad = new TextEncoder().encode(`AUREON|CLOUDFLARE-ENVELOPE|v1|${vaultId}|${generation}`);
-  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, dek));
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: asArrayBuffer(aad), tagLength: 128 }, key, asArrayBuffer(dek)));
   return { formatVersion: 1, rootKeyVersion, algorithm: "HKDF-SHA-256/AES-256-GCM", salt: base64Url(salt), nonce: base64Url(nonce), cipherText: base64Url(encrypted) };
 }
 async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: string, generation: number, deviceJwk: JsonWebKey, env: Env) {
@@ -178,7 +183,7 @@ async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: strin
   const rootKey = await deriveRootKey(env, rootKeyVersion, salt, vaultId, generation);
   const aad = new TextEncoder().encode(`AUREON|CLOUDFLARE-ENVELOPE|v1|${vaultId}|${generation}`);
   let dek: Uint8Array;
-  try { dek = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, rootKey, ciphertext)); }
+  try { dek = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: asArrayBuffer(nonce), additionalData: asArrayBuffer(aad), tagLength: 128 }, rootKey, asArrayBuffer(ciphertext))); }
   catch { throw new HttpError(409, "Cloudflare envelope authentication failed."); }
   try {
     if (dek.length !== 32) throw new HttpError(409, "Recovered vault key has an invalid length.");
@@ -187,10 +192,10 @@ async function unwrapAndRewrap(envelope: Record<string, unknown>, vaultId: strin
     const ephemeral = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
     const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: devicePublic }, ephemeral.privateKey, 256));
     const wrapSalt = randomBytes(32), wrapNonce = randomBytes(12);
-    const material = await crypto.subtle.importKey("raw", shared, "HKDF", false, ["deriveKey"]); shared.fill(0);
+    const material = await crypto.subtle.importKey("raw", asArrayBuffer(shared), "HKDF", false, ["deriveKey"]); shared.fill(0);
     const info = new TextEncoder().encode(`AUREON|DEVICE-BOUND-VAULT-DEK|v1|${vaultId}|${generation}`);
-    const wrapKey = await crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: wrapSalt, info }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
-    const wrapped = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: wrapNonce, additionalData: info, tagLength: 128 }, wrapKey, dek));
+    const wrapKey = await crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: asArrayBuffer(wrapSalt), info: asArrayBuffer(info) }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+    const wrapped = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: asArrayBuffer(wrapNonce), additionalData: asArrayBuffer(info), tagLength: 128 }, wrapKey, asArrayBuffer(dek)));
     return { formatVersion: 1, algorithm: "ECDH-P256/HKDF-SHA-256/AES-256-GCM", vaultId, generation,
       serverEphemeralPublicKey: await crypto.subtle.exportKey("jwk", ephemeral.publicKey),
       salt: base64Url(wrapSalt), nonce: base64Url(wrapNonce), cipherText: base64Url(wrapped) };
