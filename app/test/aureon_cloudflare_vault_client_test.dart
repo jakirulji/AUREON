@@ -133,6 +133,7 @@ void main() {
     final synced = await store.syncWithCloudflare(client: client, idTokenProvider: tokenProvider);
     expect(synced.cloudflareEnvelope, isNotNull);
     expect(transport.calls, [
+      'GET /v1/vault/snapshot',
       'POST /v1/vault/envelope',
       'PUT /v1/vault/snapshot',
     ]);
