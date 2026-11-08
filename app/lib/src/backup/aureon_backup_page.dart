@@ -39,7 +39,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   Future<void> _loadExistingVaultBundle() async {
     try {
-      final bundle = await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
+      final bundle = await _vaultStore.loadPendingBundle() ?? await _vaultStore.loadBundle();
       if (mounted && bundle != null) setState(() => _vaultBundle = bundle);
     } catch (error) {
       if (mounted) setState(() => _status = 'Local Recovery Bundle could not be read: $error');
@@ -121,7 +121,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   }
 
   Future<void> _generateKeys() => _run(() async {
-    final existing = _vaultBundle ?? await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
+    final existing = _vaultBundle ?? await _vaultStore.loadPendingBundle() ?? await _vaultStore.loadBundle();
     if (existing != null) {
       setState(() => _vaultBundle = existing);
       throw StateError('A local vault already exists. Import its matching .key file instead of creating a new vault.');
@@ -168,7 +168,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
     if (file == null) return;
     final passphrase = await _askPassphrase(title: 'Unlock encrypted recovery key file');
     if (passphrase == null) return;
-    final knownBundle = _vaultBundle ?? await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
+    final knownBundle = _vaultBundle ?? await _vaultStore.loadPendingBundle() ?? await _vaultStore.loadBundle();
     final imported = await _recovery.importEncryptedKeyFile(
       bytes: await file.readAsBytes(),
       passphrase: passphrase,
@@ -236,7 +236,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   Future<void> _restoreVaultBundle() => _run(() async {
     final keys = _keySet;
-    final bundle = _vaultBundle ?? await _vaultStore.loadBundle() ?? await _vaultStore.loadPendingBundle();
+    final bundle = _vaultBundle ?? await _vaultStore.loadPendingBundle() ?? await _vaultStore.loadBundle();
     if (keys == null) throw StateError('Import the matching AUREON-Recovery.key file first.');
     if (bundle == null) throw StateError('Import the matching .aureon-vault bundle first.');
     if (keys.vaultId != bundle.vaultId || keys.generation != bundle.generation) {
