@@ -167,6 +167,7 @@ class AureonFirebaseAuthService {
   final AureonAuthSecretStore _secrets;
   AureonFirebaseSession? _session;
   Future<AureonFirebaseSession>? _refreshing;
+  int _sessionEpoch = 0;
 
   static const _refreshKey = 'aureon.firebase.refresh_token.v1';
   static const _emailKey = 'aureon.firebase.email.v1';
@@ -209,7 +210,9 @@ class AureonFirebaseAuthService {
       throw const FormatException('Firebase authentication response is incomplete.');
     }
     final expiresIn = int.tryParse(response['expiresIn']?.toString() ?? '') ?? 3600;
-    final verified = response['emailVerified'] == true;
+    final verified = response['emailVerified'] is bool
+        ? response['emailVerified'] as bool
+        : (_session?.user.emailVerified ?? false);
     final session = AureonFirebaseSession(
       user: AureonFirebaseUser(
         localId: localId,
@@ -220,9 +223,21 @@ class AureonFirebaseAuthService {
       refreshToken: refreshToken,
       expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
     );
+    final epoch = ++_sessionEpoch;
     _session = session;
     await _secrets.write(_refreshKey, refreshToken);
+    if (epoch != _sessionEpoch) {
+      final stored = await _secrets.read(_refreshKey);
+      if (stored == refreshToken) await _secrets.delete(_refreshKey);
+      throw StateError('Authentication session changed during sign-in. Retry the operation.');
+    }
     await _secrets.write(_emailKey, email);
+    if (epoch != _sessionEpoch) {
+      final stored = await _secrets.read(_refreshKey);
+      if (stored == refreshToken) await _secrets.delete(_refreshKey);
+      await _secrets.delete(_emailKey);
+      throw StateError('Authentication session changed during sign-in. Retry the operation.');
+    }
     return session;
   }
 
@@ -237,10 +252,14 @@ class AureonFirebaseAuthService {
         'Use a password with at least 8 characters.',
       );
     }
+    final requestEpoch = _sessionEpoch;
     final response = await _transport.post(
       _identityUri('accounts:signUp'),
       body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
     );
+    if (requestEpoch != _sessionEpoch) {
+      throw StateError('Authentication session changed during account creation. Retry the operation.');
+    }
     final session = await _sessionFromResponse(response);
     await sendVerificationEmail();
     return session;
@@ -251,10 +270,14 @@ class AureonFirebaseAuthService {
     required String password,
   }) async {
     _requireConfiguration();
+    final requestEpoch = _sessionEpoch;
     final response = await _transport.post(
       _identityUri('accounts:signInWithPassword'),
       body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
     );
+    if (requestEpoch != _sessionEpoch) {
+      throw StateError('Authentication session changed during sign-in. Retry the operation.');
+    }
     return _sessionFromResponse(response);
   }
 
@@ -352,6 +375,7 @@ class AureonFirebaseAuthService {
   }
 
   Future<AureonFirebaseSession> _performRefresh(String refreshToken) async {
+    final epoch = _sessionEpoch;
     final response = await _transport.post(
       _refreshUri,
       formEncoded: true,
@@ -363,6 +387,9 @@ class AureonFirebaseAuthService {
     if (idToken is! String || nextRefresh is! String || localId is! String) {
       throw const FormatException('Firebase refresh response is incomplete.');
     }
+    if (epoch != _sessionEpoch) {
+      throw StateError('Authentication session changed while refreshing. Retry the operation.');
+    }
     final email = await _secrets.read(_emailKey) ?? '';
     final previouslyVerified = _session?.user.emailVerified ?? false;
     final session = AureonFirebaseSession(
@@ -373,12 +400,18 @@ class AureonFirebaseAuthService {
         Duration(seconds: int.tryParse(response['expires_in']?.toString() ?? '') ?? 3600),
       ),
     );
-    _session = session;
     await _secrets.write(_refreshKey, nextRefresh);
+    if (epoch != _sessionEpoch) {
+      final stored = await _secrets.read(_refreshKey);
+      if (stored == nextRefresh) await _secrets.delete(_refreshKey);
+      throw StateError('Authentication session changed during token refresh. Retry the operation.');
+    }
+    _session = session;
     return session;
   }
 
   Future<void> signOut() async {
+    _sessionEpoch++;
     _session = null;
     await _secrets.delete(_refreshKey);
     await _secrets.delete(_emailKey);
@@ -389,7 +422,9 @@ class AureonFirebaseAuthService {
     if (code.startsWith('INVALID_EMAIL')) return 'Enter a valid email address.';
     if (code.startsWith('INVALID_LOGIN_CREDENTIALS') ||
         code.startsWith('EMAIL_NOT_FOUND') ||
-        code.startsWith('INVALID_PASSWORD')) return 'Email or password is incorrect.';
+        code.startsWith('INVALID_PASSWORD')) {
+      return 'Email or password is incorrect.';
+    }
     if (code.startsWith('WEAK_PASSWORD')) return 'Password does not meet Firebase requirements.';
     if (code.startsWith('TOO_MANY_ATTEMPTS')) return 'Too many attempts. Wait and try again.';
     if (code.startsWith('USER_DISABLED')) return 'This account has been disabled.';

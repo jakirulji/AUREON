@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
 
@@ -14,12 +16,15 @@ class _FakeSecrets implements AureonAuthSecretStore {
 class _FakeTransport implements AureonFirebaseAuthTransport {
   final calls = <({Uri uri, Map<String, String> body, bool form})>[];
   final responses = <Map<String, Object?>>[];
+  Completer<Map<String, Object?>>? pendingResponse;
   @override
   Future<Map<String, Object?>> post(Uri uri, {
     required Map<String, String> body,
     bool formEncoded = false,
   }) async {
     calls.add((uri: uri, body: body, form: formEncoded));
+    final pending = pendingResponse;
+    if (pending != null) return pending.future;
     if (responses.isEmpty) throw StateError('No fake Firebase response queued.');
     return responses.removeAt(0);
   }
@@ -145,6 +150,24 @@ void main() {
     await auth.signOut();
     expect(auth.currentSession, isNull);
     expect(secrets.values, isEmpty);
+  });
+
+  test('sign-out prevents an in-flight refresh from restoring local credentials', () async {
+    secrets.values['aureon.firebase.refresh_token.v1'] = 'old-refresh';
+    secrets.values['aureon.firebase.email.v1'] = 'owner@example.com';
+    transport.pendingResponse = Completer<Map<String, Object?>>();
+    final pendingToken = auth.getIdToken();
+    await Future<void>.delayed(Duration.zero);
+    await auth.signOut();
+    transport.pendingResponse!.complete({
+      'id_token': 'late-id-token',
+      'refresh_token': 'late-refresh-token',
+      'user_id': 'user-123',
+      'expires_in': '3600',
+    });
+    await expectLater(pendingToken, throwsStateError);
+    expect(secrets.values, isEmpty);
+    expect(auth.currentSession, isNull);
   });
 
   test('unconfigured Firebase fails closed', () async {
