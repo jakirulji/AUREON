@@ -45,6 +45,11 @@ describe("vault snapshot validation", () => {
     input.encryptedCredentialRecords.push({ ...input.encryptedCredentialRecords[0] });
     expect(() => validateSnapshot(input)).toThrow(/Duplicate provider account/);
   });
+  it("rejects an unsupported Cloudflare root-key version", () => {
+    const input = validSnapshot();
+    input.cloudflareEnvelope.rootKeyVersion = 3;
+    expect(() => validateSnapshot(input)).toThrow(/Cloudflare envelope cryptographic fields/);
+  });
   it("rejects a bundle without all five manual envelopes", () => {
     const input = validSnapshot();
     input.manualKeyEnvelopes.pop();
