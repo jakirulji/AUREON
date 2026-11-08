@@ -70,11 +70,11 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (email.isEmpty || password.isEmpty) {
           throw StateError('Enter both email and password.');
         }
+        _password.clear();
         final session = _createMode
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
         final user = await widget.auth.reloadUser();
-        _password.clear();
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
