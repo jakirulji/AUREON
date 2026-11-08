@@ -65,8 +65,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       try {
         await widget.auth.restoreSession();
         final user = await widget.auth.reloadUser();
-        final bound = await _profileStore.bindActiveProfile(user.localId);
-        widget.auth.acceptBoundProfile(bound);
+        final bound = await _bindProfile(user.localId);
         if (mounted) setState(() {
           _activeProfile = bound;
           _status = 'Signed in as ${user.email}. Backend profile “${bound.name}” is bound to this Firebase identity and Worker.';
@@ -76,6 +75,19 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       }
     } catch (error) {
       if (mounted) setState(() => _status = 'Backend profile setup needs attention: $error');
+    }
+  }
+
+  Future<AureonBackendProfile> _bindProfile(String uid) async {
+    try {
+      final bound = await _profileStore.bindActiveProfile(uid);
+      widget.auth.acceptBoundProfile(bound);
+      return bound;
+    } catch (_) {
+      // A profile bound to another Firebase identity must never keep a live
+      // session attached to the wrong Worker/backend configuration.
+      await widget.auth.signOut();
+      rethrow;
     }
   }
 
@@ -146,8 +158,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
         final user = await widget.auth.reloadUser();
-        final boundProfile = await _profileStore.bindActiveProfile(user.localId);
-        widget.auth.acceptBoundProfile(boundProfile);
+        final boundProfile = await _bindProfile(user.localId);
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
