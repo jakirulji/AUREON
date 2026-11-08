@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'aureon_firebase_auth_service.dart';
+import 'aureon_backend_profile.dart';
 
 class AureonAccountPage extends StatefulWidget {
   const AureonAccountPage({super.key, required this.auth});
@@ -14,6 +15,13 @@ class AureonAccountPage extends StatefulWidget {
 class _AureonAccountPageState extends State<AureonAccountPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _profileName = TextEditingController();
+  final _firebaseApiKey = TextEditingController();
+  final _firebaseProjectId = TextEditingController();
+  final _workerUrl = TextEditingController();
+  final _profileStore = AureonBackendProfileStore();
+  List<AureonBackendProfile> _profiles = const [];
+  AureonBackendProfile? _activeProfile;
   bool _busy = false;
   bool _createMode = false;
   bool _obscure = true;
@@ -29,26 +37,84 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _profileName.dispose();
+    _firebaseApiKey.dispose();
+    _firebaseProjectId.dispose();
+    _workerUrl.dispose();
     super.dispose();
   }
 
   Future<void> _restore() async {
-    if (!widget.auth.isConfigured) {
-      setState(() => _status =
-          'Firebase is not configured yet. The app is ready for the owner-provisioned Firebase project; no account or password is required in this preview.');
-      return;
-    }
     try {
-      await widget.auth.restoreSession();
-      final user = await widget.auth.reloadUser();
-      if (mounted) {
-        setState(() => _status =
-            'Signed in as ${user.email}. Email verification: ${user.emailVerified ? "verified" : "pending"}.');
+      final profiles = await _profileStore.listProfiles();
+      final active = await _profileStore.activeProfile();
+      if (active != null) {
+        widget.auth.configureProfile(active);
+        _activeProfile = active;
+        _profileName.text = active.name;
+        _firebaseApiKey.text = active.firebaseApiKey;
+        _firebaseProjectId.text = active.firebaseProjectId;
+        _workerUrl.text = active.workerBaseUrl;
       }
-    } catch (_) {
-      if (mounted) setState(() => _status = 'No active session. Sign in or create your AUREON account.');
+      if (!mounted) return;
+      setState(() => _profiles = profiles);
+      if (active == null) {
+        setState(() => _status = 'Add your own Firebase project and Cloudflare Worker profile. AUREON does not provide a shared default backend.');
+        return;
+      }
+      try {
+        await widget.auth.restoreSession();
+        final user = await widget.auth.reloadUser();
+        final bound = await _profileStore.bindActiveProfile(user.localId);
+        widget.auth.acceptBoundProfile(bound);
+        if (mounted) setState(() {
+          _activeProfile = bound;
+          _status = 'Signed in as ${user.email}. Backend profile “${bound.name}” is bound to this Firebase identity and Worker.';
+        });
+      } catch (_) {
+        if (mounted) setState(() => _status = 'Backend profile “${active.name}” is active. Sign in or create your AUREON account.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _status = 'Backend profile setup needs attention: $error');
     }
   }
+
+  Future<void> _saveBackendProfile() => _run(() async {
+    if (widget.auth.currentUser != null) {
+      throw StateError('Sign out before changing backend profiles.');
+    }
+    final profile = await _profileStore.saveProfile(
+      name: _profileName.text,
+      firebaseApiKey: _firebaseApiKey.text,
+      firebaseProjectId: _firebaseProjectId.text,
+      workerBaseUrl: _workerUrl.text,
+    );
+    widget.auth.configureProfile(profile);
+    final profiles = await _profileStore.listProfiles();
+    if (mounted) setState(() {
+      _activeProfile = profile;
+      _profiles = profiles;
+      _status = 'Backend profile “${profile.name}” saved locally and selected. It will be bound to your Master Account after sign-in.';
+    });
+  });
+
+  Future<void> _activateBackendProfile(String id) => _run(() async {
+    if (widget.auth.currentUser != null) {
+      throw StateError('Sign out before switching backend profiles.');
+    }
+    await _profileStore.activateProfile(id);
+    final profile = await _profileStore.activeProfile();
+    if (profile == null) throw StateError('Selected backend profile could not be loaded.');
+    widget.auth.configureProfile(profile);
+    if (mounted) setState(() {
+      _activeProfile = profile;
+      _profileName.text = profile.name;
+      _firebaseApiKey.text = profile.firebaseApiKey;
+      _firebaseProjectId.text = profile.firebaseProjectId;
+      _workerUrl.text = profile.workerBaseUrl;
+      _status = 'Using backend profile “${profile.name}”.';
+    });
+  });
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -67,6 +133,9 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   }
 
   Future<void> _submit() => _run(() async {
+        if (_activeProfile == null || !widget.auth.isConfigured) {
+          throw StateError('Save and activate your own Firebase + Cloudflare backend profile first.');
+        }
         final email = _email.text.trim();
         final password = _password.text;
         if (email.isEmpty || password.isEmpty) {
@@ -77,10 +146,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
         final user = await widget.auth.reloadUser();
+        final boundProfile = await _profileStore.bindActiveProfile(user.localId);
+        widget.auth.acceptBoundProfile(boundProfile);
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
-              : 'Signed in as ${user.email}. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
+              : 'Signed in as ${user.email}. Backend profile “${boundProfile.name}” is identity-bound. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
         }
       });
 
@@ -157,9 +228,42 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (!widget.auth.isConfigured)
           _notice(
             Icons.settings_suggest_outlined,
-            'Firebase project setup required',
-            'Email/Password Authentication must be enabled in Firebase. Then build with AUREON_FIREBASE_API_KEY and AUREON_FIREBASE_PROJECT_ID. These values are public client configuration, not passwords. Do not paste service-account keys or private secrets into the app.',
+            'Your own backend profile is required',
+            'AUREON has no shared developer-hosted backend. Add your Firebase Web API key, Firebase project ID and your Cloudflare Worker HTTPS URL below. These are client configuration values; never enter service-account JSON, Worker Secrets or private keys.',
           ),
+        const SizedBox(height: 18),
+        const Text('Your backend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        if (_profiles.isNotEmpty)
+          DropdownButtonFormField<String>(
+            value: _activeProfile?.id,
+            decoration: const InputDecoration(labelText: 'Saved backend profile', border: OutlineInputBorder()),
+            items: _profiles.map((profile) => DropdownMenuItem(
+              value: profile.id, child: Text(profile.name),
+            )).toList(),
+            onChanged: _busy || widget.auth.currentUser != null ? null : (id) {
+              if (id != null) _activateBackendProfile(id);
+            },
+          ),
+        const SizedBox(height: 10),
+        _field(_profileName, 'Profile name (e.g. Personal)'),
+        const SizedBox(height: 10),
+        _field(_firebaseApiKey, 'Firebase Web API key'),
+        const SizedBox(height: 10),
+        _field(_firebaseProjectId, 'Firebase project ID'),
+        const SizedBox(height: 10),
+        _field(_workerUrl, 'Cloudflare Worker HTTPS URL', keyboardType: TextInputType.url),
+        const SizedBox(height: 8),
+        FilledButton.tonalIcon(
+          onPressed: _busy || widget.auth.currentUser != null ? null : _saveBackendProfile,
+          icon: const Icon(Icons.cloud_done_outlined),
+          label: const Text('Save & use this backend'),
+        ),
+        const SizedBox(height: 18),
+        const Divider(),
+        const SizedBox(height: 10),
+        const Text('Master Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
         if (user == null) ...[
           _field(_email, 'Email address', keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 10),
@@ -175,14 +279,14 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _createMode,
-            onChanged: widget.auth.isConfigured && !_busy
+            onChanged: widget.auth.isConfigured && _activeProfile != null && !_busy
                 ? (value) => setState(() => _createMode = value)
                 : null,
             title: const Text('Create a new AUREON account'),
             subtitle: const Text('Otherwise, sign in to an existing account.'),
           ),
           FilledButton.icon(
-            onPressed: widget.auth.isConfigured && !_busy ? _submit : null,
+            onPressed: widget.auth.isConfigured && _activeProfile != null && !_busy ? _submit : null,
             icon: Icon(_createMode ? Icons.person_add_alt_1 : Icons.login),
             label: Text(_createMode ? 'Create account' : 'Sign in'),
           ),
