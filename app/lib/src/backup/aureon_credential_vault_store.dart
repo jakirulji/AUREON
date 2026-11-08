@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'aureon_recovery_key_service.dart';
+import 'aureon_cloudflare_vault_client.dart';
 
 abstract interface class AureonVaultDekStore {
   Future<List<int>?> read(String vaultId, int generation);
@@ -275,6 +276,60 @@ class AureonCredentialVaultStore {
     } finally {
       plan.nextDek.fillRange(0, plan.nextDek.length, 0);
     }
+  }
+
+  /// Provisions the server-assisted envelope once, persists it locally, then
+  /// uploads only the encrypted credential snapshot. A failed upload can be
+  /// retried without creating a second envelope.
+  Future<VaultRecoveryBundle> syncWithCloudflare({
+    required AureonCloudflareVaultClient client,
+    required AureonFirebaseIdTokenProvider idTokenProvider,
+  }) async {
+    final current = await loadBundle();
+    if (current == null) throw StateError('No local credential-vault bundle exists.');
+    final dek = await _dekStore.read(current.vaultId, current.generation);
+    if (dek == null) {
+      throw StateError('The local vault is locked. Restore it with an active manual recovery key before cloud sync.');
+    }
+    try {
+      final envelope = current.cloudflareEnvelope ??
+          await client.createCloudflareEnvelope(
+            vaultId: current.vaultId,
+            generation: current.generation,
+            dek: dek,
+            idTokenProvider: idTokenProvider,
+          );
+      final synchronized = VaultRecoveryBundle(
+        vaultId: current.vaultId,
+        generation: current.generation,
+        createdAtEpochMs: current.createdAtEpochMs,
+        encryptedCredentialRecords: current.encryptedCredentialRecords,
+        manualKeyEnvelopes: current.manualKeyEnvelopes,
+        cloudflareEnvelope: envelope,
+      );
+      if (current.cloudflareEnvelope == null) await _writeBundle(synchronized);
+      await client.uploadSnapshot(
+        bundle: synchronized,
+        idTokenProvider: idTokenProvider,
+      );
+      return synchronized;
+    } finally {
+      dek.fillRange(0, dek.length, 0);
+    }
+  }
+
+  /// Fetches an authenticated encrypted snapshot and quarantines it until an
+  /// active manual key authenticates its DEK and every encrypted record.
+  Future<VaultRecoveryBundle> fetchCloudflareSnapshot({
+    required String vaultId,
+    required AureonCloudflareVaultClient client,
+    required AureonFirebaseIdTokenProvider idTokenProvider,
+  }) async {
+    final bundle = await client.fetchSnapshot(
+      vaultId: vaultId,
+      idTokenProvider: idTokenProvider,
+    );
+    return importBundle(utf8.encode(jsonEncode(bundle.toJson())));
   }
 
   Future<VaultRecoveryBundle> replaceCredentialRecords({
