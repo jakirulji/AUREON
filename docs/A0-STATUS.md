@@ -1,6 +1,6 @@
 # AUREON A0 — Readiness and Exit-Gate Tracker
 
-**Last updated:** 2026-11-08  
+**Last updated:** 2026-11-09  
 **Overall status:** <strong>IN PROGRESS</strong> — Contract and existing Ktor/PostgreSQL CI are green; Android and Windows native prototypes are progressing. Owner selected Firebase Spark + Cloudflare Workers/D1, but the Worker/D1 migration, production security approval and live platform integration remain open.
 
 This file is the operational A0 checklist. A document existing in GitHub is not the same as a decision being verified or code being implemented.
@@ -172,3 +172,11 @@ A0 may be marked **COMPLETE** only when every required gate in section 2 has con
 - The Manual Recovery Key works locally and is never sent to Cloudflare. Cloudflare recovery is the alternate route if the manual key is lost.
 - A portable encrypted Recovery Bundle must be exportable and storable outside Cloudflare. The manual key alone cannot restore ciphertext that is unavailable; bundle freshness must be visible and stale imports reconciled safely.
 - Both recovery paths are architecture requirements only; no dual-envelope code, bundle export/import, Worker recovery, or cloud deployment is implemented yet.
+
+## Automated continuation update (2026-11-09)
+
+- Android transfer persistence now has explicit guarded transitions for queued, uploading, network/auth/quota waits, retry wait, pause/resume, finalization, verification and verified states. Final verification is accepted only from the verifying state after all declared bytes are acknowledged. Source cleanup eligibility still requires remote verification, user opt-in and OS permission. Android storage CI [Run #55](https://github.com/jakirulji/AUREON/actions/runs/42521513443) passed shared Dart contracts, Pigeon generation/analyze, Room persistence/recovery tests, Kotlin bridge compilation and Android storage module assembly.
+- Added a recent-transfer snapshot list to the Pigeon host API and Room repository. The response exposes only operation ID, status, byte progress, total size and remote-verification state; source URI envelopes and provider session envelopes remain native-only. Validation is pending in [Android Storage Run #56](https://github.com/jakirulji/AUREON/actions/runs/42521851872). This is not yet a live FlutterEngine-to-Dart round trip and is not wired to the app's Transfers page.
+- Cloudflare Worker JSON request parsing now enforces the body-size cap while streaming, including when Content-Length is absent, and rejects malformed length headers/non-object JSON. Recovery challenge issuance now enforces the three-per-ten-minute cap and cooldown in the conditional D1 INSERT itself, preventing a parallel read-then-write race. Added D1 index migration `0002_recovery_challenge_rate_limit_index.sql`.
+- Worker CI [Run #61](https://github.com/jakirulji/AUREON/actions/runs/42521748093) passed unit tests, SQLite execution of all D1 migrations and index assertions, TypeScript typecheck and Cloudflare dry-run. Backend CI [Run #156](https://github.com/jakirulji/AUREON/actions/runs/42521673380) also passed.
+- **Overall A0 remains IN PROGRESS.** No Firebase/Cloudflare resource has been provisioned or deployed; no live Google OAuth/provider transfer, production credential broker, independent cryptographic review, real device/Windows laptop testing or Windows Cloud Files hydration callbacks have been completed. The transfer API is still a native spike, not a production-connected transfer engine. A1 remains gated on the A0 exit review.
