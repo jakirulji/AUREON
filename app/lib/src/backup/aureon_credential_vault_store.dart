@@ -357,8 +357,18 @@ class AureonCredentialVaultStore {
     } finally {
       dek.fillRange(0, dek.length, 0);
     }
-    await _writeBundle(bundle);
-    return bundle;
+    final monotonicBundle = bundle.createdAtEpochMs > current.createdAtEpochMs
+        ? bundle
+        : VaultRecoveryBundle(
+            vaultId: bundle.vaultId,
+            generation: bundle.generation,
+            createdAtEpochMs: current.createdAtEpochMs + 1,
+            encryptedCredentialRecords: bundle.encryptedCredentialRecords,
+            manualKeyEnvelopes: bundle.manualKeyEnvelopes,
+            cloudflareEnvelope: bundle.cloudflareEnvelope,
+          );
+    await _writeBundle(monotonicBundle);
+    return monotonicBundle;
   }
 
   Future<void> _writeBundle(VaultRecoveryBundle bundle, {bool pending = false}) async {
