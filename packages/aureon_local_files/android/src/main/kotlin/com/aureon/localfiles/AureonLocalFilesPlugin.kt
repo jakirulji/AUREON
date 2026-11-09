@@ -2,27 +2,34 @@ package com.aureon.localfiles
 
 import android.app.Activity
 import android.content.Intent
-import android.content.ContentResolver
 import android.net.Uri
-import android.provider.DocumentsContract
-import android.provider.DocumentsContract.Document
-import android.os.Handler
-import android.os.Looper
-import java.security.MessageDigest
-import java.util.UUID
-import java.nio.file.FileAlreadyExistsException
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import org.json.JSONObject
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.UUID
 
-/** User-authorized SAF folder access. No broad storage permission is requested. */
+/**
+ * Android shared-storage file access.
+ *
+ * Android 11+ requires the user to explicitly grant MANAGE_EXTERNAL_STORAGE
+ * in Special App Access. The app never attempts to bypass Android's sandbox.
+ */
 class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     MethodChannel.MethodCallHandler, PluginRegistry.ActivityResultListener {
     private lateinit var channel: MethodChannel
     private var activityBinding: ActivityPluginBinding? = null
+    private var pendingAccessResult: MethodChannel.Result? = null
     private var pendingPicker: MethodChannel.Result? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -32,7 +39,9 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
-        pendingPicker?.error("detached", "Plugin detached while folder picker was open.", null)
+        pendingAccessResult?.error("detached", "AUREON closed while permission settings were open.", null)
+        pendingPicker?.error("detached", "AUREON closed while folder selection was open.", null)
+        pendingAccessResult = null
         pendingPicker = null
     }
 
@@ -42,8 +51,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     }
 
     override fun onDetachedFromActivityForConfigChanges() = detachActivity()
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) =
-        onAttachedToActivity(binding)
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) = onAttachedToActivity(binding)
     override fun onDetachedFromActivity() = detachActivity()
 
     private fun detachActivity() {
@@ -53,6 +61,9 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "hasAllFilesAccess" -> result.success(hasAllFilesAccess())
+            "requestAllFilesAccess" -> requestAllFilesAccess(result)
+            "defaultRoot" -> result.success(defaultRoot())
             "pickRoot" -> pickRoot(result)
             "listChildren" -> listChildren(call, result)
             "openFile" -> openFile(call, result)
@@ -69,597 +80,350 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         }
     }
 
-    private fun pickRoot(result: MethodChannel.Result) {
+    private fun hasAllFilesAccess(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager()
+        else true
+
+    private fun requestAllFilesAccess(result: MethodChannel.Result) {
+        if (hasAllFilesAccess()) {
+            result.success(true)
+            return
+        }
         val activity = activityBinding?.activity
         if (activity == null) {
-            result.error("no_activity", "AUREON needs an active screen to open the folder picker.", null)
+            result.error("no_activity", "AUREON needs an active screen to request storage access.", null)
             return
         }
-        if (pendingPicker != null) {
-            result.error("picker_busy", "A folder picker request is already active.", null)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            result.success(false)
             return
         }
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-            addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+        if (pendingAccessResult != null) {
+            result.error("permission_request_busy", "A storage permission request is already active.", null)
+            return
         }
-        pendingPicker = result
+        pendingAccessResult = result
         try {
-            activity.startActivityForResult(intent, PICK_ROOT_REQUEST)
-        } catch (error: Exception) {
-            pendingPicker = null
-            result.error("picker_failed", error.message ?: "Unable to open the system folder picker.", null)
+            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:${activity.packageName}")
+            }
+            activity.startActivityForResult(intent, REQUEST_ALL_FILES_ACCESS)
+        } catch (_: Exception) {
+            pendingAccessResult = null
+            try {
+                activity.startActivityForResult(
+                    Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                    REQUEST_ALL_FILES_ACCESS
+                )
+                pendingAccessResult = result
+            } catch (error: Exception) {
+                pendingAccessResult = null
+                result.error("settings_unavailable", error.message ?: "Android storage access settings could not be opened.", null)
+            }
         }
     }
 
+    private fun defaultRoot(): Map<String, String>? {
+        if (!hasAllFilesAccess()) return null
+        val root = Environment.getExternalStorageDirectory().canonicalFile
+        return mapOf("rootId" to root.path, "displayName" to "Internal storage", "rootDocumentId" to root.path)
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode != PICK_ROOT_REQUEST) return false
-        val result = pendingPicker ?: return true
-        pendingPicker = null
-        if (resultCode != Activity.RESULT_OK) {
-            result.success(null)
+        if (requestCode == REQUEST_ALL_FILES_ACCESS) {
+            val pending = pendingAccessResult ?: return true
+            pendingAccessResult = null
+            pending.success(hasAllFilesAccess())
             return true
         }
-        val uri = data?.data
-        if (uri == null) {
-            result.error("invalid_selection", "The system picker returned no folder.", null)
+        if (requestCode == PICK_ROOT_REQUEST) {
+            val pending = pendingPicker ?: return true
+            pendingPicker = null
+            if (resultCode != Activity.RESULT_OK || data?.data == null) {
+                pending.success(null)
+            } else {
+                // Retain a SAF grant for removable drives/providers. Main internal
+                // storage browsing uses direct filesystem access after All files access.
+                pending.error("secondary_root_unsupported", "Additional document-provider roots are not enabled in this build. Internal shared storage is available through All files access.", null)
+            }
             return true
         }
+        return false
+    }
+
+    private fun pickRoot(result: MethodChannel.Result) {
+        // Kept as an explicit secondary-storage entry point. Internal storage no
+        // longer requires this picker.
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.error("no_activity", "AUREON needs an active screen to open folder selection.", null)
+            return
+        }
+        if (pendingPicker != null) {
+            result.error("picker_busy", "A folder selection is already active.", null)
+            return
+        }
+        pendingPicker = result
         try {
-            val granted = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            activityBinding?.activity?.contentResolver?.takePersistableUriPermission(uri, granted)
-            val documentId = DocumentsContract.getTreeDocumentId(uri)
-            val name = queryDisplayName(uri) ?: "Selected folder"
-            result.success(mapOf("rootId" to uri.toString(), "displayName" to name, "rootDocumentId" to documentId))
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+            }
+            activity.startActivityForResult(intent, PICK_ROOT_REQUEST)
         } catch (error: Exception) {
-            result.error("permission_failed", error.message ?: "Could not retain folder access.", null)
+            pendingPicker = null
+            result.error("picker_failed", error.message ?: "Unable to open folder selection.", null)
+        }
+    }
+
+    private fun requireAccess(result: MethodChannel.Result): Boolean {
+        if (!hasAllFilesAccess()) {
+            result.error("all_files_access_required", "Grant AUREON the All files access permission in Android Settings, then try again.", null)
+            return false
         }
         return true
     }
 
-    private fun queryDisplayName(uri: Uri): String? {
-        val resolver = activityBinding?.activity?.contentResolver ?: return null
-        val documentUri = DocumentsContract.buildDocumentUriUsingTree(
-            uri, DocumentsContract.getTreeDocumentId(uri)
-        )
-        return resolver.query(documentUri, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)
-            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    private fun rootFile(rootId: String): File {
+        val root = File(rootId).canonicalFile
+        val allowed = Environment.getExternalStorageDirectory().canonicalFile
+        if (root != allowed) throw SecurityException("Only the authorized shared-storage root is supported.")
+        return root
     }
 
-    private fun copyFile(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val sourceId = call.argument<String>("sourceId")
-        val parentId = call.argument<String>("parentId")
-        val targetName = call.argument<String>("targetName")?.trim()
-        if (root.isNullOrBlank() || sourceId.isNullOrBlank() || parentId.isNullOrBlank() ||
-            targetName.isNullOrBlank() || targetName == "." || targetName == ".." ||
-            targetName.contains("/") || targetName.contains("\\")) {
-            result.error("invalid_arguments", "A valid source, destination folder and file name are required.", null); return
+    private fun resolve(rootId: String, entryId: String): File {
+        val root = rootFile(rootId)
+        val candidate = File(entryId).canonicalFile
+        if (candidate.path != root.path && !candidate.path.startsWith(root.path + File.separator)) {
+            throw SecurityException("The requested path is outside AUREON's shared-storage root.")
         }
-        val resolver = activityBinding?.activity?.contentResolver
-        if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
-        Thread {
-            var temporary: Uri? = null
-            try {
-                val treeUri = Uri.parse(root)
-                val source = DocumentsContract.buildDocumentUriUsingTree(treeUri, sourceId)
-                val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentId)
-                val rootDocument = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
-                if (!DocumentsContract.isChildDocument(resolver, rootDocument, source) ||
-                    (parentId != DocumentsContract.getTreeDocumentId(treeUri) &&
-                     !DocumentsContract.isChildDocument(resolver, rootDocument, parent))) {
-                    throw SecurityException("Source or destination is outside the selected folder.")
-                }
-                val sourceMime = resolver.getType(source)
-                if (sourceMime == null || sourceMime == Document.MIME_TYPE_DIR) {
-                    throw IllegalArgumentException("Only regular files can be copied in this operation.")
-                }
-                resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId),
-                    arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
-                    val col = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
-                    while (cursor.moveToNext()) if (cursor.getString(col).equals(targetName, ignoreCase = true))
-                        throw FileAlreadyExistsException("An item with that name already exists. Nothing was overwritten.")
-                } ?: throw IllegalStateException("Destination folder cannot be listed.")
-                temporary = DocumentsContract.createDocument(resolver, parent, sourceMime,
-                    ".aureon-copy-" + UUID.randomUUID().toString() + ".partial")
-                    ?: throw IllegalStateException("Provider cannot create a temporary copy.")
-                val sourceHash = MessageDigest.getInstance("SHA-256")
-                resolver.openInputStream(source)?.use { input ->
-                    resolver.openOutputStream(temporary, "w")?.use { output ->
-                        val buffer = ByteArray(256 * 1024)
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            sourceHash.update(buffer, 0, count)
-                            output.write(buffer, 0, count)
-                        }
-                        output.flush()
-                    } ?: throw IllegalStateException("Cannot write the temporary copy.")
-                } ?: throw IllegalStateException("Cannot read the source file.")
-                val copiedHash = MessageDigest.getInstance("SHA-256")
-                resolver.openInputStream(temporary)?.use { input ->
-                    val buffer = ByteArray(256 * 1024)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        copiedHash.update(buffer, 0, count)
-                    }
-                } ?: throw IllegalStateException("Cannot read back the temporary copy.")
-                if (!MessageDigest.isEqual(sourceHash.digest(), copiedHash.digest()))
-                    throw IllegalStateException("SHA-256 verification failed. The source was preserved.")
-                val finalized = DocumentsContract.renameDocument(resolver, temporary, targetName)
-                    ?: throw UnsupportedOperationException("Provider cannot finalize the verified copy.")
-                temporary = null
-                Handler(Looper.getMainLooper()).post { result.success(DocumentsContract.getDocumentId(finalized)) }
-            } catch (error: Exception) {
-                temporary?.let { try { DocumentsContract.deleteDocument(resolver, it) } catch (_: Exception) { } }
-                val code = when (error) {
-                    is SecurityException -> "permission_denied"
-                    is FileAlreadyExistsException -> "conflict"
-                    is UnsupportedOperationException -> "unsupported"
-                    is IllegalArgumentException -> "unsupported_item"
-                    else -> "copy_failed"
-                }
-                Handler(Looper.getMainLooper()).post { result.error(code, error.message ?: "Copy failed; source preserved.", null) }
-            }
-        }.start()
+        return candidate
     }
 
-
-    private fun moveEntry(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val entryId = call.argument<String>("entryId")
-        val sourceParentId = call.argument<String>("sourceParentId")
-        val targetParentId = call.argument<String>("targetParentId")
-        if (root.isNullOrBlank() || entryId.isNullOrBlank() ||
-            sourceParentId.isNullOrBlank() || targetParentId.isNullOrBlank() ||
-            sourceParentId == targetParentId) {
-            result.error("invalid_arguments", "A source item and two different parent folders are required.", null)
-            return
+    private fun safeName(name: String?): String {
+        val value = name?.trim().orEmpty()
+        require(value.isNotEmpty() && value != "." && value != ".." &&
+            !value.contains("/") && !value.contains("\\") && !value.contains('\u0000')) {
+            "A valid file or folder name is required."
         }
-        val resolver = activityBinding?.activity?.contentResolver
-        if (resolver == null) {
-            result.error("no_activity", "The Android activity is unavailable.", null)
-            return
-        }
-        Thread {
-            try {
-                val treeUri = Uri.parse(root)
-                val rootId = DocumentsContract.getTreeDocumentId(treeUri)
-                val rootDocument = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId)
-                val source = DocumentsContract.buildDocumentUriUsingTree(treeUri, entryId)
-                val sourceParent = DocumentsContract.buildDocumentUriUsingTree(treeUri, sourceParentId)
-                val targetParent = DocumentsContract.buildDocumentUriUsingTree(treeUri, targetParentId)
-                fun insideRoot(document: Uri, id: String): Boolean =
-                    id == rootId || DocumentsContract.isChildDocument(resolver, rootDocument, document)
-                if (!insideRoot(source, entryId) || !insideRoot(sourceParent, sourceParentId) ||
-                    !insideRoot(targetParent, targetParentId)) {
-                    throw SecurityException("Source or destination is outside the selected folder.")
-                }
-                var displayName: String? = null
-                resolver.query(source, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) displayName = cursor.getString(0)
-                } ?: throw IllegalStateException("The source item cannot be inspected.")
-                val name = displayName ?: throw IllegalStateException("The source item has no name.")
-                var foundSource = false
-                resolver.query(
-                    DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, sourceParentId),
-                    arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null
-                )?.use { cursor ->
-                    val idColumn = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
-                    while (cursor.moveToNext()) if (cursor.getString(idColumn) == entryId) foundSource = true
-                } ?: throw IllegalStateException("The source parent cannot be listed.")
-                if (!foundSource) throw SecurityException("The source item is not inside the supplied source folder.")
-                resolver.query(
-                    DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, targetParentId),
-                    arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null
-                )?.use { cursor ->
-                    val nameColumn = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
-                    while (cursor.moveToNext()) {
-                        if (cursor.getString(nameColumn).equals(name, ignoreCase = true)) {
-                            throw FileAlreadyExistsException("An item with that name already exists. Nothing was overwritten.")
-                        }
-                    }
-                } ?: throw IllegalStateException("The destination folder cannot be listed.")
-                val moved = DocumentsContract.moveDocument(resolver, source, sourceParent, targetParent)
-                    ?: throw UnsupportedOperationException("This document provider does not support native move. The source was not deleted.")
-                Handler(Looper.getMainLooper()).post {
-                    result.success(DocumentsContract.getDocumentId(moved))
-                }
-            } catch (error: Exception) {
-                val code = when (error) {
-                    is SecurityException -> "permission_denied"
-                    is FileAlreadyExistsException -> "conflict"
-                    is UnsupportedOperationException -> "unsupported"
-                    else -> "move_failed"
-                }
-                Handler(Looper.getMainLooper()).post {
-                    result.error(code, error.message ?: "Move failed; source preserved.", null)
-                }
-            }
-        }.start()
+        return value
     }
 
+    private fun entry(file: File): Map<String, Any?> = mapOf(
+        "id" to file.canonicalPath,
+        "name" to file.name.ifEmpty { "Internal storage" },
+        "isDirectory" to file.isDirectory,
+        "isHidden" to file.name.startsWith("."),
+        "sizeBytes" to if (file.isFile) file.length() else null,
+        "modifiedEpochMs" to file.lastModified().takeIf { it > 0L },
+        "isSystemTrash" to false
+    )
 
-    private fun moveToTrash(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val entryId = call.argument<String>("entryId")
-        val parentId = call.argument<String>("parentId")
-        if (root.isNullOrBlank() || entryId.isNullOrBlank() || parentId.isNullOrBlank()) {
-            result.error("invalid_arguments", "The selected item and parent folder are required.", null)
-            return
-        }
-        val resolver = activityBinding?.activity?.contentResolver
-        if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
-        Thread {
-            try {
-                val tree = Uri.parse(root)
-                val rootId = DocumentsContract.getTreeDocumentId(tree)
-                val rootDoc = DocumentsContract.buildDocumentUriUsingTree(tree, rootId)
-                val source = DocumentsContract.buildDocumentUriUsingTree(tree, entryId)
-                val parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId)
-                if (!DocumentsContract.isChildDocument(resolver, rootDoc, source) ||
-                    (parentId != rootId && !DocumentsContract.isChildDocument(resolver, rootDoc, parent))) {
-                    throw SecurityException("The selected item or parent is outside the selected folder.")
-                }
-                var name: String? = null
-                var mime: String? = null
-                var flags = 0
-                resolver.query(source, arrayOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_FLAGS),
-                    null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        name = cursor.getString(0)
-                        mime = cursor.getString(1)
-                        flags = if (cursor.isNull(2)) 0 else cursor.getInt(2)
-                    }
-                } ?: throw IllegalStateException("The selected item cannot be inspected.")
-                val displayName = name ?: throw IllegalStateException("The selected item has no name.")
-                if (displayName == ".AUREON Trash (AUREON)") throw IllegalArgumentException("The Trash folder itself cannot be moved to Trash.")
-                var sourceIsInParent = false
-                resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId),
-                    arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
-                    val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
-                    while (cursor.moveToNext()) if (cursor.getString(idCol) == entryId) sourceIsInParent = true
-                } ?: throw IllegalStateException("The source parent cannot be listed.")
-                if (!sourceIsInParent) throw SecurityException("The selected item is not inside the supplied parent folder.")
-                // Prefer provider-native Android 17 Trash when the document explicitly advertises support.
-                if (android.os.Build.VERSION.SDK_INT >= 37 && (flags and 0x00010000) != 0 && resolveProviderRootId(resolver, tree) != null) {
-                    try {
-                        val method = DocumentsContract::class.java.getMethod(
-                            "trashDocument", ContentResolver::class.java, Uri::class.java)
-                        val trashed = method.invoke(null, resolver, source) as? Uri
-                        if (trashed != null) {
-                            Handler(Looper.getMainLooper()).post {
-                                result.success(mapOf("id" to DocumentsContract.getDocumentId(trashed),
-                                    "name" to displayName, "trashFolderId" to "__system__",
-                                    "originalParentId" to parentId, "isDirectory" to (mime == Document.MIME_TYPE_DIR),
-                                    "trashedAt" to System.currentTimeMillis(), "mode" to "system"))
-                            }
-                            return@Thread
-                        }
-                    } catch (_: Exception) { }
-                }
-                val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootId)
-                var trashId: String? = null
-                resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE),
-                    null, null, null)?.use { cursor ->
-                    val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
-                    val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
-                    val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
-                    while (cursor.moveToNext()) {
-                        if (cursor.getString(nameCol) == ".AUREON Trash (AUREON)" &&
-                            cursor.getString(mimeCol) == Document.MIME_TYPE_DIR) trashId = cursor.getString(idCol)
-                    }
-                } ?: throw IllegalStateException("The selected folder cannot be listed.")
-                if (trashId == null) {
-                    val created = DocumentsContract.createDocument(resolver, rootDoc, Document.MIME_TYPE_DIR, ".AUREON Trash (AUREON)")
-                        ?: throw UnsupportedOperationException("This provider cannot create AUREON's Trash folder.")
-                    trashId = DocumentsContract.getDocumentId(created)
-                }
-                if (entryId == trashId) throw IllegalArgumentException("The Trash folder itself cannot be moved.")
-                val trashFolder = DocumentsContract.buildDocumentUriUsingTree(tree, trashId!!)
-                resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, trashId!!),
-                    arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
-                    val col = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
-                    while (cursor.moveToNext()) if (cursor.getString(col).equals(displayName, ignoreCase = true))
-                        throw FileAlreadyExistsException("An item with that name is already in Trash.")
-                } ?: throw IllegalStateException("AUREON Trash cannot be listed.")
-                val moved = DocumentsContract.moveDocument(resolver, source, parent, trashFolder)
-                    ?: throw UnsupportedOperationException("This provider cannot move items into AUREON Trash. Nothing was deleted.")
-                val movedId = DocumentsContract.getDocumentId(moved)
-                Handler(Looper.getMainLooper()).post {
-                    result.success(mapOf("id" to movedId, "name" to displayName, "trashFolderId" to trashId,
-                        "originalParentId" to parentId, "isDirectory" to (mime == Document.MIME_TYPE_DIR),
-                        "trashedAt" to System.currentTimeMillis()))
-                }
-            } catch (error: Exception) {
-                val code = when (error) {
-                    is SecurityException -> "permission_denied"
-                    is FileAlreadyExistsException -> "conflict"
-                    is UnsupportedOperationException -> "unsupported"
-                    is IllegalArgumentException -> "invalid_item"
-                    else -> "trash_failed"
-                }
-                Handler(Looper.getMainLooper()).post {
-                    result.error(code, error.message ?: "Could not move this item to Trash. The original was not intentionally deleted.", null)
-                }
-            }
-        }.start()
-    }
-
-    private fun deleteTrashEntry(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val entryId = call.argument<String>("entryId")
-        val trashFolderId = call.argument<String>("trashFolderId")
-        if (root.isNullOrBlank() || entryId.isNullOrBlank() || trashFolderId.isNullOrBlank()) {
-            result.error("invalid_arguments", "Trash item identity is incomplete.", null)
-            return
-        }
+    private fun listChildren(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
         try {
-            val resolver = activityBinding?.activity?.contentResolver
-                ?: throw IllegalStateException("The Android activity is unavailable.")
-            val tree = Uri.parse(root)
-            val rootId = DocumentsContract.getTreeDocumentId(tree)
-            val rootDoc = DocumentsContract.buildDocumentUriUsingTree(tree, rootId)
-            val item = DocumentsContract.buildDocumentUriUsingTree(tree, entryId)
-            val trash = DocumentsContract.buildDocumentUriUsingTree(tree, trashFolderId)
-            if (!DocumentsContract.isChildDocument(resolver, rootDoc, trash) ||
-                !DocumentsContract.isChildDocument(resolver, trash, item)) {
-                throw SecurityException("The item is not inside AUREON Trash.")
+            val root = call.argument<String>("rootId") ?: error("rootId is required.")
+            val parentId = call.argument<String>("parentId") ?: error("parentId is required.")
+            val parent = resolve(root, parentId)
+            if (!parent.exists() || !parent.isDirectory) {
+                result.error("not_a_directory", "This folder no longer exists or is not accessible.", null)
+                return
             }
-            if (!DocumentsContract.deleteDocument(resolver, item)) {
-                throw IllegalStateException("The provider did not confirm permanent deletion.")
-            }
-            result.success(true)
+            val children = parent.listFiles() ?: throw SecurityException("Android could not list this folder.")
+            result.success(children.map { entry(it) }.sortedWith(
+                compareByDescending<Map<String, Any?>> { it["isDirectory"] == true }
+                    .thenBy { (it["name"] as String).lowercase() }
+            ))
         } catch (error: Exception) {
-            result.error("permanent_delete_failed", error.message ?: "Permanent deletion failed.", null)
-        }
-    }
-
- 
-    private fun resolveProviderRootId(resolver: ContentResolver, tree: Uri): String? {
-        val authority = tree.authority ?: return null
-        val selectedId = DocumentsContract.getTreeDocumentId(tree)
-        val selected = DocumentsContract.buildDocumentUriUsingTree(tree, selectedId)
-        val roots = DocumentsContract.buildRootsUri(authority)
-        resolver.query(roots, arrayOf(DocumentsContract.Root.COLUMN_ROOT_ID,
-            DocumentsContract.Root.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
-            val rootIdCol = cursor.getColumnIndexOrThrow(DocumentsContract.Root.COLUMN_ROOT_ID)
-            val documentIdCol = cursor.getColumnIndexOrThrow(DocumentsContract.Root.COLUMN_DOCUMENT_ID)
-            while (cursor.moveToNext()) {
-                val rootId = cursor.getString(rootIdCol)
-                val documentId = cursor.getString(documentIdCol)
-                if (!rootId.isNullOrBlank() && !documentId.isNullOrBlank()) {
-                    val rootDocument = DocumentsContract.buildDocumentUri(authority, documentId)
-                    if (documentId == selectedId || DocumentsContract.isChildDocument(resolver, rootDocument, selected)) {
-                        return rootId
-                    }
-                }
-            }
-        }
-        return null
-    }
-
-    private fun listSystemTrash(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        if (root.isNullOrBlank()) { result.error("invalid_arguments", "rootId is required.", null); return }
-        if (android.os.Build.VERSION.SDK_INT < 37) { result.success(emptyList<Map<String, Any?>>()); return }
-        val resolver = activityBinding?.activity?.contentResolver
-        if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
-        try {
-            val tree = Uri.parse(root)
-            val providerRootId = resolveProviderRootId(resolver, tree)
-                ?: throw UnsupportedOperationException("The provider root for this selected folder could not be resolved.")
-            val method = DocumentsContract::class.java.getMethod("buildTrashDocumentsUri", String::class.java, String::class.java)
-            val trashUri = method.invoke(null, tree.authority ?: "", providerRootId) as Uri
-            val rows = mutableListOf<Map<String, Any?>>()
-            resolver.query(trashUri, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME,
-                Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE), null, null, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
-                val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
-                val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
-                val sizeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_SIZE)
-                while (cursor.moveToNext()) rows.add(mapOf(
-                    "id" to cursor.getString(idCol),
-                    "name" to (cursor.getString(nameCol) ?: "Unnamed"),
-                    "isDirectory" to (cursor.getString(mimeCol) == Document.MIME_TYPE_DIR),
-                    "sizeBytes" to if (cursor.isNull(sizeCol)) null else cursor.getLong(sizeCol),
-                    "isSystemTrash" to true))
-            }
-            result.success(rows)
-        } catch (_: Exception) {
-            // A provider without Android 17 Trash support returns an empty native Trash view.
-            result.success(emptyList<Map<String, Any?>>())
-        }
-    }
-
-    private fun restoreSystemTrashEntry(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val entryId = call.argument<String>("entryId")
-        if (root.isNullOrBlank() || entryId.isNullOrBlank()) {
-            result.error("invalid_arguments", "rootId and entryId are required.", null); return
-        }
-        if (android.os.Build.VERSION.SDK_INT < 37) {
-            result.error("unsupported", "Provider-native Trash restore requires Android 17 or later.", null); return
-        }
-        try {
-            val resolver = activityBinding?.activity?.contentResolver
-                ?: throw IllegalStateException("The Android activity is unavailable.")
-            val tree = Uri.parse(root)
-            val source = DocumentsContract.buildDocumentUri(tree.authority!!, entryId)
-            val method = DocumentsContract::class.java.getMethod("restoreDocumentFromTrash",
-                ContentResolver::class.java, Uri::class.java, Uri::class.java)
-            val restored = method.invoke(null, resolver, source, null) as? Uri
-                ?: throw UnsupportedOperationException("The provider could not restore this item.")
-            result.success(DocumentsContract.getDocumentId(restored))
-        } catch (error: Exception) {
-            result.error("restore_failed", error.message ?: "Provider-native restore failed.", null)
-        }
-    }
-
-    private fun deleteSystemTrashEntry(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val entryId = call.argument<String>("entryId")
-        if (root.isNullOrBlank() || entryId.isNullOrBlank()) {
-            result.error("invalid_arguments", "rootId and entryId are required.", null); return
-        }
-        if (android.os.Build.VERSION.SDK_INT < 37) {
-            result.error("unsupported", "Provider-native Trash deletion requires Android 17 or later.", null); return
-        }
-        try {
-            val resolver = activityBinding?.activity?.contentResolver
-                ?: throw IllegalStateException("The Android activity is unavailable.")
-            val tree = Uri.parse(root)
-            val providerRootId = resolveProviderRootId(resolver, tree)
-                ?: throw UnsupportedOperationException("The provider root for this selected folder could not be resolved.")
-            val method = DocumentsContract::class.java.getMethod("buildTrashDocumentsUri", String::class.java, String::class.java)
-            val trashUri = method.invoke(null, tree.authority ?: "", providerRootId) as Uri
-            var found = false
-            resolver.query(trashUri, arrayOf(Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
-                while (cursor.moveToNext()) if (cursor.getString(idCol) == entryId) found = true
-            } ?: throw IllegalStateException("Provider Trash cannot be listed.")
-            if (!found) throw SecurityException("The selected item is not in provider Trash.")
-            val item = DocumentsContract.buildDocumentUri(tree.authority!!, entryId)
-            if (!DocumentsContract.deleteDocument(resolver, item))
-                throw IllegalStateException("The provider did not confirm permanent deletion.")
-            result.success(true)
-        } catch (error: Exception) {
-            result.error("permanent_delete_failed", error.message ?: "Provider Trash deletion failed.", null)
-        }
-    }
-
-    private fun renameEntry(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val entryId = call.argument<String>("entryId")
-        val newName = call.argument<String>("newName")?.trim()
-        if (root.isNullOrBlank() || entryId.isNullOrBlank() || newName.isNullOrBlank() ||
-            newName == "." || newName == ".." || newName.contains("/") || newName.contains("\\")) {
-            result.error("invalid_arguments", "A valid new name and entry identity are required.", null); return
-        }
-        try {
-            val resolver = activityBinding?.activity?.contentResolver
-            if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
-            val uri = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(root), entryId)
-            val renamed = DocumentsContract.renameDocument(resolver, uri, newName)
-            if (renamed == null) { result.error("unsupported", "This document provider does not support renaming.", null); return }
-            result.success(DocumentsContract.getDocumentId(renamed))
-        } catch (error: SecurityException) {
-            result.error("permission_denied", "Write access was revoked. Re-select the folder.", null)
-        } catch (error: Exception) {
-            result.error("rename_failed", error.message ?: "Unable to rename this item.", null)
+            result.error(if (error is SecurityException) "permission_denied" else "listing_failed",
+                error.message ?: "Unable to list this folder.", null)
         }
     }
 
     private fun createFolder(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val parentId = call.argument<String>("parentId")
-        val name = call.argument<String>("name")?.trim()
-        if (root.isNullOrBlank() || parentId.isNullOrBlank() || name.isNullOrBlank() ||
-            name == "." || name == ".." || name.contains("/") || name.contains("\\")) {
-            result.error("invalid_arguments", "A valid folder name and parent identity are required.", null); return
-        }
+        if (!requireAccess(result)) return
         try {
-            val resolver = activityBinding?.activity?.contentResolver
-            if (resolver == null) { result.error("no_activity", "The Android activity is unavailable.", null); return }
-            val parent = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(root), parentId)
-            val created = DocumentsContract.createDocument(resolver, parent, Document.MIME_TYPE_DIR, name)
-            if (created == null) { result.error("unsupported", "This document provider does not support creating folders.", null); return }
-            result.success(DocumentsContract.getDocumentId(created))
-        } catch (error: SecurityException) {
-            result.error("permission_denied", "Write access was revoked. Re-select the folder.", null)
-        } catch (error: Exception) {
-            result.error("create_failed", error.message ?: "Unable to create this folder.", null)
-        }
+            val root = call.argument<String>("rootId") ?: error("rootId is required.")
+            val parent = resolve(root, call.argument<String>("parentId") ?: error("parentId is required."))
+            val name = safeName(call.argument<String>("name"))
+            val target = File(parent, name)
+            if (target.exists()) throw IllegalStateException("An item with that name already exists.")
+            if (!target.mkdirs()) throw IllegalStateException("Could not create the folder.")
+            result.success(target.canonicalPath)
+        } catch (error: Exception) { result.error("create_folder_failed", error.message, null) }
+    }
+
+    private fun renameEntry(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val root = call.argument<String>("rootId") ?: error("rootId is required.")
+            val source = resolve(root, call.argument<String>("entryId") ?: error("entryId is required."))
+            val name = safeName(call.argument<String>("newName"))
+            val target = File(source.parentFile, name)
+            if (!source.exists()) throw IllegalStateException("The item no longer exists.")
+            if (target.exists()) throw IllegalStateException("An item with that name already exists.")
+            if (!source.renameTo(target)) throw IllegalStateException("Rename failed.")
+            result.success(target.canonicalPath)
+        } catch (error: Exception) { result.error("rename_failed", error.message, null) }
+    }
+
+    private fun copyFile(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val root = call.argument<String>("rootId") ?: error("rootId is required.")
+            val source = resolve(root, call.argument<String>("sourceId") ?: error("sourceId is required."))
+            val parent = resolve(root, call.argument<String>("parentId") ?: error("parentId is required."))
+            val target = File(parent, safeName(call.argument<String>("targetName")))
+            if (!source.isFile || !parent.isDirectory) throw IllegalArgumentException("A file and destination folder are required.")
+            if (target.exists()) throw IllegalStateException("An item with that name already exists; nothing was overwritten.")
+            val partial = File(parent, ".aureon-copy-${UUID.randomUUID()}.partial")
+            try {
+                Files.copy(source.toPath(), partial.toPath())
+                if (source.length() != partial.length()) throw IllegalStateException("Copy verification failed; source preserved.")
+                if (!partial.renameTo(target)) throw IllegalStateException("Could not finalize copied file.")
+            } finally { if (partial.exists()) partial.delete() }
+            result.success(target.canonicalPath)
+        } catch (error: Exception) { result.error("copy_failed", error.message, null) }
+    }
+
+    private fun moveEntry(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val root = call.argument<String>("rootId") ?: error("rootId is required.")
+            val source = resolve(root, call.argument<String>("entryId") ?: error("entryId is required."))
+            val parent = resolve(root, call.argument<String>("targetParentId") ?: error("targetParentId is required."))
+            if (!source.exists() || !parent.isDirectory) throw IllegalArgumentException("Source or destination is unavailable.")
+            val target = File(parent, source.name)
+            if (target.exists()) throw IllegalStateException("An item with that name already exists; nothing was overwritten.")
+            if (!source.renameTo(target)) {
+                // Cross-volume moves are copied and verified before source removal.
+                if (source.isDirectory) throw IllegalStateException("Moving folders across storage volumes is not supported.")
+                val partial = File(parent, ".aureon-move-${UUID.randomUUID()}.partial")
+                try {
+                    Files.copy(source.toPath(), partial.toPath())
+                    if (source.length() != partial.length()) throw IllegalStateException("Move verification failed; source preserved.")
+                    if (!partial.renameTo(target)) throw IllegalStateException("Could not finalize moved file.")
+                    if (!source.delete()) { target.delete(); throw IllegalStateException("Could not remove source after verified copy.") }
+                } finally { if (partial.exists()) partial.delete() }
+            }
+            result.success(target.canonicalPath)
+        } catch (error: Exception) { result.error("move_failed", error.message, null) }
+    }
+
+    private fun trashDir(root: File) = File(root, ".AUREON Trash (AUREON)")
+    private fun trashIndex(root: File) = File(trashDir(root), ".aureon-trash-index.json")
+
+    private fun readTrashIndex(root: File): JSONObject {
+        val file = trashIndex(root)
+        return if (file.exists()) JSONObject(file.readText()) else JSONObject()
+    }
+
+    private fun moveToTrash(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val rootId = call.argument<String>("rootId") ?: error("rootId is required.")
+            val root = rootFile(rootId)
+            val source = resolve(rootId, call.argument<String>("entryId") ?: error("entryId is required."))
+            if (!source.exists() || source == root || source.parentFile == trashDir(root)) throw IllegalArgumentException("This item cannot be moved to Trash.")
+            val trash = trashDir(root)
+            if (!trash.exists() && !trash.mkdirs()) throw IllegalStateException("Could not create AUREON Trash.")
+            val id = UUID.randomUUID().toString()
+            val target = File(trash, id + "_" + source.name)
+            val index = readTrashIndex(root)
+            val parent = source.parentFile?.canonicalPath ?: root.path
+            val name = source.name
+            if (!source.renameTo(target)) {
+                if (!source.isFile) throw IllegalStateException("Could not move this folder to Trash.")
+                Files.copy(source.toPath(), target.toPath())
+                if (source.length() != target.length()) { target.delete(); throw IllegalStateException("Trash verification failed; original preserved.") }
+                if (!source.delete()) { target.delete(); throw IllegalStateException("Could not remove original after verified Trash copy.") }
+            }
+            index.put(target.name, JSONObject().put("originalParent", parent).put("originalName", name).put("trashedAt", System.currentTimeMillis()))
+            trashIndex(root).writeText(index.toString())
+            result.success(mapOf("id" to target.canonicalPath, "name" to name, "trashFolderId" to trash.canonicalPath,
+                "originalParentId" to parent, "trashedAt" to System.currentTimeMillis(), "mode" to "managed"))
+        } catch (error: Exception) { result.error("trash_failed", error.message, null) }
+    }
+
+    private fun listSystemTrash(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val root = rootFile(call.argument<String>("rootId") ?: error("rootId is required."))
+            val trash = trashDir(root)
+            val files = trash.listFiles()?.filter { it.isFile && it.name != ".aureon-trash-index.json" }.orEmpty()
+            result.success(files.map { file ->
+                val meta = readTrashIndex(root).optJSONObject(file.name)
+                mapOf("id" to file.canonicalPath, "name" to (meta?.optString("originalName")?.takeIf { it.isNotBlank() } ?: file.name),
+                    "isDirectory" to file.isDirectory, "isHidden" to false, "sizeBytes" to file.length(),
+                    "modifiedEpochMs" to file.lastModified(), "isSystemTrash" to true)
+            })
+        } catch (error: Exception) { result.error("trash_list_failed", error.message, null) }
+    }
+
+    private fun restoreSystemTrashEntry(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val rootId = call.argument<String>("rootId") ?: error("rootId is required.")
+            val root = rootFile(rootId)
+            val trashed = resolve(rootId, call.argument<String>("entryId") ?: error("entryId is required."))
+            val index = readTrashIndex(root)
+            val meta = index.optJSONObject(trashed.name) ?: throw IllegalStateException("Trash restore metadata is missing.")
+            val parent = resolve(rootId, meta.getString("originalParent"))
+            if (!parent.isDirectory) throw IllegalStateException("Original folder is unavailable.")
+            val originalName = safeName(meta.getString("originalName"))
+            var target = File(parent, originalName)
+            if (target.exists()) target = File(parent, "${System.currentTimeMillis()}_$originalName")
+            if (!trashed.renameTo(target)) throw IllegalStateException("Could not restore this item.")
+            index.remove(trashed.name)
+            trashIndex(root).writeText(index.toString())
+            result.success(null)
+        } catch (error: Exception) { result.error("trash_restore_failed", error.message, null) }
+    }
+
+    private fun deleteSystemTrashEntry(call: MethodCall, result: MethodChannel.Result) {
+        deleteTrashEntry(call, result)
+    }
+
+    private fun deleteTrashEntry(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        try {
+            val rootId = call.argument<String>("rootId") ?: error("rootId is required.")
+            val root = rootFile(rootId)
+            val file = resolve(rootId, call.argument<String>("entryId") ?: error("entryId is required."))
+            if (file.parentFile != trashDir(root)) throw SecurityException("Only AUREON Trash items can be permanently deleted here.")
+            if (!deleteRecursively(file)) throw IllegalStateException("Could not permanently delete the Trash item.")
+            val index = readTrashIndex(root)
+            index.remove(file.name)
+            trashIndex(root).writeText(index.toString())
+            result.success(null)
+        } catch (error: Exception) { result.error("trash_delete_failed", error.message, null) }
+    }
+
+    private fun deleteRecursively(file: File): Boolean {
+        if (file.isDirectory) file.listFiles()?.forEach { if (!deleteRecursively(it)) return false }
+        return !file.exists() || file.delete()
     }
 
     private fun openFile(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val fileId = call.argument<String>("fileId")
-        if (root.isNullOrBlank() || fileId.isNullOrBlank()) {
-            result.error("invalid_arguments", "rootId and fileId are required.", null); return
-        }
-        val activity = activityBinding?.activity
-        if (activity == null) { result.error("no_activity", "An active screen is required.", null); return }
+        if (!requireAccess(result)) return
         try {
-            val uri = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(root), fileId)
-            val mime = activity.contentResolver.getType(uri) ?: "application/octet-stream"
+            val rootId = call.argument<String>("rootId") ?: error("rootId is required.")
+            val file = resolve(rootId, call.argument<String>("fileId") ?: error("fileId is required."))
+            if (!file.isFile) throw IllegalArgumentException("The selected item is not a file.")
+            val activity = activityBinding?.activity ?: throw IllegalStateException("AUREON has no active screen.")
+            val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.aureon.fileprovider", file)
+            val mime = activity.contentResolver.getType(uri) ?: "*/*"
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            activity.startActivity(intent)
-            result.success(true)
-        } catch (error: android.content.ActivityNotFoundException) {
-            result.error("no_viewer", "No installed app can open this file type.", null)
-        } catch (error: SecurityException) {
-            result.error("permission_denied", "File access was revoked. Re-select its folder.", null)
-        } catch (error: Exception) {
-            result.error("open_failed", error.message ?: "Unable to open this file.", null)
-        }
-    }
-
-    private fun listChildren(call: MethodCall, result: MethodChannel.Result) {
-        val root = call.argument<String>("rootId")
-        val parentId = call.argument<String>("parentId")
-        if (root.isNullOrBlank() || parentId.isNullOrBlank()) {
-            result.error("invalid_arguments", "rootId and parentId are required.", null)
-            return
-        }
-        try {
-            val treeUri = Uri.parse(root)
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
-            val resolver = activityBinding?.activity?.contentResolver
-            if (resolver == null) {
-                result.error("no_activity", "The Android activity is unavailable.", null)
-                return
-            }
-            val projection = arrayOf(
-                Document.COLUMN_DOCUMENT_ID,
-                Document.COLUMN_DISPLAY_NAME,
-                Document.COLUMN_MIME_TYPE,
-                Document.COLUMN_SIZE,
-                Document.COLUMN_LAST_MODIFIED
-            )
-            val entries = mutableListOf<Map<String, Any?>>()
-            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
-                val nameCol = cursor.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
-                val mimeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
-                val sizeCol = cursor.getColumnIndexOrThrow(Document.COLUMN_SIZE)
-                val modifiedCol = cursor.getColumnIndexOrThrow(Document.COLUMN_LAST_MODIFIED)
-                while (cursor.moveToNext()) {
-                    val mime = cursor.getString(mimeCol)
-                    val isDirectory = mime == Document.MIME_TYPE_DIR
-                    val id = cursor.getString(idCol)
-                    entries.add(
-                        mapOf(
-                            "id" to id,
-                            "name" to (cursor.getString(nameCol) ?: "Unnamed"),
-                            "isDirectory" to isDirectory,
-                            "isHidden" to (cursor.getString(nameCol)?.startsWith(".") == true),
-                            "sizeBytes" to if (isDirectory || cursor.isNull(sizeCol)) null else cursor.getLong(sizeCol),
-                            "modifiedEpochMs" to if (cursor.isNull(modifiedCol)) null else cursor.getLong(modifiedCol),
-                        )
-                    )
-                }
-            } ?: run {
-                result.error("listing_unavailable", "The selected folder could not be listed by its document provider.", null)
-                return
-            }
-            entries.sortWith(compareByDescending<Map<String, Any?>> { it["isDirectory"] == true }
-                .thenBy { (it["name"] as String).lowercase() })
-            result.success(entries)
-        } catch (error: SecurityException) {
-            result.error("permission_denied", "Folder access was revoked. Select the folder again.", null)
-        } catch (error: Exception) {
-            result.error("listing_failed", error.message ?: "Unable to list this folder.", null)
-        }
+            activity.startActivity(Intent.createChooser(intent, "Open with"))
+            result.success(null)
+        } catch (error: Exception) { result.error("open_failed", error.message, null) }
     }
 
     companion object {
+        private const val REQUEST_ALL_FILES_ACCESS = 0xA0E1
         private const val PICK_ROOT_REQUEST = 0xA0E0
     }
 }
