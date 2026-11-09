@@ -44,9 +44,28 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_savedRootKey);
       if (saved == null) {
-        // First launch: ask for the user's folder permission immediately.
-        // Android displays the system SAF folder-grant UI; Windows opens
-        // the native folder chooser. The granted root is persisted below.
+        if (Platform.isWindows) {
+          // Windows already runs with the signed-in user's filesystem
+          // permissions. Start in that user's profile automatically;
+          // users can still choose another root from the Files toolbar.
+          final root = await _files.defaultRoot();
+          if (root != null) {
+            await prefs.setString(_savedRootKey, jsonEncode({
+              'rootId': root.rootId, 'displayName': root.displayName,
+              'rootDocumentId': root.rootDocumentId,
+            }));
+            if (!mounted) return;
+            setState(() {
+              _root = root;
+              _levels..clear()..add(_Folder(root.displayName, root.rootDocumentId));
+            });
+            await _load();
+            return;
+          }
+        }
+        // Android: show the system Storage Access Framework picker on
+        // first launch so the user explicitly grants a persistent folder
+        // permission. Android does not permit silent unrestricted access.
         if (mounted) await _choose();
         return;
       }
