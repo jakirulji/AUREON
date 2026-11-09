@@ -6,12 +6,13 @@ This guide is for the project owner. Do not send passwords, service-account JSON
 
 1. Create a Firebase project under an owner-controlled Google account with MFA enabled.
 2. Keep the project on the no-cost Spark plan. Do not enable billing solely for AUREON setup.
-3. Open Authentication → Sign-in method and enable Email/Password. Do not enable SMS/phone authentication.
+3. Open Authentication → Sign-in method and enable **Email/Password** and **Email link (passwordless sign-in)**. Do not enable SMS/phone authentication.
 4. Open Project settings → General and copy:
    - Firebase Project ID
    - Web API Key
 5. The Web API Key is public client configuration, not a service-account secret. Do not use a service-account key in the app. Restrict the API key to Firebase Authentication / Identity Toolkit and Secure Token APIs where the Google Cloud console permits; verify restrictions do not block Android/Windows native requests.
 6. Email verification is required by the Worker. Configure the Firebase verification email template and sender settings in Firebase. Check the spam folder during initial tests.
+7. Email Link provider enablement is only Firebase-side configuration. The AUREON app must separately implement the passwordless email-link request/completion flow, Android App Links and Windows link handoff before users can sign in passwordlessly. This flow is tracked in A2 of `AUREON-PLAN.md`; do not mark it complete merely because the provider is enabled.
 
 The Flutter app uses Firebase Identity Toolkit and Secure Token REST endpoints directly so the same email/password flow works on Android and Windows without a Firebase native plugin dependency. Passwords are sent only to Firebase over HTTPS and are not persisted by AUREON. The rotating refresh token is stored using flutter_secure_storage (Android Keystore-backed storage / Windows DPAPI-backed storage); ID tokens remain in memory. Signing out clears this device's local refresh token. It does not revoke the Firebase refresh token server-side.
 
