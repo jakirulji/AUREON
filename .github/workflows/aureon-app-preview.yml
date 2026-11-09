@@ -178,29 +178,41 @@ jobs:
           flutter config --enable-windows-desktop
           flutter create --empty --platforms=windows --project-name aureon --org com.aureon "$env:RUNNER_TEMP/aureon-windows"
           Copy-Item app/assets/branding/aureon.ico "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico" -Force
-          python -m pip install --quiet pillow
+          npm install --no-save sharp
           @'
-          from pathlib import Path
-          from PIL import Image
-          import io, struct
-          path = Path(__import__("os").environ["RUNNER_TEMP"]) / "aureon-windows" / "windows" / "runner" / "resources" / "app_icon.ico"
-          source = Image.open(path)
-          ico = source.ico
-          sizes = sorted(ico.sizes(), reverse=True)
-          entries, payloads = [], []
-          offset = 6 + 16 * len(sizes)
-          for size in sizes:
-              image = ico.getimage(size).convert("RGBA")
-              png = io.BytesIO()
-              image.save(png, format="PNG", optimize=True)
-              data = png.getvalue()
-              dimension = 0 if size == 256 else size
-              entries.append(struct.pack("<BBBBHHII", dimension, dimension, 0, 0, 1, 32, len(data), offset))
-              payloads.append(data)
-              offset += len(data)
-          path.write_bytes(struct.pack("<HHH", 0, 1, len(entries)) + b"".join(entries) + b"".join(payloads))
-          print(f"Normalized AUREON icon to PNG-compressed ICO ({sizes})")
-          '@ | python -
+          const fs = require("fs");
+          const path = require("path");
+          const sharp = require("sharp");
+          (async () => {
+            const root = process.env.RUNNER_TEMP;
+            const svg = path.join(process.cwd(), "app", "assets", "branding", "aureon-icon.svg");
+            const ico = path.join(root, "aureon-windows", "windows", "runner", "resources", "app_icon.ico");
+            const sizes = [256, 128, 64, 48, 32, 16];
+            const pngs = [];
+            for (const size of sizes) {
+              pngs.push(await sharp(svg).resize(size, size, { fit: "contain" }).png().toBuffer());
+            }
+            const header = Buffer.alloc(6 + sizes.length * 16);
+            header.writeUInt16LE(0, 0);
+            header.writeUInt16LE(1, 2);
+            header.writeUInt16LE(sizes.length, 4);
+            let offset = header.length;
+            for (let i = 0; i < sizes.length; i++) {
+              const size = sizes[i], data = pngs[i], pos = 6 + i * 16;
+              header.writeUInt8(size === 256 ? 0 : size, pos);
+              header.writeUInt8(size === 256 ? 0 : size, pos + 1);
+              header.writeUInt8(0, pos + 2);
+              header.writeUInt8(0, pos + 3);
+              header.writeUInt16LE(1, pos + 4);
+              header.writeUInt16LE(32, pos + 6);
+              header.writeUInt32LE(data.length, pos + 8);
+              header.writeUInt32LE(offset, pos + 12);
+              offset += data.length;
+            }
+            fs.writeFileSync(ico, Buffer.concat([header, ...pngs]));
+            console.log("Generated valid PNG-compressed AUREON ICO from SVG.");
+          })().catch(err => { console.error(err); process.exit(1); });
+          '@ | node -
           if (-not (Test-Path "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico")) { throw "AUREON Windows icon was not installed into the runner project." }
           Copy-Item app/pubspec.yaml "$env:RUNNER_TEMP/aureon-windows/pubspec.yaml" -Force
           Remove-Item "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse -Force
