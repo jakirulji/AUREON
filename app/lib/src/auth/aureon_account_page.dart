@@ -67,6 +67,26 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     );
   }
 
+  Future<void> _openOAuthGuide() async {
+    final guide = await rootBundle.loadString('assets/guides/google-drive-oauth-setup.txt');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Google Drive OAuth setup & security'),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: SelectableText(guide, style: const TextStyle(fontSize: 12, height: 1.45)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _restore() async {
     try {
       final profiles = await _profileStore.listProfiles();
@@ -303,6 +323,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           onPressed: _busy ? null : _openSetupGuide,
           icon: const Icon(Icons.menu_book_outlined),
           label: const Text('Read Firebase & Cloudflare setup guide'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _openOAuthGuide,
+          icon: const Icon(Icons.key_outlined),
+          label: const Text('Google Drive OAuth setup & security guide'),
         ),
         const SizedBox(height: 18),
         const Text('Your backend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
