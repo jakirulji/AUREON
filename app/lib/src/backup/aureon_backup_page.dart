@@ -37,7 +37,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   ManualRecoveryKeySet? _keySet;
   VaultRecoveryBundle? _vaultBundle;
   bool _busy = false;
-  String _status = 'Recovery key and metadata backup tools are available. Live credential-vault recovery is not connected yet.';
+  String _status = 'Local recovery tools are ready. Cloudflare vault sync and recovery are available after Firebase and Worker profile setup.';
   List<String> _restoreConflicts = const [];
 
   @override
@@ -571,7 +571,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
               child: Text('Bundle ready • generation ${_vaultBundle!.generation} • ${_vaultBundle!.encryptedCredentialRecords.length} encrypted credential records • Cloudflare envelope: ${_vaultBundle!.cloudflareEnvelope == null ? "not provisioned" : "present"}', style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
             ),
           const SizedBox(height: 8),
-          const Text('The TXT contains plaintext secrets. The .key file encrypts all five keys using Argon2id + AES-256-GCM. The separate .aureon-vault file contains encrypted credential records and wrapped-DEK envelopes, never plaintext keys or OAuth tokens. The local DEK is stored through platform secure storage. Provider OAuth/token refresh and Cloudflare recovery remain pending.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
+          const Text('The TXT contains plaintext recovery keys. The .key file encrypts all five keys using Argon2id + AES-256-GCM. The separate .aureon-vault file contains encrypted credential records and wrapped-DEK envelopes, never plaintext keys or OAuth tokens. The local DEK is stored through platform secure storage. Cloudflare snapshot sync/recovery is available in the section below; provider OAuth/token refresh integration remains pending.', style: TextStyle(fontSize: 12, color: Color(0xFFFFD27A))),
         ],
       ),
       const SizedBox(height: 14),
