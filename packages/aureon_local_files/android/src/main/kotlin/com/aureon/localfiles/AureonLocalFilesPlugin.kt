@@ -230,7 +230,8 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 return
             }
             val children = parent.listFiles() ?: throw SecurityException("Android could not list this folder.")
-            result.success(children.map { entry(it) }.sortedWith(
+            val visibleChildren = if (parent.canonicalFile == rootFile(root).canonicalFile) children.filter { it != trashDir(rootFile(root)) } else children
+            result.success(visibleChildren.map { entry(it) }.sortedWith(
                 compareByDescending<Map<String, Any?>> { it["isDirectory"] == true }
                     .thenBy { (it["name"] as String).lowercase() }
             ))
@@ -260,7 +261,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             val source = resolve(root, call.argument<String>("entryId") ?: error("entryId is required."))
             val name = safeName(call.argument<String>("newName"))
             val target = File(source.parentFile, name)
-            if (!source.exists()) throw IllegalStateException("The item no longer exists.")
+            if (!source.exists() || source == rootFile(root)) throw IllegalStateException("The item no longer exists or cannot be renamed.")
             if (target.exists()) throw IllegalStateException("An item with that name already exists.")
             if (!source.renameTo(target)) throw IllegalStateException("Rename failed.")
             result.success(target.canonicalPath)
@@ -292,7 +293,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             val root = call.argument<String>("rootId") ?: error("rootId is required.")
             val source = resolve(root, call.argument<String>("entryId") ?: error("entryId is required."))
             val parent = resolve(root, call.argument<String>("targetParentId") ?: error("targetParentId is required."))
-            if (!source.exists() || !parent.isDirectory) throw IllegalArgumentException("Source or destination is unavailable.")
+            if (!source.exists() || source == rootFile(root) || !parent.isDirectory) throw IllegalArgumentException("Source or destination is unavailable.")
             val target = File(parent, source.name)
             if (target.exists()) throw IllegalStateException("An item with that name already exists; nothing was overwritten.")
             if (!source.renameTo(target)) {
@@ -350,11 +351,11 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         try {
             val root = rootFile(call.argument<String>("rootId") ?: error("rootId is required."))
             val trash = trashDir(root)
-            val files = trash.listFiles()?.filter { it.isFile && it.name != ".aureon-trash-index.json" }.orEmpty()
+            val files = trash.listFiles()?.filter { it.name != ".aureon-trash-index.json" }.orEmpty()
             result.success(files.map { file ->
                 val meta = readTrashIndex(root).optJSONObject(file.name)
                 mapOf("id" to file.canonicalPath, "name" to (meta?.optString("originalName")?.takeIf { it.isNotBlank() } ?: file.name),
-                    "isDirectory" to file.isDirectory, "isHidden" to false, "sizeBytes" to file.length(),
+                    "isDirectory" to file.isDirectory, "isHidden" to false, "sizeBytes" to if (file.isFile) file.length() else null,
                     "modifiedEpochMs" to file.lastModified(), "isSystemTrash" to true)
             })
         } catch (error: Exception) { result.error("trash_list_failed", error.message, null) }
