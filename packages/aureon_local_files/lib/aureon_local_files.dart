@@ -82,6 +82,13 @@ class AureonLocalFiles {
 
   final MethodChannel _channel;
 
+  Future<AureonLocalRoot?> defaultRoot() async {
+    final value = await _channel.invokeMethod<Object?>('defaultRoot');
+    if (value == null) return null;
+    if (value is! Map) throw const FormatException('Native default folder returned an invalid response.');
+    return AureonLocalRoot.fromMap(value);
+  }
+
   Future<AureonLocalRoot?> pickRoot() async {
     final value = await _channel.invokeMethod<Object?>('pickRoot');
     if (value == null) return null;
