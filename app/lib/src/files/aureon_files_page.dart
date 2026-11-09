@@ -39,33 +39,81 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   @override
   void dispose() { _searchController.dispose(); super.dispose(); }
 
+  Future<bool> _ensureAndroidAccess() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      if (await _files.hasAllFilesAccess()) return true;
+      if (!mounted) return false;
+      final openSettings = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Allow AUREON to manage files'),
+          content: const Text(
+            'AUREON is a file manager. To browse, organize and manage files across your shared internal storage without repeatedly choosing folders, Android requires the special “All files access” permission. AUREON will not upload or delete files unless you separately enable those features.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue')),
+          ],
+        ),
+      );
+      if (openSettings != true || !mounted) return false;
+      final granted = await _files.requestAllFilesAccess();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All files access was not granted. Enable it in Android Settings to use AUREON Files.')),
+        );
+      }
+      return granted;
+    } catch (error) {
+      _fail('Could not request Android file access: $error');
+      return false;
+    }
+  }
+
+  Future<void> _activateRoot(AureonLocalRoot root) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_savedRootKey, jsonEncode({
+      'rootId': root.rootId,
+      'displayName': root.displayName,
+      'rootDocumentId': root.rootDocumentId,
+    }));
+    if (!mounted) return;
+    setState(() {
+      _root = root;
+      _levels
+        ..clear()
+        ..add(_Folder(root.displayName, root.rootDocumentId));
+      _entries = [];
+      _searchController.clear();
+    });
+    await _load();
+  }
+
   Future<void> _restoreRoot() async {
     try {
+      if (Platform.isAndroid) {
+        if (!await _ensureAndroidAccess()) return;
+        final root = await _files.defaultRoot();
+        if (root == null) {
+          _fail('Android did not return the shared internal-storage root. Check All files access in Settings.');
+          return;
+        }
+        await _activateRoot(root);
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_savedRootKey);
       if (saved == null) {
         if (Platform.isWindows) {
-          // Windows already runs with the signed-in user's filesystem
-          // permissions. Start in that user's profile automatically;
-          // users can still choose another root from the Files toolbar.
+          // Windows starts in the signed-in user's profile folder.
           final root = await _files.defaultRoot();
           if (root != null) {
-            await prefs.setString(_savedRootKey, jsonEncode({
-              'rootId': root.rootId, 'displayName': root.displayName,
-              'rootDocumentId': root.rootDocumentId,
-            }));
-            if (!mounted) return;
-            setState(() {
-              _root = root;
-              _levels..clear()..add(_Folder(root.displayName, root.rootDocumentId));
-            });
-            await _load();
+            await _activateRoot(root);
             return;
           }
         }
-        // Android: show the system Storage Access Framework picker on
-        // first launch so the user explicitly grants a persistent folder
-        // permission. Android does not permit silent unrestricted access.
         if (mounted) await _choose();
         return;
       }
@@ -73,31 +121,42 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       if (decoded is! Map) throw const FormatException('Saved folder bookmark is invalid.');
       final root = AureonLocalRoot.fromMap(decoded.cast<Object?, Object?>());
       if (!mounted) return;
-      setState(() { _root = root; _levels..clear()..add(_Folder(root.displayName, root.rootDocumentId)); });
+      setState(() {
+        _root = root;
+        _levels
+          ..clear()
+          ..add(_Folder(root.displayName, root.rootDocumentId));
+      });
       await _load();
-    } catch (error) { _fail('Could not restore the previous folder. Choose it again. $error'); }
+    } catch (error) {
+      _fail('Could not restore the previous folder. Choose it again. $error');
+    }
   }
 
   Future<void> _choose() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final root = await _files.pickRoot();
+      AureonLocalRoot? root;
+      if (Platform.isAndroid) {
+        if (!await _ensureAndroidAccess()) {
+          if (mounted) setState(() => _loading = false);
+          return;
+        }
+        root = await _files.defaultRoot();
+      } else {
+        root = await _files.pickRoot();
+      }
       if (!mounted) return;
-      if (root == null) { setState(() => _loading = false); return; }
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_savedRootKey, jsonEncode({
-        'rootId': root.rootId, 'displayName': root.displayName, 'rootDocumentId': root.rootDocumentId,
-      }));
-      if (!mounted) return;
-      setState(() {
-        _root = root;
-        _levels..clear()..add(_Folder(root.displayName, root.rootDocumentId));
-        _entries = [];
-        _searchController.clear();
-      });
-      await _load();
-    } on PlatformException catch (error) { _fail(error.message ?? error.code); }
-    catch (error) { _fail(error.toString()); }
+      if (root == null) {
+        setState(() => _loading = false);
+        return;
+      }
+      await _activateRoot(root);
+    } on PlatformException catch (error) {
+      _fail(error.message ?? error.code);
+    } catch (error) {
+      _fail(error.toString());
+    }
   }
 
   Future<void> _load() async {
