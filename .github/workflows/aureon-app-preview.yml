@@ -292,7 +292,7 @@ jobs:
         run: |
           choco install innosetup --no-progress -y
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
           $version = (Select-String -Path "pubspec.yaml" -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)' ).Matches.Groups[1].Value
           if (-not $version) { throw "Could not read AUREON version from pubspec.yaml" }
@@ -300,6 +300,7 @@ jobs:
           $outputDir = Join-Path $env:RUNNER_TEMP "aureon-windows-installer"
           New-Item -ItemType Directory -Force $outputDir | Out-Null
           $iss = Join-Path $env:RUNNER_TEMP "aureon-installer.iss"
+          $setupIcon = Join-Path (Get-Location) "windows/runner/resources/app_icon.ico"
           @"
           #define MyAppName "AUREON"
           #define MyAppVersion "$version"
@@ -313,7 +314,7 @@ jobs:
           DefaultGroupName=AUREON
           OutputDir=$outputDir
           OutputBaseFilename=AUREON-Setup-$version
-          SetupIconFile=$(Join-Path (Get-Location) "windows/runner/resources/app_icon.ico")
+          SetupIconFile=$setupIcon
           UninstallDisplayIcon={app}\aureon.exe
           ArchitecturesAllowed=x64
           ArchitecturesInstallIn64BitMode=x64
