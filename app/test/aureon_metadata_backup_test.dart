@@ -74,6 +74,34 @@ void main() {
     expect(decoded.preferences['sort'], 'custom');
   });
 
+  test('metadata backup rejects credential material and device-specific paths', () {
+    final unsafe = AureonMetadataSnapshot(
+      snapshotId: 'unsafe',
+      generation: 1,
+      createdAtEpochMs: 1,
+      preferences: const {
+        'theme': 'dark',
+        'nested': {'refreshToken': 'must-not-export'},
+      },
+    );
+    expect(() => unsafe.toJson(), throwsFormatException);
+
+    final unsafePath = AureonMetadataSnapshot(
+      snapshotId: 'unsafe-path',
+      generation: 1,
+      createdAtEpochMs: 1,
+      preferences: const {'devicePath': 'C:\\\\Users\\\\private'},
+    );
+    expect(() => unsafePath.toJson(), throwsFormatException);
+
+    final decoded = _snapshot().toJson();
+    decoded['preferences'] = {'oauthSecret': 'must-not-restore'};
+    expect(
+      () => AureonMetadataSnapshot.fromJson(decoded),
+      throwsFormatException,
+    );
+  });
+
   test('encrypted metadata archive round trips and rejects wrong passphrase', () async {
     final codec = AureonMetadataBackupCodec();
     final bytes = await codec.encrypt(_snapshot(), 'independent-metadata-backup-passphrase');
