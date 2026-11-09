@@ -65,6 +65,8 @@ jobs:
           cp app/android/app/src/main/res/drawable/aureon_launcher_icon.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable/aureon_launcher_icon.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
+          mkdir -p "$RUNNER_TEMP/aureon-android/assets"
+          cp -R app/assets/. "$RUNNER_TEMP/aureon-android/assets/"
           rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test" "$RUNNER_TEMP/aureon-android/integration_test"
           cp -R app/lib "$RUNNER_TEMP/aureon-android/lib"
           cp -R app/test "$RUNNER_TEMP/aureon-android/test"
