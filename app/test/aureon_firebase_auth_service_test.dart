@@ -16,7 +16,7 @@ class _FakeTransport implements AureonFirebaseAuthTransport {
   final responses = <Map<String, Object?>>[];
   @override
   Future<Map<String, Object?>> post(Uri uri, {
-    required Map<String, String> body,
+    required Map<String, Object?> body,
     bool formEncoded = false,
   }) async {
     calls.add((uri: uri, body: body, form: formEncoded));
