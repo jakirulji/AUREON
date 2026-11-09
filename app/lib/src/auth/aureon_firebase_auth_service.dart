@@ -68,7 +68,7 @@ class AureonFirebaseAuthException implements Exception {
 abstract interface class AureonFirebaseAuthTransport {
   Future<Map<String, Object?>> post(
     Uri uri, {
-    required Map<String, String> body,
+    required Map<String, Object?> body,
     bool formEncoded = false,
   });
 }
@@ -82,7 +82,7 @@ class AureonIoFirebaseAuthTransport implements AureonFirebaseAuthTransport {
   @override
   Future<Map<String, Object?>> post(
     Uri uri, {
-    required Map<String, String> body,
+    required Map<String, Object?> body,
     bool formEncoded = false,
   }) async {
     if (uri.scheme != 'https' || uri.host.isEmpty) {
@@ -94,7 +94,7 @@ class AureonIoFirebaseAuthTransport implements AureonFirebaseAuthTransport {
           ContentType('application', 'x-www-form-urlencoded', charset: 'utf-8');
       request.write(body.entries
           .map((entry) =>
-              '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}')
+              '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value.toString())}')
           .join('&'));
     } else {
       request.headers.contentType = ContentType.json;
@@ -316,7 +316,7 @@ class AureonFirebaseAuthService {
         'requestType': 'EMAIL_SIGNIN',
         'email': normalizedEmail,
         'continueUrl': continueUrl,
-        'canHandleCodeInApp': 'true',
+        'canHandleCodeInApp': true,
       },
     );
   }
