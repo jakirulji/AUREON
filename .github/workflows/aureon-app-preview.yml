@@ -62,6 +62,8 @@ jobs:
           cp app/android/app/src/main/res/drawable/aureon_launcher_icon.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable/aureon_launcher_icon.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
+          mkdir -p "$RUNNER_TEMP/aureon-android/assets"
+          cp -R app/assets/. "$RUNNER_TEMP/aureon-android/assets/"
           rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test" "$RUNNER_TEMP/aureon-android/integration_test"
           cp -R app/lib "$RUNNER_TEMP/aureon-android/lib"
           cp -R app/test "$RUNNER_TEMP/aureon-android/test"
@@ -228,6 +230,7 @@ jobs:
           '@ | node -
           if (-not (Test-Path "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico")) { throw "AUREON Windows icon was not installed into the runner project." }
           Copy-Item app/pubspec.yaml "$env:RUNNER_TEMP/aureon-windows/pubspec.yaml" -Force
+          Copy-Item app/assets "$env:RUNNER_TEMP/aureon-windows/assets" -Recurse -Force
           Remove-Item "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse -Force
           if (Test-Path "$env:RUNNER_TEMP/aureon-windows/test") { Remove-Item "$env:RUNNER_TEMP/aureon-windows/test" -Recurse -Force }
           Copy-Item app/lib "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse
