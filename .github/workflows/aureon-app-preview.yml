@@ -276,7 +276,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile Windows release
         shell: pwsh
-        working-directory: \${{ runner.temp }}/aureon-windows
+        working-directory: ${{ runner.temp }}/aureon-windows
         run: |
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -288,7 +288,7 @@ jobs:
 
       - name: Build Windows installer EXE
         shell: pwsh
-        working-directory: \${{ runner.temp }}/aureon-windows
+        working-directory: ${{ runner.temp }}/aureon-windows
         run: |
           choco install innosetup --no-progress -y
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -343,6 +343,6 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: AUREON-Windows-Setup-EXE
-          path: \${{ runner.temp }}/aureon-windows-installer/AUREON-Setup-*.exe
+          path: ${{ runner.temp }}/aureon-windows-installer/AUREON-Setup-*.exe
           if-no-files-found: error
           retention-days: 14
