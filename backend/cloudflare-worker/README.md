@@ -20,9 +20,8 @@ The Worker verifies RS256 Firebase ID tokens against Google's Secure Token JWK s
 
 Run npm install, npm test, npm run typecheck and npm run dry-run from this directory.
 
-Create the D1 database `aureon-db`, replace `REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID` in wrangler.toml with its actual ID, verify Firebase project ID `aureon-7f612`, then apply migrations:
+The owner-created D1 database `aureon-db` is configured in wrangler.toml with database ID `eec1ed1f-048e-4774-8c4d-0d1b08c0b5c4`. Firebase project ID is `aureon-7f612`. Before deploying, verify that the Cloudflare dashboard shows this exact database ID, then apply migrations:
 
-- npx wrangler d1 create aureon-db
 - npx wrangler d1 migrations apply aureon-db --remote
 - npx wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
 - npx wrangler deploy
