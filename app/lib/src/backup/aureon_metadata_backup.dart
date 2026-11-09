@@ -168,18 +168,21 @@ class AureonMetadataSnapshot {
   /// Only user organization/preferences. Never put tokens, keys or OS paths here.
   final Map<String, Object?> preferences;
 
-  Map<String, Object?> toJson() => {
-    'format': 'AUREON-METADATA-SNAPSHOT',
-    'schemaVersion': schemaVersion,
-    'snapshotId': snapshotId,
-    'generation': generation,
-    'createdAtEpochMs': createdAtEpochMs,
-    'rootFolders': rootFolders.map((folder) => folder.toJson()).toList(),
-    'virtualFolders': virtualFolders.map((folder) => folder.toJson()).toList(),
-    'savedViews': savedViews.map((view) => view.toJson()).toList(),
-    'globalTags': globalTags,
-    'preferences': preferences,
-  };
+  Map<String, Object?> toJson() {
+    _rejectSensitiveMetadataFields(preferences);
+    return {
+      'format': 'AUREON-METADATA-SNAPSHOT',
+      'schemaVersion': schemaVersion,
+      'snapshotId': snapshotId,
+      'generation': generation,
+      'createdAtEpochMs': createdAtEpochMs,
+      'rootFolders': rootFolders.map((folder) => folder.toJson()).toList(),
+      'virtualFolders': virtualFolders.map((folder) => folder.toJson()).toList(),
+      'savedViews': savedViews.map((view) => view.toJson()).toList(),
+      'globalTags': globalTags,
+      'preferences': preferences,
+    };
+  }
 
   factory AureonMetadataSnapshot.fromJson(Map<String, Object?> json) {
     if (json['format'] != 'AUREON-METADATA-SNAPSHOT' || json['schemaVersion'] != schemaVersion) {
@@ -194,6 +197,7 @@ class AureonMetadataSnapshot {
         tags.any((tag) => tag is! String) || preferences is! Map) {
       throw const FormatException('Invalid AUREON metadata snapshot.');
     }
+    _rejectSensitiveMetadataFields(preferences);
     final snapshot = AureonMetadataSnapshot(
       snapshotId: _requiredString(json, 'snapshotId'),
       generation: _requiredInt(json, 'generation'),
@@ -523,6 +527,30 @@ class AureonMetadataRestorePlanner {
   int _countPending(List<AureonMetadataFolder> folders) =>
       folders.fold<int>(0, (sum, folder) =>
         sum + folder.files.where((file) => file.pendingProviderReconciliation).length + _countPending(folder.folders));
+}
+
+
+/// Metadata backups must never become an accidental credential, key or
+/// device-path export. Validate arbitrary preference maps on both write and
+/// restore; typed provider references are serialized separately.
+void _rejectSensitiveMetadataFields(Object? value, [String path = 'preferences']) {
+  final forbidden = RegExp(
+    r'(?:access|refresh|id)[_-]?token|password|secret|credential|recovery.?key|vault.?dek|private.?key|(?:local|device|filesystem|source|content)[_-]?(?:file)?[_-]?path|file[_-]?uri|content[_-]?uri',
+    caseSensitive: false,
+  );
+  if (value is Map) {
+    for (final entry in value.entries) {
+      final key = entry.key.toString();
+      if (forbidden.hasMatch(key)) {
+        throw FormatException('Sensitive field is not allowed in AUREON metadata backup: $path.$key');
+      }
+      _rejectSensitiveMetadataFields(entry.value, '$path.$key');
+    }
+  } else if (value is List) {
+    for (var index = 0; index < value.length; index++) {
+      _rejectSensitiveMetadataFields(value[index], '$path[$index]');
+    }
+  }
 }
 
 void _validateUniqueFolderIds(List<AureonMetadataFolder> roots) {
