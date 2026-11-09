@@ -300,6 +300,73 @@ class AureonFirebaseAuthService {
     return _sessionFromResponse(response);
   }
 
+  /// Sends a Firebase passwordless sign-in email. The project default
+  /// Firebase Hosting action domain is used; the app accepts the full link
+  /// pasted from the email so this flow does not depend on OS deep-link setup.
+  Future<void> sendPasswordlessSignInLink({required String email}) async {
+    _requireConfiguration();
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty || !normalizedEmail.contains('@')) {
+      throw ArgumentError('Enter a valid email address.');
+    }
+    final continueUrl = 'https://${_config.projectId}.firebaseapp.com';
+    await _transport.post(
+      _identityUri('accounts:sendOobCode'),
+      body: {
+        'requestType': 'EMAIL_SIGNIN',
+        'email': normalizedEmail,
+        'continueUrl': continueUrl,
+        'canHandleCodeInApp': 'true',
+      },
+    );
+  }
+
+  /// Completes email-link sign-in from the URL copied out of the user's
+  /// mailbox. Validates the action mode and, when present, the Firebase API
+  /// key before exchanging the one-time code.
+  Future<AureonFirebaseSession> signInWithEmailLink({
+    required String email,
+    required String emailLink,
+  }) async {
+    _requireConfiguration();
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty || !normalizedEmail.contains('@')) {
+      throw ArgumentError('Enter the same valid email address used to request the link.');
+    }
+    final link = Uri.tryParse(emailLink.trim());
+    if (link == null || !link.hasScheme || link.host.isEmpty) {
+      throw const FormatException('Paste the complete sign-in link from your email.');
+    }
+    var parameters = link.queryParameters;
+    final nestedLink = parameters['link'];
+    if (nestedLink != null && nestedLink.isNotEmpty) {
+      final nested = Uri.tryParse(nestedLink);
+      if (nested == null) throw const FormatException('The email sign-in link is malformed.');
+      parameters = nested.queryParameters;
+    }
+    final mode = parameters['mode'];
+    if (mode != null && mode != 'signIn') {
+      throw const FormatException('This email link is not an AUREON sign-in link.');
+    }
+    final linkApiKey = parameters['apiKey'];
+    if (linkApiKey != null && linkApiKey != _config.apiKey) {
+      throw const FormatException('This sign-in link belongs to a different Firebase project.');
+    }
+    final oobCode = parameters['oobCode'];
+    if (oobCode == null || oobCode.isEmpty) {
+      throw const FormatException('The email link does not contain a sign-in code.');
+    }
+    final response = await _transport.post(
+      _identityUri('accounts:signInWithEmailLink'),
+      body: {
+        'email': normalizedEmail,
+        'oobCode': oobCode,
+        'returnSecureToken': 'true',
+      },
+    );
+    return _sessionFromResponse(response);
+  }
+
   Future<void> sendVerificationEmail() async {
     _requireConfiguration();
     final token = await getIdToken();
