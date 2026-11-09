@@ -7,6 +7,7 @@
 #include <bcrypt.h>
 #include <shellapi.h>
 #include <shobjidl.h>
+#include <shlobj.h>
 #include <wrl/client.h>
 
 #include <algorithm>
