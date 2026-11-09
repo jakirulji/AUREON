@@ -153,8 +153,12 @@ jobs:
         shell: bash
         run: |
           APK="$RUNNER_TEMP/aureon-android/build/app/outputs/flutter-apk/app-release.apk"
-          "$FLUTTER_ROOT/bin/cache/artifacts/engine/android-arm64-release/linux-x64/aapt" dump badging "$APK" | grep -F "package: name='com.aureon.backup'"
-          jarsigner -verify -verbose -certs "$APK" >/dev/null
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$AAPT"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.aureon.backup'"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
           echo "Signed APK verification passed."
 
       - name: Upload final test APK
