@@ -143,13 +143,13 @@ jobs:
         with:
           # Use a lighter image: GitHub's hosted Linux runner has no KVM,
           # and the API 36 Pixel 6 image repeatedly timed out during boot.
-          api-level: 30
+          api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          cores: 4
+          cores: 2
           emulator-boot-timeout: 600
-          disable-linux-hw-accel: true
+          disable-linux-hw-accel: false
           script: cd "${{ runner.temp }}/aureon-android" && test -f pubspec.yaml && flutter test integration_test/transfer_bridge_test.dart
 
 
