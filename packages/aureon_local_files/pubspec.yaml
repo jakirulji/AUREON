@@ -1,5 +1,5 @@
 name: aureon_local_files
-description: Read-only native local-folder browsing for AUREON on Android and Windows.
+description: Native local filesystem access for AUREON on Android and Windows.
 version: 0.1.0
 publish_to: none
 environment:
