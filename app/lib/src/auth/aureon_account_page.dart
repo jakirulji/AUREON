@@ -15,6 +15,7 @@ class AureonAccountPage extends StatefulWidget {
 class _AureonAccountPageState extends State<AureonAccountPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _emailLink = TextEditingController();
   final _profileName = TextEditingController();
   final _firebaseApiKey = TextEditingController();
   final _firebaseProjectId = TextEditingController();
@@ -37,6 +38,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _emailLink.dispose();
     _profileName.dispose();
     _firebaseApiKey.dispose();
     _firebaseProjectId.dispose();
@@ -172,6 +174,33 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         }
       });
 
+  Future<void> _sendPasswordlessLink() => _run(() async {
+        if (_activeProfile == null || !widget.auth.isConfigured) {
+          throw StateError('Save and activate your own Firebase + Cloudflare backend profile first.');
+        }
+        final email = _email.text.trim();
+        await widget.auth.sendPasswordlessSignInLink(email: email);
+        if (mounted) {
+          setState(() => _status = 'A sign-in link was sent to $email. Open the email, copy the complete link, then paste it below to finish signing in.');
+        }
+      });
+
+  Future<void> _completePasswordlessSignIn() => _run(() async {
+        if (_activeProfile == null || !widget.auth.isConfigured) {
+          throw StateError('Save and activate your own Firebase + Cloudflare backend profile first.');
+        }
+        final email = _email.text.trim();
+        final link = _emailLink.text.trim();
+        if (link.isEmpty) throw StateError('Paste the complete sign-in link from your email.');
+        final session = await widget.auth.signInWithEmailLink(email: email, emailLink: link);
+        final user = await widget.auth.reloadUser();
+        final boundProfile = await _bindProfile(user.localId);
+        _emailLink.clear();
+        if (mounted) {
+          setState(() => _status = 'Passwordless sign-in completed for ${session.user.email}. Backend profile “${boundProfile.name}” is identity-bound. Email link sign-in verified the email address.');
+        }
+      });
+
   Future<void> _refreshVerification() => _run(() async {
         final user = await widget.auth.reloadUser();
         // Firebase ID tokens carry the email_verified claim. Force a refresh
@@ -293,6 +322,36 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
               label: Text(_obscure ? 'Show password' : 'Hide password'),
             ),
           ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: widget.auth.isConfigured && _activeProfile != null && !_busy
+                ? _sendPasswordlessLink
+                : null,
+            icon: const Icon(Icons.mark_email_read_outlined),
+            label: const Text('Send passwordless sign-in link'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _emailLink,
+            minLines: 2,
+            maxLines: 4,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Paste sign-in link from email',
+              helperText: 'Use the same email address above. The link is one-time and expires.',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            onPressed: widget.auth.isConfigured && _activeProfile != null && !_busy
+                ? _completePasswordlessSignIn
+                : null,
+            icon: const Icon(Icons.login),
+            label: const Text('Complete passwordless sign-in'),
+          ),
+          const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _createMode,
