@@ -12,7 +12,7 @@ class _FakeSecrets implements AureonAuthSecretStore {
 }
 
 class _FakeTransport implements AureonFirebaseAuthTransport {
-  final calls = <({Uri uri, Map<String, String> body, bool form})>[];
+  final calls = <({Uri uri, Map<String, Object?> body, bool form})>[];
   final responses = <Map<String, Object?>>[];
   @override
   Future<Map<String, Object?>> post(Uri uri, {
@@ -82,7 +82,7 @@ void main() {
       'requestType': 'EMAIL_SIGNIN',
       'email': 'owner@example.com',
       'continueUrl': 'https://aureon-test.firebaseapp.com',
-      'canHandleCodeInApp': 'true',
+      'canHandleCodeInApp': true,
     });
   });
 
