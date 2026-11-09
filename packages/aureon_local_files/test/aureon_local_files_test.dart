@@ -12,6 +12,24 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
+  test('All files access status is read from the Android host', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'hasAllFilesAccess');
+      return true;
+    });
+    expect(await files.hasAllFilesAccess(), isTrue);
+  });
+
+  test('All files access request returns the permission result', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'requestAllFilesAccess');
+      return true;
+    });
+    expect(await files.requestAllFilesAccess(), isTrue);
+  });
+
   test('folder picker maps a native root response', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
