@@ -57,6 +57,8 @@ jobs:
         run: |
           flutter create --empty --platforms=android --project-name backup --org com.aureon "$RUNNER_TEMP/aureon-android"
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable"
+          cp app/android/app/src/main/res/drawable/aureon_launcher_icon.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable/aureon_launcher_icon.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
           rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test" "$RUNNER_TEMP/aureon-android/integration_test"
