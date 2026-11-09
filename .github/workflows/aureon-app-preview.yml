@@ -142,7 +142,8 @@ jobs:
           emulator-boot-timeout: 600
           disable-linux-hw-accel: true
           script: |
-            cd "$RUNNER_TEMP/aureon-android"
+            cd "${{ runner.temp }}/aureon-android"
+            test -f pubspec.yaml || { echo "Android validation project not found at $(pwd)"; exit 1; }
             flutter test integration_test/transfer_bridge_test.dart
 
 
