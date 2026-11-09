@@ -138,11 +138,24 @@ jobs:
             sleep $((attempt * 20))
           done
 
+      - name: Enable KVM access for Android emulator
+        shell: bash
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::The hosted runner does not expose /dev/kvm; x86_64 emulator integration tests cannot start."
+            exit 1
+          fi
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          ls -l /dev/kvm
+
       - name: Run Android native transfer bridge integration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # Use a lighter image: GitHub's hosted Linux runner has no KVM,
-          # and the API 36 Pixel 6 image repeatedly timed out during boot.
+          # The runner exposes /dev/kvm, but its default permissions exclude
+          # the GitHub Actions user. Enable access before launching x86_64.
           api-level: 35
           target: google_apis
           arch: x86_64
