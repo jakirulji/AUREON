@@ -58,6 +58,8 @@ jobs:
         run: |
           flutter create --empty --platforms=android --project-name backup --org com.aureon "$RUNNER_TEMP/aureon-android"
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable"
+          cp app/android/app/src/main/res/drawable/aureon_launcher_icon.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable/aureon_launcher_icon.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
           rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test" "$RUNNER_TEMP/aureon-android/integration_test"
@@ -176,6 +178,29 @@ jobs:
           flutter config --enable-windows-desktop
           flutter create --empty --platforms=windows --project-name aureon --org com.aureon "$env:RUNNER_TEMP/aureon-windows"
           Copy-Item app/assets/branding/aureon.ico "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico" -Force
+          python -m pip install --quiet pillow
+          @'
+          from pathlib import Path
+          from PIL import Image
+          import io, struct
+          path = Path(__import__("os").environ["RUNNER_TEMP"]) / "aureon-windows" / "windows" / "runner" / "resources" / "app_icon.ico"
+          source = Image.open(path)
+          ico = source.ico
+          sizes = sorted(ico.sizes(), reverse=True)
+          entries, payloads = [], []
+          offset = 6 + 16 * len(sizes)
+          for size in sizes:
+              image = ico.getimage(size).convert("RGBA")
+              png = io.BytesIO()
+              image.save(png, format="PNG", optimize=True)
+              data = png.getvalue()
+              dimension = 0 if size == 256 else size
+              entries.append(struct.pack("<BBBBHHII", dimension, dimension, 0, 0, 1, 32, len(data), offset))
+              payloads.append(data)
+              offset += len(data)
+          path.write_bytes(struct.pack("<HHH", 0, 1, len(entries)) + b"".join(entries) + b"".join(payloads))
+          print(f"Normalized AUREON icon to PNG-compressed ICO ({sizes})")
+          '@ | python -
           if (-not (Test-Path "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico")) { throw "AUREON Windows icon was not installed into the runner project." }
           Copy-Item app/pubspec.yaml "$env:RUNNER_TEMP/aureon-windows/pubspec.yaml" -Force
           Remove-Item "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse -Force

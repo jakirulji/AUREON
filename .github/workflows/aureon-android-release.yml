@@ -57,10 +57,11 @@ jobs:
         run: |
           flutter create --empty --platforms=android --project-name backup --org com.aureon "$RUNNER_TEMP/aureon-android"
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable"
+          cp app/android/app/src/main/res/drawable/aureon_launcher_icon.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable/aureon_launcher_icon.xml"
           # Prefer Gradle's direct distribution host; services.gradle.org redirects to GitHub Releases,
           # which intermittently returns HTTP 504 on hosted runners.
-          $wrapper = "$env:RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"
-          (Get-Content $wrapper -Raw) -replace 'https\\://services\\.gradle\\.org/distributions/', 'https://downloads.gradle.org/distributions/' | Set-Content $wrapper
+          sed -i 's#https://services.gradle.org/distributions/#https://downloads.gradle.org/distributions/#' "$RUNNER_TEMP/aureon-android/android/gradle/wrapper/gradle-wrapper.properties"
           mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable"
           cp app/android/app/src/main/res/drawable/aureon_launcher_icon.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/res/drawable/aureon_launcher_icon.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
