@@ -132,10 +132,15 @@ jobs:
       - name: Run Android native transfer bridge integration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          # Use a lighter image: GitHub's hosted Linux runner has no KVM,
+          # and the API 36 Pixel 6 image repeatedly timed out during boot.
+          api-level: 30
           target: google_apis
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_2
+          cores: 4
+          emulator-boot-timeout: 600
+          disable-linux-hw-accel: true
           script: |
             cd "$RUNNER_TEMP/aureon-android"
             flutter test integration_test/transfer_bridge_test.dart
