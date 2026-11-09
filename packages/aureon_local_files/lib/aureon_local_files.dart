@@ -73,7 +73,7 @@ class AureonLocalEntry {
   }
 }
 
-/// Read-only folder picker and directory enumerator.
+/// Native local filesystem access and directory enumerator.
 /// Android root IDs are persisted SAF tree URIs; child IDs are document IDs.
 /// Windows root and child IDs are filesystem paths.
 class AureonLocalFiles {
@@ -81,6 +81,19 @@ class AureonLocalFiles {
       : _channel = channel ?? const MethodChannel('aureon/local_files');
 
   final MethodChannel _channel;
+
+  /// Returns whether Android's special All files access permission is active.
+  /// Other desktop platforms do not need this permission.
+  Future<bool> hasAllFilesAccess() async {
+    final value = await _channel.invokeMethod<Object?>('hasAllFilesAccess');
+    return value == true;
+  }
+
+  /// Opens Android Special App Access settings and resolves after the user returns.
+  Future<bool> requestAllFilesAccess() async {
+    final value = await _channel.invokeMethod<Object?>('requestAllFilesAccess');
+    return value == true;
+  }
 
   Future<AureonLocalRoot?> defaultRoot() async {
     final value = await _channel.invokeMethod<Object?>('defaultRoot');
