@@ -362,12 +362,31 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     return 'Modified ${local.formatShortDate(date)} ${local.formatTimeOfDay(TimeOfDay.fromDateTime(date))}';
   }
 
+  Future<void> _openSetupGuide() async {
+    final guide = await rootBundle.loadString('assets/guides/firebase-cloudflare-setup.txt');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('AUREON setup instructions'),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: SelectableText(guide, style: const TextStyle(fontSize: 12, height: 1.45)),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = _visibleEntries;
     return Padding(padding: const EdgeInsets.all(22), child: Column(
       crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
+          IconButton(tooltip: 'AUREON setup guide', onPressed: _openSetupGuide, icon: const Icon(Icons.menu_book_outlined)),
           const Expanded(child: Text('Files', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
           IconButton(tooltip: 'Operation history', onPressed: _openHistory, icon: const Icon(Icons.history)),
           if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
