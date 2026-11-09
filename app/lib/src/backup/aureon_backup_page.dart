@@ -345,7 +345,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   AureonCloudflareVaultClient _cloudflareClient() {
     if (_cloudflareApiUrl.trim().isEmpty) {
-      throw StateError('Cloudflare API URL is not configured. Set AUREON_CLOUDFLARE_API_URL at build time.');
+      throw StateError('No active Cloudflare backend profile is configured. Open Account → Your backend and save your own Worker URL first.');
     }
     return AureonCloudflareVaultClient(baseUrl: _cloudflareApiUrl);
   }
