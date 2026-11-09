@@ -122,79 +122,23 @@ class _AureonHomeState extends State<AureonHome> {
 
   // Home is the live local-files workspace, not a sample-data dashboard.
   // The Files navigation entry opens the same workspace for discoverability.
-  Widget _content(bool wide) => (selected == 0 || selected == 1)
-      ? const AureonFilesPage()
-      : selected == 2
-          ? const AureonVirtualFoldersPage()
-          : selected == 3
-              ? const AureonTransfersPage()
-              : selected == 4
-              ? AureonAccountPage(auth: _auth)
-              : selected == 5
-                  ? AureonBackupPage(auth: _auth)
-                  : SingleChildScrollView(
-    padding: EdgeInsets.fromLTRB(wide ? 34 : 20, 22, wide ? 34 : 20, 28),
-    child: Center(child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1180),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          if (!wide) const Icon(Icons.all_inclusive, color: Color(0xFF64E6C2), size: 27),
-          if (!wide) const SizedBox(width: 9),
-          Expanded(child: Text(selected == 0 ? 'Good evening' : labels[selected], style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
-          IconButton(onPressed: () => setState(() => selected = 4), icon: const Icon(Icons.person_outline)),
-        ]),
-        const SizedBox(height: 5),
-        const Text('One place for all your files.', style: TextStyle(color: Color(0xFF9AA8BD))),
-        const SizedBox(height: 22),
-        Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(color: const Color(0xFF302817), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF66512A))),
-          child: const Row(children: [
-            Icon(Icons.science_outlined, color: Color(0xFFFFD27A)),
-            SizedBox(width: 10),
-            Expanded(child: Text('Preview build • Sample data only. Real cloud accounts and provider transfers are not connected yet.', style: TextStyle(fontSize: 12, color: Color(0xFFFFE4B0)))),
-          ]),
-        ),
-        const SizedBox(height: 24),
-        const Text('Storage overview', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 12),
-        LayoutBuilder(builder: (context, box) {
-          final count = box.maxWidth > 1000 ? 3 : box.maxWidth > 520 ? 2 : 1;
-          return GridView.count(
-            crossAxisCount: count, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: count == 1 ? 3.1 : count == 2 ? 2.8 : 2.5,
-            children: const [
-              _StorageCard(icon: Icons.phone_android, name: 'This device', detail: 'Local storage • Not connected', color: Color(0xFF64E6C2)),
-              _StorageCard(icon: Icons.cloud_queue, name: 'Cloud accounts', detail: 'No accounts connected', color: Color(0xFF83A9FF)),
-              _StorageCard(icon: Icons.sync, name: 'Transfers', detail: 'No active transfers', color: Color(0xFFFFC477)),
-            ],
-          );
-        }),
-        const SizedBox(height: 26),
-        Row(children: [const Expanded(child: Text('Recent files', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))), TextButton(onPressed: () => setState(() => selected = 1), child: const Text('View files'))]),
-        const SizedBox(height: 8),
-        _fileRow(Icons.picture_as_pdf_outlined, 'Project brief.pdf', 'Documents • Sample item', '2.4 MB'),
-        _fileRow(Icons.image_outlined, 'Workspace photo.jpg', 'Pictures • Sample item', '4.8 MB'),
-        _fileRow(Icons.folder_zip_outlined, 'Design assets.zip', 'Archives • Sample item', '18.2 MB'),
-        const SizedBox(height: 22),
-        const Text('AUREON is being built in testable stages.', style: TextStyle(color: Color(0xFF8492AA), fontSize: 12)),
-      ]),
-    )),
-  );
-
-  Widget _fileRow(IconData icon, String name, String detail, String size) => Container(
-    margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(color: const Color(0xFF111A2E), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF202C42))),
-    child: Row(children: [
-      Icon(icon, color: const Color(0xFF8EA5C5), size: 23), const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        const SizedBox(height: 3), Text(detail, style: const TextStyle(fontSize: 11, color: Color(0xFF8492AA))),
-      ])),
-      Text(size, style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
-      const SizedBox(width: 8), const Icon(Icons.more_horiz, color: Color(0xFF8492AA)),
-    ]),
-  );
+  Widget _content(bool wide) {
+    switch (selected) {
+      case 0:
+      case 1:
+        return const AureonFilesPage();
+      case 2:
+        return const AureonVirtualFoldersPage();
+      case 3:
+        return const AureonTransfersPage();
+      case 4:
+        return AureonAccountPage(auth: _auth);
+      case 5:
+        return AureonBackupPage(auth: _auth);
+      default:
+        return const Center(child: Text('Select a section from the navigation.'));
+    }
+  }
 }
 
 class _StorageCard extends StatelessWidget {
