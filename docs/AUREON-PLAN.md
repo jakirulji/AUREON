@@ -49,6 +49,15 @@ Prefer direct client-to-provider file transfer where feasible. Any content relay
 
 AUREON has its own Master Account, separate from Google accounts. A new device should restore the linked-account inventory, file index, settings and backup state after Master Account sign-in. Google may still require re-authentication if consent is revoked, credentials expire or policy requires it.
 
+### Master Account authentication methods
+
+- Support both **Email/Password** and **passwordless Email Link sign-in**. The owner has enabled both providers in the Firebase project; enabling a provider in Firebase Console does not mean the app flow is implemented.
+- **Passwordless Email Link is planned but NOT IMPLEMENTED.** Add it to the A2 Master Account identity milestone before A2 can be considered complete.
+- Required flow: user enters email; AUREON requests a Firebase email sign-in link; Firebase sends the link; Android and Windows handle the returned deep link safely; AUREON validates that the link is a sign-in link for the configured Firebase project, completes the Firebase Identity Toolkit email-link sign-in, establishes the normal AUREON session, and binds the backend profile to the resulting Firebase UID.
+- Implement Android App Links / intent handling for package `com.aureon.backup`, plus the corresponding Windows link handoff. Configure Firebase authorized domains and action-code settings as required. Do not depend on deprecated Firebase Dynamic Links.
+- Security/UX requirements: never treat an arbitrary incoming URL as authentication; validate project/action mode and email-link state, safely handle app-not-installed/browser fallback, prevent replay/mismatched-email completion, provide resend/expired-link errors, and do not persist passwords. Reuse the existing secure refresh-token storage and project/UID isolation.
+- Acceptance tests: request link, valid link sign-in, expired/invalid link, wrong or mismatched email, replay, app cold-start and already-running link delivery, Android and Windows handoff, and session restore after successful sign-in.
+
 Never ask users to enter Google passwords, OTPs or 2FA recovery codes into AUREON. Use official OAuth flows and least-privilege scopes.
 
 Users may connect multiple supported cloud accounts. The interface should provide:
@@ -197,7 +206,7 @@ Store minimal metadata and encrypt sensitive metadata where appropriate. Never l
 ### Android milestones
 - **A0 — Specification and threat model:** requirements, provider-policy boundaries, API contracts, data model, state machine, acceptance tests.
 - **A1 — Android foundation:** Flutter/Kotlin skeleton, navigation/design system, local database/migrations, CI.
-- **A2 — Master account/device identity:** registration/login, sessions, device registration/revocation, secure local session storage.
+- **A2 — Master account/device identity:** Email/Password and passwordless Email Link registration/login, sessions, device registration/revocation, secure local session storage. Email Link must pass the cross-platform deep-link and security acceptance tests above.
 - **A3 — Google Drive:** official OAuth, connect/disconnect, token refresh/revocation, scope minimization and verification assessment.
 - **A4 — Unified file browser:** account-wise inventory, search/sort/filter, accurate file location.
 - **A5 — Safe transfer engine:** queue, staging, retry/resume, persistent state machine, remote verification and no-delete tests.
@@ -436,3 +445,9 @@ For each new idea:
 - Added a Windows C++ native filesystem and Cloud Files API integration track alongside the Flutter desktop UI.
 - Adopted hybrid parallel development: freeze shared file/provider/transfer/encryption/deletion contracts first, then advance Android and Windows platform adapters in parallel.
 - Clarified that AUREON will integrate through supported Windows associations and shell entry points; it will not kill, patch or replace explorer.exe or promise a global default-file-manager switch unsupported by Windows.
+
+
+### 2026-11-09 — Passwordless Email Link requirement recorded
+- Owner confirmed Firebase Email/Password and Email Link providers are enabled for project `aureon-7f612`.
+- Added passwordless Email Link as an explicit A2 requirement, including Android/Windows deep-link handling, Firebase Identity Toolkit completion, security checks and acceptance tests.
+- Status remains **PLANNED / NOT IMPLEMENTED**; Firebase Console provider enablement alone is not implementation evidence.
