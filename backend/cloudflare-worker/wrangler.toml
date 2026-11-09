@@ -11,7 +11,7 @@ AUREON_VAULT_ACTIVE_ROOT_VERSION = "1"
 [[d1_databases]]
 binding = "DB"
 database_name = "aureon-db"
-database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+database_id = "eec1ed1f-048e-4774-8c4d-0d1b08c0b5c4"
 migrations_dir = "migrations"
 
 # Configure the production Worker Secret:
