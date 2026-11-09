@@ -461,7 +461,12 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   @override
   Widget build(BuildContext context) {
     final visible = _visibleEntries;
-    return Padding(padding: const EdgeInsets.all(22), child: Column(
+    return PopScope<Object?>(
+      canPop: _levels.length <= 1,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _levels.length > 1) unawaited(_up());
+      },
+      child: Padding(padding: const EdgeInsets.all(22), child: Column(
       crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           IconButton(tooltip: 'AUREON setup guide', onPressed: _openSetupGuide, icon: const Icon(Icons.menu_book_outlined)),
@@ -549,7 +554,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                 ));
               })),
       ],
-    ));
+    )));
   }
 }
 
