@@ -43,7 +43,13 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_savedRootKey);
-      if (saved == null) return;
+      if (saved == null) {
+        // First launch: ask for the user's folder permission immediately.
+        // Android displays the system SAF folder-grant UI; Windows opens
+        // the native folder chooser. The granted root is persisted below.
+        if (mounted) await _choose();
+        return;
+      }
       final decoded = jsonDecode(saved);
       if (decoded is! Map) throw const FormatException('Saved folder bookmark is invalid.');
       final root = AureonLocalRoot.fromMap(decoded.cast<Object?, Object?>());
