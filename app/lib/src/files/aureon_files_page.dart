@@ -169,7 +169,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       setState(() { _entries = rows; _loading = false; });
     } on PlatformException catch (error) {
       _fail(switch (error.code) {
-        'permission_denied' => 'Folder permission was revoked. Re-select the folder to restore access.',
+        'permission_denied' || 'all_files_access_required' => 'AUREON needs All files access. Enable it in Android Settings to continue.',
         'invalid_root' => 'The selected drive or folder is unavailable. Reconnect the drive or choose another folder.',
         'not_a_directory' => 'This folder no longer exists. Return to the parent folder or choose another folder.',
         _ => error.message ?? error.code,
@@ -469,7 +469,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           IconButton(tooltip: 'Operation history', onPressed: _openHistory, icon: const Icon(Icons.history)),
           if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
           OutlinedButton.icon(onPressed: _loading ? null : _choose,
-            icon: const Icon(Icons.create_new_folder_outlined), label: const Text('Choose folder')),
+            icon: const Icon(Icons.create_new_folder_outlined), label: Text(Platform.isAndroid ? 'Storage access' : 'Choose folder')),
         ]),
         const SizedBox(height: 8),
         const Text('Local folder operations are explicit. AUREON never overwrites or deletes files automatically.',
@@ -508,13 +508,13 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
         if (_error != null) Padding(padding: const EdgeInsets.all(10), child: Row(children: [
           const Icon(Icons.warning_amber_rounded, color: Color(0xFFFFC477)), const SizedBox(width: 8),
           Expanded(child: Text(_error!, style: const TextStyle(color: Color(0xFFFFC477)))),
-          TextButton(onPressed: _loading ? null : _choose, child: const Text('Re-select')),
+          TextButton(onPressed: _loading ? null : _choose, child: Text(Platform.isAndroid ? 'Grant access' : 'Re-select')),
         ])),
         if (_root == null && !_loading)
           Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.folder_open_outlined, size: 52, color: Color(0xFF8295B1)),
             const SizedBox(height: 12), const Text('No folder selected'), const SizedBox(height: 12),
-            FilledButton.icon(onPressed: _choose, icon: const Icon(Icons.folder_open), label: const Text('Choose folder')),
+            FilledButton.icon(onPressed: _choose, icon: const Icon(Icons.folder_open), label: Text(Platform.isAndroid ? 'Grant access' : 'Choose folder')),
           ])))
         else
           Expanded(child: visible.isEmpty && !_loading
