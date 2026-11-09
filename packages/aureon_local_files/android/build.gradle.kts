@@ -23,6 +23,10 @@ android {
     }
 }
 
+dependencies {
+    implementation("androidx.core:core-ktx:1.15.0")
+}
+
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
