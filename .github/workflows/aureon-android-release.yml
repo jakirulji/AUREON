@@ -149,7 +149,14 @@ jobs:
           AUREON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.AUREON_ANDROID_KEYSTORE_PASSWORD }}
           AUREON_ANDROID_KEY_ALIAS: ${{ secrets.AUREON_ANDROID_KEY_ALIAS }}
           AUREON_ANDROID_KEY_PASSWORD: ${{ secrets.AUREON_ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release
+        run: |
+          for attempt in 1 2 3; do
+            flutter build apk --release && exit 0
+            status=$?
+            if [ "$attempt" -eq 3 ]; then exit "$status"; fi
+            echo "Gradle distribution/build failed (attempt $attempt); retrying after a short backoff."
+            sleep $((attempt * 20))
+          done
 
       - name: Verify APK signature and package identity
         shell: bash

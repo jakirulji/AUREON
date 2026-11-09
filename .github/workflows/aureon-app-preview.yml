@@ -127,7 +127,14 @@ jobs:
         run: flutter test
       - name: Compile Android debug APK (no artifact upload)
         working-directory: ${{ runner.temp }}/aureon-android
-        run: flutter build apk --debug --verbose
+        run: |
+          for attempt in 1 2 3; do
+            flutter build apk --debug --verbose && exit 0
+            status=$?
+            if [ "$attempt" -eq 3 ]; then exit "$status"; fi
+            echo "Gradle download/build failed (attempt $attempt); retrying after a short backoff."
+            sleep $((attempt * 20))
+          done
 
       - name: Run Android native transfer bridge integration test
         uses: reactivecircus/android-emulator-runner@v2
@@ -169,7 +176,20 @@ jobs:
           flutter config --enable-windows-desktop
           flutter create --empty --platforms=windows --project-name aureon --org com.aureon "$env:RUNNER_TEMP/aureon-windows"
           Copy-Item app/assets/branding/aureon.ico "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico" -Force
-          if (-not (Test-Path "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico")) { throw "AUREON Windows icon was not installed into the runner project." }
+          $iconPath = "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico"
+          if (-not (Test-Path $iconPath)) { throw "AUREON Windows icon was not installed into the runner project." }
+          $ico = [System.IO.File]::ReadAllBytes($iconPath)
+          if ($ico.Length -lt 100 -or [BitConverter]::ToUInt16($ico, 0) -ne 0 -or [BitConverter]::ToUInt16($ico, 2) -ne 1 -or [BitConverter]::ToUInt16($ico, 4) -ne 2) { throw "AUREON ICO directory is invalid." }
+          for ($i = 0; $i -lt 2; $i++) {
+            $entry = 6 + ($i * 16)
+            $width = [int]$ico[$entry]; if ($width -eq 0) { $width = 256 }
+            $height = [int]$ico[$entry + 1]; if ($height -eq 0) { $height = 256 }
+            $offset = [BitConverter]::ToUInt32($ico, $entry + 12)
+            $dibSize = [BitConverter]::ToUInt32($ico, $offset)
+            $bits = [BitConverter]::ToUInt16($ico, $offset + 14)
+            if ($dibSize -ne 40 -or $width -notin @(16, 32) -or $height -ne $width -or $bits -ne 32) { throw "ICO image $i is not a legacy-compatible 16/32-bit 32bpp DIB." }
+          }
+          Write-Host "Verified uncompressed 16x16 and 32x32 BITMAPINFOHEADER ICO resources."
           Copy-Item app/pubspec.yaml "$env:RUNNER_TEMP/aureon-windows/pubspec.yaml" -Force
           Remove-Item "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse -Force
           if (Test-Path "$env:RUNNER_TEMP/aureon-windows/test") { Remove-Item "$env:RUNNER_TEMP/aureon-windows/test" -Recurse -Force }
