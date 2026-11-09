@@ -1,0 +1,171 @@
+name: AUREON Signed Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "packages/aureon_local_files/**"
+      - "shared/aureon_contracts/**"
+      - ".github/workflows/aureon-android-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aureon-android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  signed-apk:
+    name: Build and sign installable Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Export Flutter SDK path
+        shell: bash
+        run: |
+          FLUTTER_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v flutter)")")")"
+          echo "FLUTTER_ROOT=$FLUTTER_ROOT" >> "$GITHUB_ENV"
+          flutter precache --android
+
+      - name: Prepare local Dart packages
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/packages" "$RUNNER_TEMP/shared"
+          cp -R packages/aureon_local_files "$RUNNER_TEMP/packages/aureon_local_files"
+          cp -R shared/aureon_contracts "$RUNNER_TEMP/shared/aureon_contracts"
+
+      - name: Generate Android host project
+        shell: bash
+        run: |
+          flutter create --empty --platforms=android --project-name backup --org com.aureon "$RUNNER_TEMP/aureon-android"
+          cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
+          sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
+          cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
+          rm -rf "$RUNNER_TEMP/aureon-android/lib" "$RUNNER_TEMP/aureon-android/test" "$RUNNER_TEMP/aureon-android/integration_test"
+          cp -R app/lib "$RUNNER_TEMP/aureon-android/lib"
+          cp -R app/test "$RUNNER_TEMP/aureon-android/test"
+          cp -R app/integration_test "$RUNNER_TEMP/aureon-android/integration_test"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/aureon_storage"
+          cp -R android-spike/storage/. "$RUNNER_TEMP/aureon-android/android/aureon_storage/"
+          mkdir -p "$RUNNER_TEMP/aureon-android/shared/contract-fixtures"
+          cp -R shared/contract-fixtures/. "$RUNNER_TEMP/aureon-android/shared/contract-fixtures/"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup"
+          cp app/android/app/src/main/kotlin/com/aureon/backup/MainActivity.kt "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup/MainActivity.kt"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          root = Path(os.environ["RUNNER_TEMP"]) / "aureon-android" / "android"
+          settings = root / "settings.gradle.kts"
+          source = settings.read_text()
+          agp_line = next((line.strip() for line in source.splitlines() if 'id("com.android.application")' in line), None)
+          kotlin_line = next((line.strip() for line in source.splitlines() if 'id("org.jetbrains.kotlin.android")' in line), None)
+          if not agp_line or not kotlin_line:
+              raise SystemExit("Could not determine Android Gradle Plugin/Kotlin versions.")
+          agp_version = agp_line.split('version "')[1].split('"')[0]
+          kotlin_version = "2.3.10"
+          source = source.replace(agp_line, agp_line + f'\n    id("com.android.library") version "{agp_version}" apply false', 1)
+          pinned = re.sub(r'version ".*?"', f'version "{kotlin_version}"', kotlin_line)
+          source = source.replace(kotlin_line, pinned + f'\n    id("org.jetbrains.kotlin.kapt") version "{kotlin_version}" apply false', 1)
+          source += '\ninclude(":aureon_storage")\nproject(":aureon_storage").projectDir = file("aureon_storage")\n'
+          settings.write_text(source)
+          app_gradle = root / "app" / "build.gradle.kts"
+          gradle = app_gradle.read_text()
+          gradle += '\n\ndependencies { implementation(project(":aureon_storage")) }\n'
+          gradle += """
+          android {
+              signingConfigs {
+                  create("release") {
+                      storeFile = file(System.getenv("AUREON_KEYSTORE_FILE"))
+                      storePassword = System.getenv("AUREON_ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias = System.getenv("AUREON_ANDROID_KEY_ALIAS")
+                      keyPassword = System.getenv("AUREON_ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  getByName("release") {
+                      signingConfig = signingConfigs.getByName("release")
+                  }
+              }
+          }
+          """
+          app_gradle.write_text(gradle)
+          PY
+
+      - name: Generate Android transfer Pigeon bindings
+        working-directory: android-spike/pigeon
+        shell: bash
+        run: |
+          flutter pub get
+          mkdir -p "$RUNNER_TEMP/aureon-android/lib/src/transfers"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/aureon_storage/src/main/kotlin/com/aureon/storage/generated"
+          dart run pigeon --input aureon_storage_api.dart \
+            --dart_out "$RUNNER_TEMP/aureon-android/lib/src/transfers/aureon_storage_api.g.dart" \
+            --kotlin_out "$RUNNER_TEMP/aureon-android/android/aureon_storage/src/main/kotlin/com/aureon/storage/generated/AureonStorageApi.g.kt" \
+            --kotlin_package com.aureon.storage.generated
+
+      - name: Configure signing key
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.AUREON_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "Missing AUREON_ANDROID_KEYSTORE_BASE64"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aureon-release.jks"
+          test -s "$RUNNER_TEMP/aureon-release.jks"
+          echo "AUREON_KEYSTORE_FILE=$RUNNER_TEMP/aureon-release.jks" >> "$GITHUB_ENV"
+
+      - name: Resolve dependencies
+        working-directory: ${{ runner.temp }}/aureon-android
+        run: flutter pub get
+
+      - name: Analyze and test
+        working-directory: ${{ runner.temp }}/aureon-android
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Build signed release APK
+        working-directory: ${{ runner.temp }}/aureon-android
+        env:
+          AUREON_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.AUREON_ANDROID_KEYSTORE_PASSWORD }}
+          AUREON_ANDROID_KEY_ALIAS: ${{ secrets.AUREON_ANDROID_KEY_ALIAS }}
+          AUREON_ANDROID_KEY_PASSWORD: ${{ secrets.AUREON_ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release
+
+      - name: Verify APK signature and package identity
+        shell: bash
+        run: |
+          APK="$RUNNER_TEMP/aureon-android/build/app/outputs/flutter-apk/app-release.apk"
+          "$FLUTTER_ROOT/bin/cache/artifacts/engine/android-arm64-release/linux-x64/aapt" dump badging "$APK" | grep -F "package: name='com.aureon.backup'"
+          jarsigner -verify -verbose -certs "$APK" >/dev/null
+          echo "Signed APK verification passed."
+
+      - name: Upload final test APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: AUREON-Android-Test-APK
+          path: ${{ runner.temp }}/aureon-android/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/aureon-release.jks"
