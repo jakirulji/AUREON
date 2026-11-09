@@ -42,18 +42,25 @@ The preview CI intentionally has no owner backend configuration. A green preview
 ~~~bash
 cd backend/cloudflare-worker
 npm ci
-npx wrangler d1 create aureon-metadata
+npx wrangler d1 create aureon-db
 ~~~
 
-4. Copy the returned database ID into wrangler.toml in place of the all-zero placeholder.
+4. Copy the returned database ID into `backend/cloudflare-worker/wrangler.toml` in place of `REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID`. The `database_name` must remain `aureon-db`.
 5. Replace REPLACE_WITH_FIREBASE_PROJECT_ID in wrangler.toml with the exact Firebase Project ID.
-6. Generate a random 32-byte Worker root secret locally and encode it as unpadded base64url. For example, with Node.js:
+6. Generate a random 32-byte Worker root secret locally and encode it as unpadded base64url. For example, in Windows PowerShell:
 
-~~~bash
-node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+~~~powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$secret = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_')
+$rng.Dispose()
+Set-Clipboard -Value $secret
 ~~~
 
-7. Set the secret directly through Wrangler. The CLI prompts for the value; do not paste it into source files or chat:
+Paste the clipboard value directly into the Cloudflare Secret prompt. Do not use standard Base64; the Worker expects unpadded base64url.
+
+7. Set the secret directly through Wrangler. The CLI prompts for the value; do not paste it into source files or chat. The deployed Worker expects the exact binding name `AUREON_VAULT_ROOT_SECRET_V1` (not `WORKER_ROOT_SECRET`):
 
 ~~~bash
 npx wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
@@ -62,13 +69,13 @@ npx wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
 8. Apply migrations and deploy:
 
 ~~~bash
-npx wrangler d1 migrations apply aureon-metadata --remote
+npx wrangler d1 migrations apply aureon-db --remote
 npx wrangler deploy
 ~~~
 
 9. Open /health/ready on the deployed Worker. It must return HTTP 200 and {"ready":true} before enabling the app's Cloudflare URL.
 
-The wrangler.toml database ID and Firebase project ID are placeholders until the owner configures them. Do not deploy while either placeholder remains.
+The wrangler.toml D1 database ID remains a placeholder until the owner copies the ID of their existing `aureon-db` database into it. The Firebase project ID is already set to this owner's `aureon-7f612` project. Do not deploy while the D1 ID placeholder remains.
 
 ## 4. Recovery secret custody and production cautions
 
