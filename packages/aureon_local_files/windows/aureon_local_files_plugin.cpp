@@ -99,6 +99,34 @@ void PickRoot(std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   }));
 }
 
+void DefaultRoot(std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
+  PWSTR profile = nullptr;
+  const HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, KF_FLAG_DEFAULT, nullptr, &profile);
+  if (FAILED(hr) || profile == nullptr) {
+    if (profile) CoTaskMemFree(profile);
+    result->Error("default_root_unavailable", "Windows could not resolve the current user's profile folder.");
+    return;
+  }
+  const std::filesystem::path path(profile);
+  CoTaskMemFree(profile);
+  std::error_code ec;
+  const auto canonical = std::filesystem::canonical(path, ec);
+  if (ec || !std::filesystem::is_directory(canonical, ec) || ec) {
+    result->Error("default_root_unavailable", "The current user's profile folder is not accessible.");
+    return;
+  }
+  const auto utf8 = canonical.u8string();
+  const std::string value(reinterpret_cast<const char*>(utf8.data()), utf8.size());
+  const auto leaf = canonical.filename().u8string();
+  const std::string name = leaf.empty() ? "User profile" :
+      std::string(reinterpret_cast<const char*>(leaf.data()), leaf.size());
+  result->Success(EncodableValue(EncodableMap{
+      {EncodableValue("rootId"), EncodableValue(value)},
+      {EncodableValue("displayName"), EncodableValue(name)},
+      {EncodableValue("rootDocumentId"), EncodableValue(value)}
+  }));
+}
+
 void OpenFile(const EncodableMap* args,
               std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   const auto* root = GetString(args, "rootId");
@@ -444,6 +472,10 @@ void AureonLocalFilesPlugin::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
   if (call.method_name() == "pickRoot") {
     PickRoot(std::move(result));
+    return;
+  }
+  if (call.method_name() == "defaultRoot") {
+    DefaultRoot(std::move(result));
     return;
   }
   if (call.method_name() == "listChildren") {
