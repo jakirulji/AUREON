@@ -4,16 +4,17 @@ compatibility_date = "2026-11-08"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-FIREBASE_PROJECT_ID = "REPLACE_WITH_FIREBASE_PROJECT_ID"
-ENVIRONMENT = "development"
+FIREBASE_PROJECT_ID = "aureon-7f612"
+ENVIRONMENT = "production"
 AUREON_VAULT_ACTIVE_ROOT_VERSION = "1"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "aureon-metadata"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_name = "aureon-db"
+database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
 migrations_dir = "migrations"
 
-# Configure versioned secrets with wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
-# and (during rotation) AUREON_VAULT_ROOT_SECRET_V2. Values are base64url-encoded
-# 32-byte random secrets. Keep old versions until every envelope is migrated.
+# Configure the production Worker Secret:
+# wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
+# The value must be 32 random bytes encoded as unpadded base64url.
+# During rotation, retain V1 while configuring V2 and migrating every envelope.
