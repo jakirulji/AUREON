@@ -296,9 +296,16 @@ void main() {
     expect(find.textContaining('Documents / notes-copy.txt'), findsOneWidget);
   });
 
-  testWidgets('AUREON dashboard still renders', (tester) async {
+  testWidgets('AUREON opens the active local file manager on Home', (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'pickRoot') return null;
+      if (call.method == 'listChildren') return <Map<String, Object?>>[];
+      return null;
+    });
     await tester.pumpWidget(const AureonApp());
-    expect(find.text('AUREON'), findsOneWidget);
-    expect(find.text('Storage overview'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(AureonFilesPage), findsOneWidget);
+    expect(find.text('Storage overview'), findsNothing);
   });
 }
