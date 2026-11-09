@@ -141,23 +141,3 @@ class _AureonHomeState extends State<AureonHome> {
   }
 }
 
-class _StorageCard extends StatelessWidget {
-  const _StorageCard({required this.icon, required this.name, required this.detail, required this.color});
-  final IconData icon;
-  final String name;
-  final String detail;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: const Color(0xFF111A2E), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF202C42))),
-    child: Row(children: [
-      Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-        const SizedBox(height: 4), Text(detail, style: const TextStyle(fontSize: 11, color: Color(0xFF8492AA))),
-      ])),
-    ]),
-  );
-}
