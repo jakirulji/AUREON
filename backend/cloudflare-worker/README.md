@@ -20,14 +20,14 @@ The Worker verifies RS256 Firebase ID tokens against Google's Secure Token JWK s
 
 Run npm install, npm test, npm run typecheck and npm run dry-run from this directory.
 
-Create a D1 database, replace the placeholder database_id and Firebase project ID in wrangler.toml, then apply migrations:
+Create the D1 database `aureon-db`, replace `REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID` in wrangler.toml with its actual ID, verify Firebase project ID `aureon-7f612`, then apply migrations:
 
-- npx wrangler d1 create aureon-metadata
-- npx wrangler d1 migrations apply aureon-metadata --remote
+- npx wrangler d1 create aureon-db
+- npx wrangler d1 migrations apply aureon-db --remote
 - npx wrangler secret put AUREON_VAULT_ROOT_SECRET_V1
 - npx wrangler deploy
 
-Generate each Worker root secret offline as 32 random bytes and encode it base64url. AUREON_VAULT_ACTIVE_ROOT_VERSION selects the active version. Versioned secrets allow old envelopes to remain decryptable during a planned migration. **Automated bulk root-secret rewrapping is not implemented yet; do not rotate the production active version while V1 envelopes exist.** Keep an encrypted offline emergency copy under owner control. Worker Secrets are not KMS/HSM; compromise of the Worker deployment/account can expose the server-assisted recovery capability.
+Generate each Worker root secret offline as 32 random bytes and encode it as unpadded base64url (not standard Base64). The production secret binding name is exactly `AUREON_VAULT_ROOT_SECRET_V1`; `WORKER_ROOT_SECRET` is not read by this Worker. AUREON_VAULT_ACTIVE_ROOT_VERSION selects the active version. Versioned secrets allow old envelopes to remain decryptable during a planned migration. **Automated bulk root-secret rewrapping is not implemented yet; do not rotate the production active version while V1 envelopes exist.** Keep an encrypted offline emergency copy under owner control. Worker Secrets are not KMS/HSM; compromise of the Worker deployment/account can expose the server-assisted recovery capability.
 
 ## Explicitly incomplete release gates
 
