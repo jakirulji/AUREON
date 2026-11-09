@@ -274,9 +274,74 @@ jobs:
         run: |
           flutter test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Compile Windows release (no artifact upload)
+      - name: Compile Windows release
         shell: pwsh
-        working-directory: ${{ runner.temp }}/aureon-windows
+        working-directory: \${{ runner.temp }}/aureon-windows
         run: |
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $releaseDir = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+          if (-not (Test-Path (Join-Path $releaseDir "aureon.exe"))) {
+            throw "Expected AUREON executable was not produced: $releaseDir/aureon.exe"
+          }
+          Get-ChildItem $releaseDir -Recurse | Select-Object FullName, Length
+
+      - name: Build Windows installer EXE
+        shell: pwsh
+        working-directory: \${{ runner.temp }}/aureon-windows
+        run: |
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
+          $version = (Select-String -Path "pubspec.yaml" -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)' ).Matches.Groups[1].Value
+          if (-not $version) { throw "Could not read AUREON version from pubspec.yaml" }
+          $releaseDir = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+          $outputDir = Join-Path $env:RUNNER_TEMP "aureon-windows-installer"
+          New-Item -ItemType Directory -Force $outputDir | Out-Null
+          $iss = Join-Path $env:RUNNER_TEMP "aureon-installer.iss"
+          @"
+          #define MyAppName "AUREON"
+          #define MyAppVersion "$version"
+          #define MyAppExeName "aureon.exe"
+          [Setup]
+          AppId={{9C0A7B4E-3F21-4D8C-9A61-6E2B4A8F1C30}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher=AUREON
+          DefaultDirName={autopf}\AUREON
+          DefaultGroupName=AUREON
+          OutputDir=$outputDir
+          OutputBaseFilename=AUREON-Setup-$version
+          SetupIconFile=$(Join-Path (Get-Location) "windows/runner/resources/app_icon.ico")
+          UninstallDisplayIcon={app}\aureon.exe
+          ArchitecturesAllowed=x64
+          ArchitecturesInstallIn64BitMode=x64
+          PrivilegesRequired=admin
+          Compression=lzma2
+          SolidCompression=yes
+          WizardStyle=modern
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
+          [Files]
+          Source: "$releaseDir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Icons]
+          Name: "{autoprograms}\AUREON"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{autodesktop}\AUREON"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "Launch AUREON"; Flags: postinstall skipifsilent
+          "@ | Set-Content -Path $iss -Encoding UTF8
+          & $iscc $iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installer = Join-Path $outputDir "AUREON-Setup-$version.exe"
+          if (-not (Test-Path $installer)) { throw "Windows installer EXE missing: $installer" }
+          if ((Get-Item $installer).Length -lt 1MB) { throw "Windows installer EXE is unexpectedly small." }
+          Get-Item $installer | Select-Object FullName, Length
+
+      - name: Upload Windows installer EXE
+        uses: actions/upload-artifact@v6
+        with:
+          name: AUREON-Windows-Setup-EXE
+          path: \${{ runner.temp }}/aureon-windows-installer/AUREON-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14
