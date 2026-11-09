@@ -56,7 +56,7 @@ jobs:
       - name: Generate Android host project
         shell: bash
         run: |
-          flutter create --empty --platforms=android --project-name aureon --org com.aureon "$RUNNER_TEMP/aureon-android"
+          flutter create --empty --platforms=android --project-name backup --org com.aureon "$RUNNER_TEMP/aureon-android"
           cp app/android/app/src/main/AndroidManifest.xml "$RUNNER_TEMP/aureon-android/android/app/src/main/AndroidManifest.xml"
           sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 26/" "$RUNNER_TEMP/aureon-android/android/app/build.gradle.kts"
           cp app/pubspec.yaml "$RUNNER_TEMP/aureon-android/pubspec.yaml"
@@ -68,8 +68,8 @@ jobs:
           cp -R android-spike/storage/. "$RUNNER_TEMP/aureon-android/android/aureon_storage/"
           mkdir -p "$RUNNER_TEMP/aureon-android/shared/contract-fixtures"
           cp -R shared/contract-fixtures/. "$RUNNER_TEMP/aureon-android/shared/contract-fixtures/"
-          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/aureon"
-          cp app/android/app/src/main/kotlin/com/aureon/aureon/MainActivity.kt "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/aureon/MainActivity.kt"
+          mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup"
+          cp app/android/app/src/main/kotlin/com/aureon/aureon/MainActivity.kt "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup/MainActivity.kt"
           python3 - <<'PY'
           from pathlib import Path
           import re
