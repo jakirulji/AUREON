@@ -120,7 +120,9 @@ class _AureonHomeState extends State<AureonHome> {
     ]),
   );
 
-  Widget _content(bool wide) => selected == 1
+  // Home is the live local-files workspace, not a sample-data dashboard.
+  // The Files navigation entry opens the same workspace for discoverability.
+  Widget _content(bool wide) => (selected == 0 || selected == 1)
       ? const AureonFilesPage()
       : selected == 2
           ? const AureonVirtualFoldersPage()
