@@ -168,6 +168,8 @@ jobs:
         run: |
           flutter config --enable-windows-desktop
           flutter create --empty --platforms=windows --project-name aureon --org com.aureon "$env:RUNNER_TEMP/aureon-windows"
+          Copy-Item app/assets/branding/aureon.ico "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico" -Force
+          if (-not (Test-Path "$env:RUNNER_TEMP/aureon-windows/windows/runner/resources/app_icon.ico")) { throw "AUREON Windows icon was not installed into the runner project." }
           Copy-Item app/pubspec.yaml "$env:RUNNER_TEMP/aureon-windows/pubspec.yaml" -Force
           Remove-Item "$env:RUNNER_TEMP/aureon-windows/lib" -Recurse -Force
           if (Test-Path "$env:RUNNER_TEMP/aureon-windows/test") { Remove-Item "$env:RUNNER_TEMP/aureon-windows/test" -Recurse -Force }
