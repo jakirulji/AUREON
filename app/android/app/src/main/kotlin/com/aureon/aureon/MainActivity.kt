@@ -1,4 +1,4 @@
-package com.aureon.aureon
+package com.aureon.backup
 
 import com.aureon.storage.AureonStoragePlugin
 import io.flutter.embedding.android.FlutterActivity
