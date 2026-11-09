@@ -69,7 +69,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/aureon-android/shared/contract-fixtures"
           cp -R shared/contract-fixtures/. "$RUNNER_TEMP/aureon-android/shared/contract-fixtures/"
           mkdir -p "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup"
-          cp app/android/app/src/main/kotlin/com/aureon/aureon/MainActivity.kt "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup/MainActivity.kt"
+          cp app/android/app/src/main/kotlin/com/aureon/backup/MainActivity.kt "$RUNNER_TEMP/aureon-android/android/app/src/main/kotlin/com/aureon/backup/MainActivity.kt"
           python3 - <<'PY'
           from pathlib import Path
           import re
