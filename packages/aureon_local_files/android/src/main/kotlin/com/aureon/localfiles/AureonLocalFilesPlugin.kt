@@ -230,11 +230,22 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 return
             }
             val children = parent.listFiles() ?: throw SecurityException("Android could not list this folder.")
-            val visibleChildren = if (parent.canonicalFile == rootFile(root).canonicalFile) children.filter { it != trashDir(rootFile(root)) } else children
-            result.success(visibleChildren.map { entry(it) }.sortedWith(
-                compareByDescending<Map<String, Any?>> { it["isDirectory"] == true }
-                    .thenBy { (it["name"] as String).lowercase() }
-            ))
+            val visibleChildren = ArrayList<Map<String, Any?>>()
+            val isStorageRoot = parent.canonicalFile == rootFile(root).canonicalFile
+            for (child in children) {
+                if (isStorageRoot && child.canonicalFile == trashDir(rootFile(root)).canonicalFile) continue
+                visibleChildren.add(entry(child))
+            }
+            visibleChildren.sortWith(Comparator { left, right ->
+                val leftDirectory = left["isDirectory"] == true
+                val rightDirectory = right["isDirectory"] == true
+                if (leftDirectory != rightDirectory) {
+                    if (leftDirectory) -1 else 1
+                } else {
+                    (left["name"] as String).compareTo(right["name"] as String, ignoreCase = true)
+                }
+            })
+            result.success(visibleChildren)
         } catch (error: Exception) {
             result.error(if (error is SecurityException) "permission_denied" else "listing_failed",
                 error.message ?: "Unable to list this folder.", null)
