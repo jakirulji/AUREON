@@ -361,7 +361,6 @@ class AureonFirebaseAuthService {
       body: {
         'email': normalizedEmail,
         'oobCode': oobCode,
-        'returnSecureToken': 'true',
       },
     );
     return _sessionFromResponse(response);
