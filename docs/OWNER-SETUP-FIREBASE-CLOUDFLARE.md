@@ -45,8 +45,8 @@ npm ci
 npx wrangler d1 create aureon-db
 ~~~
 
-4. Copy the returned database ID into `backend/cloudflare-worker/wrangler.toml` in place of `REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID`. The `database_name` must remain `aureon-db`.
-5. Replace REPLACE_WITH_FIREBASE_PROJECT_ID in wrangler.toml with the exact Firebase Project ID.
+4. The existing owner database `aureon-db` is configured in `backend/cloudflare-worker/wrangler.toml` with Database ID `eec1ed1f-048e-4774-8c4d-0d1b08c0b5c4`. Verify this exact ID in the Cloudflare dashboard before deployment. The `database_name` must remain `aureon-db`.
+5. The Worker is configured for Firebase Project ID `aureon-7f612`; verify it matches the owner's Firebase project.
 6. Generate a random 32-byte Worker root secret locally and encode it as unpadded base64url. For example, in Windows PowerShell:
 
 ~~~powershell
