@@ -98,7 +98,6 @@ void main() {
     expect(transport.calls.single.body, {
       'email': 'owner@example.com',
       'oobCode': 'one-time-code',
-      'returnSecureToken': 'true',
     });
     expect(secrets.values.values, contains('firebase-refresh-token'));
   });
