@@ -74,6 +74,46 @@ void main() {
     expect(transport.calls.last.body['requestType'], 'VERIFY_EMAIL');
   });
 
+  test('passwordless sign-in requests a Firebase email action link', () async {
+    transport.responses.add({'email': 'owner@example.com'});
+    await auth.sendPasswordlessSignInLink(email: ' owner@example.com ');
+    expect(transport.calls.single.uri.path, '/v1/accounts:sendOobCode');
+    expect(transport.calls.single.body, {
+      'requestType': 'EMAIL_SIGNIN',
+      'email': 'owner@example.com',
+      'continueUrl': 'https://aureon-test.firebaseapp.com',
+      'canHandleCodeInApp': 'true',
+    });
+  });
+
+  test('passwordless sign-in exchanges only a matching Firebase email link', () async {
+    transport.responses.add(signInResponse(verified: true));
+    final session = await auth.signInWithEmailLink(
+      email: 'owner@example.com',
+      emailLink: 'https://aureon-test.firebaseapp.com/__/auth/action?apiKey=test-public-api-key&mode=signIn&oobCode=one-time-code',
+    );
+    expect(session.user.localId, 'user-123');
+    expect(session.user.emailVerified, isTrue);
+    expect(transport.calls.single.uri.path, '/v1/accounts:signInWithEmailLink');
+    expect(transport.calls.single.body, {
+      'email': 'owner@example.com',
+      'oobCode': 'one-time-code',
+      'returnSecureToken': 'true',
+    });
+    expect(secrets.values.values, contains('firebase-refresh-token'));
+  });
+
+  test('passwordless sign-in rejects links from another Firebase project', () async {
+    await expectLater(
+      auth.signInWithEmailLink(
+        email: 'owner@example.com',
+        emailLink: 'https://other.firebaseapp.com/__/auth/action?apiKey=wrong-key&mode=signIn&oobCode=code',
+      ),
+      throwsFormatException,
+    );
+    expect(transport.calls, isEmpty);
+  });
+
   test('expired session refreshes through Secure Token API and rotates refresh token', () async {
     secrets.values[activeUidKey] = 'user-123';
     secrets.values[refreshKey] = 'old-refresh';
