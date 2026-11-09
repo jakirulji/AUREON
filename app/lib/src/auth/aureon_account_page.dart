@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
@@ -44,6 +45,26 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _firebaseProjectId.dispose();
     _workerUrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _openSetupGuide() async {
+    final guide = await rootBundle.loadString('assets/guides/firebase-cloudflare-setup.txt');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Firebase & Cloudflare setup'),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: SelectableText(guide, style: const TextStyle(fontSize: 12, height: 1.45)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   Future<void> _restore() async {
@@ -277,6 +298,12 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             'Your own backend profile is required',
             'AUREON has no shared developer-hosted backend. Add your Firebase Web API key, Firebase project ID and your Cloudflare Worker HTTPS URL below. These are client configuration values; never enter service-account JSON, Worker Secrets or private keys.',
           ),
+        const SizedBox(height: 18),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _openSetupGuide,
+          icon: const Icon(Icons.menu_book_outlined),
+          label: const Text('Read Firebase & Cloudflare setup guide'),
+        ),
         const SizedBox(height: 18),
         const Text('Your backend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
