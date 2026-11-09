@@ -5,6 +5,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// A user-owned Firebase + Cloudflare Worker configuration. This record must
 /// never contain service-account keys, Worker Secrets or access tokens.
 class AureonBackendProfile {
+  static const shared = AureonBackendProfile(
+    id: 'aureon-central',
+    name: 'AUREON Central',
+    firebaseApiKey: 'AIzaSyB11qyg0gcZME2lzmwz8PHUufYJ1kVHh-4',
+    firebaseProjectId: 'aureon-7f612',
+    workerBaseUrl: 'https://aureon-api.jakirul220851.workers.dev',
+  );
+
   const AureonBackendProfile({
     required this.id, required this.name, required this.firebaseApiKey,
     required this.firebaseProjectId, required this.workerBaseUrl,
