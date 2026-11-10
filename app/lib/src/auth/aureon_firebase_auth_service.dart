@@ -160,10 +160,11 @@ class AureonPlatformAuthSecretStore implements AureonAuthSecretStore {
 /// DPAPI-backed secure storage. Passwords and ID tokens are never persisted.
 class AureonFirebaseAuthService {
   AureonFirebaseAuthService({
-    AureonFirebaseAuthConfig config = const AureonFirebaseAuthConfig(apiKey: '', projectId: ''),
+    AureonFirebaseAuthConfig config = const AureonFirebaseAuthConfig(apiKey: 'AIzaSyB11qyg0gcZME2lzmwz8PHUufYJ1kVHh-4', projectId: 'aureon-7f612'),
     AureonFirebaseAuthTransport? transport,
     AureonAuthSecretStore? secretStore,
   })  : _config = config,
+        _activeBackendProfile = AureonBackendProfile.shared,
         _transport = transport ?? AureonIoFirebaseAuthTransport(),
         _secrets = secretStore ?? AureonPlatformAuthSecretStore();
 
@@ -231,7 +232,7 @@ class AureonFirebaseAuthService {
   void _requireConfiguration() {
     if (!isConfigured) {
       throw StateError(
-        'Firebase is not configured. Add your own Firebase backend profile in AUREON Account settings.',
+        'Firebase is not configured. AUREON Central Backend is not configured. Please update the app or contact AUREON support.',
       );
     }
   }
