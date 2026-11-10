@@ -132,14 +132,18 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'listChildren') {
         final parent = (call.arguments as Map)['parentId'];
-        if (parent == 'root-doc') return [
-          {'id': 'pictures', 'name': 'Pictures', 'isDirectory': true},
-          {'id': 'note', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 20},
-        ];
-        if (parent == 'pictures') return [
-          {'id': 'photo', 'name': 'holiday.jpg', 'isDirectory': false, 'sizeBytes': 100},
-          {'id': 'clip', 'name': 'holiday.mp4', 'isDirectory': false, 'sizeBytes': 200},
-        ];
+        if (parent == 'root-doc') {
+          return [
+            {'id': 'pictures', 'name': 'Pictures', 'isDirectory': true},
+            {'id': 'note', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 20},
+          ];
+        }
+        if (parent == 'pictures') {
+          return [
+            {'id': 'photo', 'name': 'holiday.jpg', 'isDirectory': false, 'sizeBytes': 100},
+            {'id': 'clip', 'name': 'holiday.mp4', 'isDirectory': false, 'sizeBytes': 200},
+          ];
+        }
       }
       return null;
     });
