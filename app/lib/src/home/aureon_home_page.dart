@@ -104,7 +104,7 @@ class _AureonHomePageState extends State<AureonHomePage>
   Widget build(BuildContext context) {
     final total = _totalMb;
     final free = _freeMb;
-    final used = total != null && free != null ? (total - free).clamp(0, total) : null;
+    final used = total != null && free != null ? (total - free).clamp(0, total).toDouble() : null;
     final ratio = total != null && used != null && total > 0
         ? (used / total).clamp(0.0, 1.0).toDouble()
         : null;
