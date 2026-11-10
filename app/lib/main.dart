@@ -2,6 +2,7 @@ import 'package:aureon/src/auth/aureon_account_page.dart';
 import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
 import 'package:aureon/src/auth/aureon_backend_profile.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
+import 'package:aureon/src/home/aureon_home_page.dart';
 import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
@@ -108,11 +109,11 @@ class _AureonHomeState extends State<AureonHome> {
     ]),
   );
 
-  // Home is the live local-files workspace, not a sample-data dashboard.
-  // The Files navigation entry opens the same workspace for discoverability.
+  // Home provides live device storage metrics; Files remains the local file workspace.
   Widget _content(bool wide) {
     switch (selected) {
       case 0:
+        return const AureonHomePage();
       case 1:
         return const AureonFilesPage();
       case 2:
