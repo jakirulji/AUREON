@@ -239,19 +239,26 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     final root = _root;
     if (root == null || _levels.isEmpty) return;
     final cacheKey = _listingCacheKey(root);
-    final cached = await _readListingCache(cacheKey);
-    if (!mounted) return;
-    setState(() { if (cached != null) _entries = cached; _loading = cached == null; _error = null; });
+    var liveLoadCompleted = false;
+    // Cache I/O must never block the native listing request or keep the UI
+    // in a loading state. This also keeps widget tests deterministic.
+    unawaited(_readListingCache(cacheKey).then((cached) {
+      if (!mounted || liveLoadCompleted || cached == null) return;
+      setState(() { _entries = cached; _loading = false; });
+    }));
+    if (mounted) setState(() { _loading = _entries.isEmpty; _error = null; });
     try {
       if (_activeCategory != null) {
         final results = await _scanCategory(root);
-        await _writeListingCache(cacheKey, results);
+        liveLoadCompleted = true;
+        unawaited(_writeListingCache(cacheKey, results));
         if (!mounted) return;
         setState(() { _entries = results; _loading = false; });
         return;
       }
       final rows = await _files.listChildren(root: root, parentId: _levels.last.id);
-      await _writeListingCache(cacheKey, rows);
+      liveLoadCompleted = true;
+      unawaited(_writeListingCache(cacheKey, rows));
       if (!mounted) return;
       setState(() { _entries = rows; _loading = false; });
     } on PlatformException catch (error) {
