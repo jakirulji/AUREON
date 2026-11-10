@@ -11,9 +11,9 @@ This directory contains the shared Flutter application layer. Android and Window
 - File open hand-off to the Android system viewer or Windows' default associated application; Windows validates root containment.
 - Verified same-root file copy, safe parent-folder move, and Trash/restore flows. Android uses provider-native Trash when supported or an AUREON-managed folder; Windows uses the Recycle Bin. No silent permanent-delete fallback.
 - AUREON Master Account email/password authentication via Firebase Identity Toolkit REST; email verification, saved refresh-token restoration, token refresh, password reauthentication and local sign-out. Passwords and ID tokens are not persisted.
-- Cloudflare credential-vault sync/recovery UI connected to the HTTPS client. It requires a configured Firebase profile and deployed personal Worker/D1 database.
-- In-app Firebase/Cloudflare setup guide now includes both D1 migrations as executable SQL, the exact Dashboard D1 SQL Console location, Wrangler alternative commands, required DB binding and Worker secrets.
-- In-app Google Drive OAuth owner guide explains the one-time AUREON Google Cloud setup, Android/Windows client registrations, PKCE, scope/verification requirements and how encrypted provider credentials are intended to be stored in each user's personal Worker.
+- AUREON Master Accounts use the single official Firebase project configured in the app; users do not create or enter backend profiles.
+- Cloudflare credential-vault sync/recovery uses the shared AUREON Worker/D1 service. The Worker derives the owner UID from a verified Firebase ID token and scopes vault, challenge, cooldown and audit records to that UID.
+- In-app Google Drive OAuth owner guide explains the one-time AUREON Google Cloud setup, Android/Windows client registrations, PKCE, scope/verification requirements and how encrypted provider credentials are intended to be stored under each user's isolated account scope in the shared AUREON backend.
 - Storage overview and recent-file cards still contain sample data.
 
 ## Validation
@@ -22,7 +22,7 @@ The app validation workflow runs Flutter dependency resolution, static analysis,
 
 ## Important limitations
 
-The Files screen supports verified copy, safe parent moves and Trash/restore, but not yet file-content preview inside AUREON. Provider OAuth account connection, authorization callback/token exchange, personal-Worker provider-token synchronization, provider file upload/download and cross-provider sync are not implemented yet. The OAuth guide is documentation only. The separate central backend-recovery registry and Recovery-Key-based backend-profile restore flow are also not implemented; current vault recovery restores an existing vault from a configured personal Worker, not a lost Worker URL/profile. Android may report that no compatible viewer is installed for a particular file type. Storage overview and recent-file cards still use sample data. AUREON is not yet a finished replacement for Windows File Explorer.
+The Files screen supports verified copy, safe parent moves and Trash/restore, but not yet file-content preview inside AUREON. Provider OAuth account connection, authorization callback/token exchange, shared-backend provider-token synchronization, provider file upload/download and cross-provider sync are not implemented yet. The OAuth guide is documentation only. The separate central backend-recovery registry and Recovery-Key-based backend-profile restore flow are also not implemented; current vault recovery restores an existing vault from the shared AUREON Worker; backend discovery is not required. Android may report that no compatible viewer is installed for a particular file type. Storage overview and recent-file cards still use sample data. AUREON is not yet a finished replacement for Windows File Explorer.
 
 ## Local validation
 
