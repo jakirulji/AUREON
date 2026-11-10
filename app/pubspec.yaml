@@ -10,6 +10,7 @@ dependencies:
   aureon_local_files:
     path: ../packages/aureon_local_files
   shared_preferences: ^2.5.3
+  disk_space_plus: ^0.2.6
   cryptography: ^2.9.0
   webcrypto: ^0.6.1
   file_picker: ^13.3.2
