@@ -1,4 +1,4 @@
-name: AUREON App Validation (No Artifacts)
+name: AUREON App Preview Builds
 
 on:
   push:
@@ -129,7 +129,7 @@ jobs:
       - name: Run Flutter tests
         working-directory: ${{ runner.temp }}/aureon-android
         run: flutter test
-      - name: Compile Android debug APK (no artifact upload)
+      - name: Compile Android debug APK
         working-directory: ${{ runner.temp }}/aureon-android
         run: |
           for attempt in 1 2 3; do
@@ -167,6 +167,13 @@ jobs:
           disable-linux-hw-accel: false
           script: cd "${{ runner.temp }}/aureon-android" && test -f pubspec.yaml && flutter test integration_test/transfer_bridge_test.dart
 
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: AUREON-Android-Debug-APK
+          path: ${{ runner.temp }}/aureon-android/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
   windows-validation:
     name: Analyze, test and compile Windows
@@ -288,6 +295,37 @@ jobs:
             throw "Expected AUREON executable was not produced: $releaseDir/aureon.exe"
           }
           Get-ChildItem $releaseDir -Recurse | Select-Object FullName, Length
+
+      - name: Package Windows preview ZIP
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/aureon-windows
+        run: |
+          $releaseDir = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+          $exe = Join-Path $releaseDir "aureon.exe"
+          if (-not (Test-Path $exe)) { throw "AUREON executable is missing from the Windows release directory." }
+          $previewDir = Join-Path $env:RUNNER_TEMP "aureon-windows-preview"
+          New-Item -ItemType Directory -Force $previewDir | Out-Null
+          $zipPath = Join-Path $previewDir "AUREON-Windows-Preview.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path (Join-Path $releaseDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+          try {
+            $entry = $archive.Entries | Where-Object { $_.FullName -ieq "aureon.exe" } | Select-Object -First 1
+            if (-not $entry) { throw "Windows preview ZIP does not contain aureon.exe at its root." }
+            if ($entry.Length -lt 1MB) { throw "AUREON executable inside the preview ZIP is unexpectedly small." }
+          } finally {
+            $archive.Dispose()
+          }
+          Get-Item $zipPath | Select-Object FullName, Length
+
+      - name: Upload Windows preview ZIP
+        uses: actions/upload-artifact@v6
+        with:
+          name: AUREON-Windows-Preview-ZIP
+          path: ${{ runner.temp }}/aureon-windows-preview/AUREON-Windows-Preview.zip
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Build Windows installer EXE
         shell: pwsh
