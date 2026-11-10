@@ -124,7 +124,7 @@ class _AureonHomeState extends State<AureonHome> {
       ])),
       bottomNavigationBar: wide ? null : NavigationBar(
         selectedIndex: selected,
-        onDestinationSelected: (value) => setState(() => selected = value),
+        onDestinationSelected: (value) => setState(() { selected = value; if (value == 1) _fileCategory = null; }),
         destinations: List.generate(labels.length, (i) => NavigationDestination(icon: Icon(icons[i]), label: labels[i])),
       ),
     );
@@ -162,7 +162,7 @@ class _AureonHomeState extends State<AureonHome> {
               leading: Icon(icons[i], color: selected == i ? scheme.primary : scheme.onSurfaceVariant),
               title: Text(labels[i], style: TextStyle(fontSize: 13,
                 color: selected == i ? scheme.onPrimaryContainer : scheme.onSurface)),
-              onTap: () => setState(() => selected = i),
+              onTap: () => setState(() { selected = i; if (i == 1) _fileCategory = null; }),
             ),
           ),
         const Spacer(),
