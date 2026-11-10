@@ -8,6 +8,7 @@ on:
       - "packages/aureon_local_files/**"
       - "shared/aureon_contracts/**"
       - ".github/workflows/aureon-android-release.yml"
+      - ".github/workflows/aureon-app-preview.yml"
   workflow_dispatch:
 
 permissions:
