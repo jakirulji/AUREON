@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +33,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   _FileSort _sort = _FileSort.name;
   String? _activeCategory;
   final Map<String, String> _categoryPaths = {};
+  final Map<String, Future<Uint8List?>> _thumbnailCache = {};
 
   @override
   void initState() {
@@ -450,6 +452,63 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (!mounted) return;
     setState(() { _error = message; _loading = false; });
   }
+  Future<Uint8List?> _thumbnailFor(AureonLocalEntry entry) {
+    final ext = _ext(entry.name);
+    const supported = {'jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'heic', 'heif',
+      'mp4', 'mkv', 'mov', 'webm', '3gp', 'avi', 'm4v'};
+    if (entry.isDirectory || !supported.contains(ext) || _root == null) {
+      return Future<Uint8List?>.value(null);
+    }
+    return _thumbnailCache.putIfAbsent(entry.id,
+      () => _files.getThumbnail(root: _root!, fileId: entry.id).catchError((_) => null));
+  }
+
+  Widget _fileLeading(AureonLocalEntry entry) {
+    if (entry.isDirectory) return const _FileTypeIcon(icon: Icons.folder_rounded, tint: Color(0xFF8B7CFF));
+    final ext = _ext(entry.name);
+    final imageOrVideo = const {'jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'heic', 'heif',
+      'mp4', 'mkv', 'mov', 'webm', '3gp', 'avi', 'm4v'}.contains(ext);
+    if (!imageOrVideo) return _FileTypeIcon(icon: _iconForExtension(ext), tint: _tintForExtension(ext));
+    return FutureBuilder<Uint8List?>(
+      future: _thumbnailFor(entry),
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (bytes == null || bytes.isEmpty) {
+          return _FileTypeIcon(
+            icon: ext == 'mp4' || ext == 'mkv' || ext == 'mov' || ext == 'webm' || ext == '3gp' || ext == 'avi' || ext == 'm4v'
+              ? Icons.play_circle_fill_rounded : Icons.image_rounded,
+            tint: const Color(0xFF65B9E8),
+          );
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: Image.memory(bytes, width: 54, height: 54, fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => _FileTypeIcon(icon: Icons.image_not_supported_outlined,
+              tint: const Color(0xFF65B9E8))),
+        );
+      },
+    );
+  }
+
+  IconData _iconForExtension(String ext) {
+    if (const {'pdf', 'doc', 'docx', 'txt', 'rtf'}.contains(ext)) return Icons.description_rounded;
+    if (const {'apk', 'aab'}.contains(ext)) return Icons.android_rounded;
+    if (const {'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'}.contains(ext)) return Icons.audio_file_rounded;
+    if (const {'zip', 'rar', '7z', 'tar', 'gz'}.contains(ext)) return Icons.folder_zip_rounded;
+    if (const {'xls', 'xlsx', 'csv'}.contains(ext)) return Icons.table_chart_rounded;
+    if (const {'ppt', 'pptx'}.contains(ext)) return Icons.slideshow_rounded;
+    return Icons.insert_drive_file_rounded;
+  }
+
+  Color _tintForExtension(String ext) {
+    if (const {'pdf', 'doc', 'docx', 'txt', 'rtf'}.contains(ext)) return const Color(0xFF62A7F5);
+    if (const {'apk', 'aab'}.contains(ext)) return const Color(0xFF55C69A);
+    if (const {'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'}.contains(ext)) return const Color(0xFFB08AF8);
+    if (const {'zip', 'rar', '7z', 'tar', 'gz'}.contains(ext)) return const Color(0xFFE7B45D);
+    return const Color(0xFF8B9BB4);
+  }
+
   String _categoryTitle(String category) => switch (category) {
     'images' => 'Images', 'videos' => 'Videos', 'audio' => 'Audio',
     'documents' => 'Documents', 'downloads' => 'Downloads', 'apks' => 'APKs',
@@ -615,7 +674,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                 final categoryMode = _activeCategory != null;
                 final subtitle = categoryMode ? '${_categoryPaths[e.id] ?? _levels.first.name} • ${_size(e.sizeBytes)}' : sub;
                 return Material(color: Colors.transparent, child: ListTile(
-                  leading: Icon(e.isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined),
+                  leading: _fileLeading(e),
                   title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
                   trailing: categoryMode ? null : PopupMenuButton<String>(
