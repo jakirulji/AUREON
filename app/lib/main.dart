@@ -92,6 +92,7 @@ class AureonHome extends StatefulWidget {
 class _AureonHomeState extends State<AureonHome> {
   final _auth = AureonFirebaseAuthService();
   int selected = 0;
+  String? _fileCategory;
 
   @override
   void initState() {
@@ -194,9 +195,13 @@ class _AureonHomeState extends State<AureonHome> {
         return AureonHomePage(
           isDarkMode: widget.themeMode == ThemeMode.dark,
           onThemeChanged: (dark) => widget.onThemeChanged(dark ? ThemeMode.dark : ThemeMode.light),
+          onBrowseCategory: (category) => setState(() {
+            _fileCategory = category;
+            selected = 1;
+          }),
         );
       case 1:
-        return const AureonFilesPage();
+        return AureonFilesPage(initialCategory: _fileCategory);
       case 2:
         return const AureonVirtualFoldersPage();
       case 3:
