@@ -720,8 +720,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
               tooltip: 'Clear search', onPressed: _searchController.clear, icon: const Icon(Icons.close)),
             isDense: true, border: const OutlineInputBorder())),
           const SizedBox(height: 8),
-          Row(children: [
-            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 4, children: [
             const Text('Sort by', style: TextStyle(color: Color(0xFF9AA8BD))),
             DropdownButton<_FileSort>(value: _sort, onChanged: (v) => setState(() => _sort = v ?? _sort),
               items: const [
@@ -733,11 +732,9 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
             FilterChip(selected: _showHidden, label: const Text('Show hidden'),
               onSelected: (v) => setState(() => _showHidden = v)),
             Text('${visible.length} items', style: const TextStyle(color: Color(0xFF9AA8BD), fontSize: 12)),
-            ]),
-            const Spacer(),
             IconButton(tooltip: 'List view', onPressed: () => _setViewMode(false), icon: Icon(Icons.view_list_rounded, color: !_gridView ? Theme.of(context).colorScheme.primary : null)),
             IconButton(tooltip: 'Grid view', onPressed: () => _setViewMode(true), icon: Icon(Icons.grid_view_rounded, color: _gridView ? Theme.of(context).colorScheme.primary : null)),
-          ]),
+          ]),),
         ],
         if (_loading) const LinearProgressIndicator(minHeight: 2),
         if (_error != null) Padding(padding: const EdgeInsets.all(10), child: Row(children: [
