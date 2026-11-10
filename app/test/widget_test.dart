@@ -135,7 +135,6 @@ void main() {
   });
 
   testWidgets('Category shortcuts recursively find matching files across storage', (tester) async {
-    final thumbnailCalls = <MethodCall>[];
     SharedPreferences.setMockInitialValues({
       'aureon.saved_local_root': jsonEncode({
         'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Internal storage',
@@ -143,7 +142,6 @@ void main() {
     });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'getThumbnail') { thumbnailCalls.add(call); return null; }
       if (call.method == 'listChildren') {
         final parent = (call.arguments as Map)['parentId'];
         if (parent == 'root-doc') {
