@@ -264,14 +264,14 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _createMode,
-            onChanged: widget.auth.isConfigured && _activeProfile != null && !_busy
+            onChanged: widget.auth.isConfigured && !_busy
                 ? (value) => setState(() => _createMode = value)
                 : null,
             title: const Text('Create a new AUREON account'),
             subtitle: const Text('Otherwise, sign in to an existing account.'),
           ),
           FilledButton.icon(
-            onPressed: widget.auth.isConfigured && _activeProfile != null && !_busy ? _submit : null,
+            onPressed: widget.auth.isConfigured && !_busy ? _submit : null,
             icon: Icon(_createMode ? Icons.person_add_alt_1 : Icons.login),
             label: Text(_createMode ? 'Create account' : 'Sign in'),
           ),
@@ -334,6 +334,22 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       ],
     );
   }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    bool obscure = false,
+    TextInputType? keyboardType,
+  }) => TextField(
+        controller: controller,
+        obscureText: obscure,
+        keyboardType: keyboardType,
+        autocorrect: false,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+      );
 
   Widget _notice(IconData icon, String title, String body) => Container(
         padding: const EdgeInsets.all(14),
