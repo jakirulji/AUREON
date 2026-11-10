@@ -25,7 +25,6 @@ class _AureonHomePageState extends State<AureonHomePage>
   bool _loading = true;
 
   static const _accent = Color(0xFF8B7CFF);
-  static const _accentBlue = Color(0xFF65D5FF);
 
   @override
   void initState() {
