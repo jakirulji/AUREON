@@ -1,6 +1,9 @@
 package com.aureon.localfiles
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -14,6 +17,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -66,6 +70,7 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
             "defaultRoot" -> result.success(defaultRoot())
             "pickRoot" -> pickRoot(result)
             "listChildren" -> listChildren(call, result)
+            "getThumbnail" -> getThumbnail(call, result)
             "openFile" -> openFile(call, result)
             "renameEntry" -> renameEntry(call, result)
             "copyFile" -> copyFile(call, result)
@@ -416,6 +421,60 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         return !file.exists() || file.delete()
     }
 
+    private fun getThumbnail(call: MethodCall, result: MethodChannel.Result) {
+        if (!requireAccess(result)) return
+        val rootId = call.argument<String>("rootId")
+        val fileId = call.argument<String>("fileId")
+        if (rootId.isNullOrBlank() || fileId.isNullOrBlank()) {
+            result.error("invalid_arguments", "rootId and fileId are required.", null)
+            return
+        }
+        Thread {
+            var bitmap: Bitmap? = null
+            try {
+                val file = resolve(rootId, fileId)
+                if (!file.isFile || !file.exists()) {
+                    result.success(null)
+                    return@Thread
+                }
+                val extension = file.extension.lowercase()
+                if (extension in IMAGE_EXTENSIONS) {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(file.absolutePath, bounds)
+                    if (bounds.outWidth > 0 && bounds.outHeight > 0) {
+                        var sample = 1
+                        while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) sample *= 2
+                        bitmap = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+                    }
+                } else if (extension in VIDEO_EXTENSIONS) {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(file.absolutePath)
+                        bitmap = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    } finally {
+                        retriever.release()
+                    }
+                }
+                val output = ByteArrayOutputStream()
+                val bytes = bitmap?.let {
+                    val scaled = if (it.width > 384 || it.height > 384) {
+                        val ratio = minOf(384.0 / it.width, 384.0 / it.height)
+                        Bitmap.createScaledBitmap(it, (it.width * ratio).toInt().coerceAtLeast(1),
+                            (it.height * ratio).toInt().coerceAtLeast(1), true)
+                    } else it
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 78, output)
+                    if (scaled !== it) scaled.recycle()
+                    output.toByteArray().takeIf { data -> data.isNotEmpty() && data.size <= MAX_THUMBNAIL_BYTES }
+                }
+                result.success(bytes)
+            } catch (_: Exception) {
+                result.success(null)
+            } finally {
+                bitmap?.recycle()
+            }
+        }.start()
+    }
+
     private fun openFile(call: MethodCall, result: MethodChannel.Result) {
         if (!requireAccess(result)) return
         try {
@@ -435,6 +494,9 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     }
 
     companion object {
+        private const val MAX_THUMBNAIL_BYTES = 512 * 1024
+        private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "heif")
+        private val VIDEO_EXTENSIONS = setOf("mp4", "mkv", "mov", "webm", "3gp", "avi", "m4v")
         private const val REQUEST_ALL_FILES_ACCESS = 0xA0E1
         private const val PICK_ROOT_REQUEST = 0xA0E0
     }
