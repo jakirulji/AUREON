@@ -345,13 +345,13 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
 
   AureonCloudflareVaultClient _cloudflareClient() {
     if (_cloudflareApiUrl.trim().isEmpty) {
-      throw StateError('No active Cloudflare backend profile is configured. Open Account → Your backend and save your own Worker URL first.');
+      throw StateError('AUREON Central Backend is unavailable in this session. Sign in again and retry.');
     }
     return AureonCloudflareVaultClient(baseUrl: _cloudflareApiUrl);
   }
 
   Future<void> _syncCloudflare() => _run(() async {
-    if (!_auth.isConfigured) throw StateError('Configure Firebase before cloud vault sync.');
+    if (!_auth.isConfigured) throw StateError('Sign in to your AUREON account before cloud vault sync.');
     final user = await _auth.reloadUser();
     if (!user.emailVerified) {
       throw StateError('Verify your AUREON account email before cloud vault sync.');
@@ -425,7 +425,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   }
 
   Future<void> _restoreCloudflare() => _run(() async {
-    if (!_auth.isConfigured) throw StateError('Configure Firebase before Cloudflare recovery.');
+    if (!_auth.isConfigured) throw StateError('Sign in to your AUREON account before Cloudflare recovery.');
     final user = await _auth.reloadUser();
     if (!user.emailVerified) {
       throw StateError('Verify your AUREON account email before cloud recovery.');
@@ -581,7 +581,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
         children: [
           Text(
             _cloudflareApiUrl.trim().isEmpty
-                ? 'Cloudflare API URL: not configured in this build.'
+                ? 'AUREON Central Backend is not reachable in this build.'
                 : 'Cloudflare API: $_cloudflareApiUrl',
             style: const TextStyle(fontSize: 12, color: Color(0xFF9AA8BD)),
           ),
