@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// A user-owned Firebase + Cloudflare Worker configuration. This record must
-/// never contain service-account keys, Worker Secrets or access tokens.
+/// The app's fixed public Firebase + Cloudflare endpoint configuration.
+/// It must never contain service-account keys, Worker Secrets or access tokens.
 class AureonBackendProfile {
   static const shared = AureonBackendProfile(
     id: 'aureon-central',
