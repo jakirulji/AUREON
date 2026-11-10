@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 
 class AureonLocalRoot {
@@ -191,6 +192,13 @@ class AureonLocalFiles {
       'rootId': root.rootId, 'parentId': parentId, 'name': name,
     });
     if (value is! String || value.isEmpty) throw const FormatException('Native folder creation returned an invalid identity.');
+    return value;
+  }
+
+  /// Returns a small JPEG preview for image/video files, or null when unsupported.
+  Future<Uint8List?> getThumbnail({required AureonLocalRoot root, required String fileId}) async {
+    final value = await _channel.invokeMethod<Uint8List?>('getThumbnail',
+      <String, Object?>{'rootId': root.rootId, 'fileId': fileId});
     return value;
   }
 
