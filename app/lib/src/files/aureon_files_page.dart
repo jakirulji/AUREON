@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
