@@ -7,28 +7,85 @@ import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const AureonApp());
 
-class AureonApp extends StatelessWidget {
+class AureonApp extends StatefulWidget {
   const AureonApp({super.key});
+
+  @override
+  State<AureonApp> createState() => _AureonAppState();
+}
+
+class _AureonAppState extends State<AureonApp> {
+  static const _themePreferenceKey = 'aureon.theme_mode';
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreTheme();
+  }
+
+  Future<void> _restoreTheme() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_themePreferenceKey);
+      if (!mounted || saved == null) return;
+      setState(() => _themeMode = saved == 'light' ? ThemeMode.light : ThemeMode.dark);
+    } catch (_) {
+      // Keep the premium dark default if local preferences are unavailable.
+    }
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    setState(() => _themeMode = mode);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_themePreferenceKey, mode == ThemeMode.light ? 'light' : 'dark');
+    } catch (_) {
+      // The selected theme remains active for this app session.
+    }
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'AUREON',
     debugShowCheckedModeBanner: false,
+    themeMode: _themeMode,
     theme: ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFF4F7FB),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF087F70),
+        brightness: Brightness.light,
+        surface: Colors.white,
+      ),
+      cardTheme: CardThemeData(color: Colors.white, elevation: 0),
+    ),
+    darkTheme: ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: const Color(0xFF0B1020),
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF64E6C2), brightness: Brightness.dark, surface: const Color(0xFF111A2E)),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF64E6C2),
+        brightness: Brightness.dark,
+        surface: const Color(0xFF111A2E),
+      ),
     ),
-    home: const AureonHome(),
+    home: AureonHome(
+      themeMode: _themeMode,
+      onThemeChanged: _setThemeMode,
+    ),
   );
 }
 
 class AureonHome extends StatefulWidget {
-  const AureonHome({super.key});
+  const AureonHome({super.key, required this.themeMode, required this.onThemeChanged});
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeChanged;
   @override
   State<AureonHome> createState() => _AureonHomeState();
 }
@@ -113,7 +170,10 @@ class _AureonHomeState extends State<AureonHome> {
   Widget _content(bool wide) {
     switch (selected) {
       case 0:
-        return const AureonHomePage();
+        return AureonHomePage(
+          isDarkMode: widget.themeMode == ThemeMode.dark,
+          onThemeChanged: (dark) => widget.onThemeChanged(dark ? ThemeMode.dark : ThemeMode.light),
+        );
       case 1:
         return const AureonFilesPage();
       case 2:
