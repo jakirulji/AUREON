@@ -11,10 +11,14 @@ class AureonHomePage extends StatefulWidget {
     required this.isDarkMode,
     required this.onThemeChanged,
     required this.onBrowseCategory,
+    required this.onOpenFiles,
+    required this.onOpenProfile,
   });
   final bool isDarkMode;
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<String> onBrowseCategory;
+  final VoidCallback onOpenFiles;
+  final VoidCallback onOpenProfile;
 
   @override
   State<AureonHomePage> createState() => _AureonHomePageState();
@@ -192,10 +196,18 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
       const Text('AUREON', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 2.1)),
       Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: muted, fontSize: 8, letterSpacing: 1.2, fontWeight: FontWeight.w700)),
     ])),
+    _action(Icons.search_rounded, 'Search files', widget.onOpenFiles, dark),
+    const SizedBox(width: 5),
+    _action(Icons.notifications_none_rounded, 'Notifications', () {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You are all caught up.')),
+      );
+    }, dark),
+    const SizedBox(width: 5),
+    _action(Icons.person_outline_rounded, 'Profile', widget.onOpenProfile, dark),
+    const SizedBox(width: 5),
     _action(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, dark ? 'Light theme' : 'Dark theme',
       () => widget.onThemeChanged(!dark), dark),
-    const SizedBox(width: 7),
-    _action(Icons.refresh_rounded, 'Refresh storage', _loading ? null : _refresh, dark),
   ]);
 
   Widget _action(IconData icon, String tip, VoidCallback? tap, bool dark) => Material(
