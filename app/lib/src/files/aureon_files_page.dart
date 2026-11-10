@@ -178,9 +178,10 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
             break;
           }
         }
-        if (downloads != null) {
+        final downloadsFolder = downloads;
+        if (downloadsFolder != null) {
           setState(() {
-            _levels.add(_Folder(downloads.name, downloads.id));
+            _levels.add(_Folder(downloadsFolder.name, downloadsFolder.id));
             _entries = [];
             _loading = false;
             _activeCategory = null;
@@ -189,9 +190,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           return;
         }
         setState(() { _entries = rows; _loading = false; _activeCategory = null; });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('A Downloads folder was not found in this storage location.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('A Downloads folder was not found in this storage location.')),
+          );
+        }
         return;
       }
       setState(() { _entries = rows; _loading = false; });
