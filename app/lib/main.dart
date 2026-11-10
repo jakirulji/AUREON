@@ -199,6 +199,8 @@ class _AureonHomeState extends State<AureonHome> {
             _fileCategory = category;
             selected = 1;
           }),
+          onOpenFiles: () => setState(() { _fileCategory = null; selected = 1; }),
+          onOpenProfile: () => setState(() => selected = 4),
         );
       case 1:
         return AureonFilesPage(initialCategory: _fileCategory);
