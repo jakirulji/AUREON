@@ -9,7 +9,8 @@ import 'aureon_operation_history.dart';
 
 enum _FileSort { name, largest, newest, type }
 class AureonFilesPage extends StatefulWidget {
-  const AureonFilesPage({super.key});
+  const AureonFilesPage({super.key, this.initialCategory});
+  final String? initialCategory;
   @override
   State<AureonFilesPage> createState() => _AureonFilesPageState();
 }
@@ -29,11 +30,13 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   bool _showHidden = false;
   String? _error;
   _FileSort _sort = _FileSort.name;
+  String? _activeCategory;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(() => setState(() {}));
+    _activeCategory = widget.initialCategory;
     _restoreRoot();
   }
   @override
@@ -166,6 +169,25 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     try {
       final rows = await _files.listChildren(root: root, parentId: _levels.last.id);
       if (!mounted) return;
+      if (_activeCategory == 'downloads' && _levels.length == 1) {
+        final downloads = rows.where((entry) => entry.isDirectory &&
+          (entry.name.toLowerCase() == 'download' || entry.name.toLowerCase() == 'downloads')).firstOrNull;
+        if (downloads != null) {
+          setState(() {
+            _levels.add(_Folder(downloads.name, downloads.id));
+            _entries = [];
+            _loading = false;
+            _activeCategory = null;
+          });
+          await _load();
+          return;
+        }
+        setState(() { _entries = rows; _loading = false; _activeCategory = null; });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('A Downloads folder was not found in this storage location.')),
+        );
+        return;
+      }
       setState(() { _entries = rows; _loading = false; });
     } on PlatformException catch (error) {
       _fail(switch (error.code) {
@@ -409,10 +431,40 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     final dot = name.lastIndexOf('.');
     return dot <= 0 ? '' : name.substring(dot + 1).toLowerCase();
   }
+  bool _matchesCategory(AureonLocalEntry entry) {
+    final category = _activeCategory;
+    if (category == null || entry.isDirectory) return true;
+    final extension = _ext(entry.name);
+    switch (category) {
+      case 'images':
+        return const {'jpg','jpeg','png','gif','webp','bmp','heic','heif','svg','tif','tiff','raw','dng'}.contains(extension);
+      case 'videos':
+        return const {'mp4','mkv','mov','avi','webm','3gp','m4v','mpeg','mpg'}.contains(extension);
+      case 'audio':
+        return const {'mp3','m4a','aac','wav','flac','ogg','opus','wma','amr'}.contains(extension);
+      case 'documents':
+        return const {'pdf','doc','docx','xls','xlsx','ppt','pptx','txt','rtf','odt','ods','odp','csv','md'}.contains(extension);
+      case 'apks':
+        return const {'apk','apks','xapk','aab'}.contains(extension);
+      case 'archives':
+        return const {'zip','rar','7z','tar','gz','bz2','xz','zst'}.contains(extension);
+      case 'other':
+        return !const {
+          'jpg','jpeg','png','gif','webp','bmp','heic','heif','svg','tif','tiff','raw','dng',
+          'mp4','mkv','mov','avi','webm','3gp','m4v','mpeg','mpg',
+          'mp3','m4a','aac','wav','flac','ogg','opus','wma','amr',
+          'pdf','doc','docx','xls','xlsx','ppt','pptx','txt','rtf','odt','ods','odp','csv','md',
+          'apk','apks','xapk','aab','zip','rar','7z','tar','gz','bz2','xz','zst',
+        }.contains(extension);
+      default:
+        return true;
+    }
+  }
+
   List<AureonLocalEntry> get _visibleEntries {
     final q = _searchController.text.trim().toLowerCase();
     final rows = _entries.where((e) => e.name != '.AUREON Trash (AUREON)' && (_showHidden || !e.isHidden) &&
-      (q.isEmpty || e.name.toLowerCase().contains(q))).toList();
+      (q.isEmpty || e.name.toLowerCase().contains(q)) && _matchesCategory(e)).toList();
     rows.sort((a, b) {
       if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
       switch (_sort) {
