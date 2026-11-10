@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -39,6 +40,7 @@ class _Folder {
 }
 class _AureonFilesPageState extends State<AureonFilesPage> {
   static const _savedRootKey = 'aureon.saved_local_root';
+  static const _viewModeKey = 'aureon.files.view_mode';
   final _files = AureonLocalFiles();
   final _searchController = TextEditingController();
   AureonLocalRoot? _root;
@@ -51,16 +53,62 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   String? _activeCategory;
   final Map<String, String> _categoryPaths = {};
   final Map<String, Future<Uint8List?>> _thumbnailCache = {};
+  bool _gridView = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(() => setState(() {}));
     _activeCategory = widget.initialCategory;
+    _restoreViewMode();
     _restoreRoot();
   }
   @override
   void dispose() { _searchController.dispose(); super.dispose(); }
+
+  Future<void> _restoreViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _gridView = prefs.getBool(_viewModeKey) ?? false);
+  }
+
+  Future<void> _setViewMode(bool grid) async {
+    setState(() => _gridView = grid);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_viewModeKey, grid);
+  }
+
+  String _listingCacheKey(AureonLocalRoot root) {
+    final location = _activeCategory == null ? 'folder:${_levels.last.id}' : 'category:$_activeCategory';
+    final identity = base64Url.encode(utf8.encode('${root.rootId}|$location')).replaceAll('=', '');
+    return 'aureon.files.cache.$identity';
+  }
+
+  Future<List<AureonLocalEntry>?> _readListingCache(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw == null) return null;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final rows = (data['entries'] as List).map((item) => AureonLocalEntry.fromMap((item as Map).cast<Object?, Object?>())).toList();
+      final paths = (data['paths'] as Map?)?.cast<String, String>() ?? <String, String>{};
+      _categoryPaths
+        ..clear()
+        ..addAll(paths);
+      return rows;
+    } catch (_) { return null; }
+  }
+
+  Future<void> _writeListingCache(String key, List<AureonLocalEntry> rows) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, jsonEncode({
+        'entries': rows.map((e) => {'id': e.id, 'name': e.name, 'isDirectory': e.isDirectory,
+          'isHidden': e.isHidden, 'sizeBytes': e.sizeBytes, 'modifiedEpochMs': e.modifiedEpochMs,
+          'isSystemTrash': e.isSystemTrash}).toList(),
+        'paths': _categoryPaths,
+      }));
+    } catch (_) { /* Cache failure must never block file browsing. */ }
+  }
 
   Future<bool> _ensureAndroidAccess() async {
     if (!Platform.isAndroid) return true;
@@ -185,15 +233,20 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   Future<void> _load() async {
     final root = _root;
     if (root == null || _levels.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    final cacheKey = _listingCacheKey(root);
+    final cached = await _readListingCache(cacheKey);
+    if (!mounted) return;
+    setState(() { if (cached != null) _entries = cached; _loading = cached == null; _error = null; });
     try {
       if (_activeCategory != null) {
         final results = await _scanCategory(root);
+        await _writeListingCache(cacheKey, results);
         if (!mounted) return;
         setState(() { _entries = results; _loading = false; });
         return;
       }
       final rows = await _files.listChildren(root: root, parentId: _levels.last.id);
+      await _writeListingCache(cacheKey, rows);
       if (!mounted) return;
       setState(() { _entries = rows; _loading = false; });
     } on PlatformException catch (error) {
@@ -476,8 +529,19 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (entry.isDirectory || !supported.contains(ext) || _root == null) {
       return Future<Uint8List?>.value(null);
     }
-    return _thumbnailCache.putIfAbsent(entry.id,
-      () => _files.getThumbnail(root: _root!, fileId: entry.id).catchError((_) => null));
+    final root = _root!;
+    final identity = base64Url.encode(utf8.encode('${root.rootId}|${entry.id}|${entry.sizeBytes}|${entry.modifiedEpochMs}')).replaceAll('=', '');
+    return _thumbnailCache.putIfAbsent(identity, () async {
+      try {
+        final directory = Directory('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}aureon_thumbnails');
+        if (!await directory.exists()) await directory.create(recursive: true);
+        final cachedFile = File('${directory.path}${Platform.pathSeparator}$identity.jpg');
+        if (await cachedFile.exists()) return await cachedFile.readAsBytes();
+        final bytes = await _files.getThumbnail(root: root, fileId: entry.id);
+        if (bytes != null && bytes.isNotEmpty) await cachedFile.writeAsBytes(bytes, flush: false);
+        return bytes;
+      } catch (_) { return null; }
+    });
   }
 
   Widget _fileLeading(AureonLocalEntry entry) {
@@ -652,7 +716,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
               tooltip: 'Clear search', onPressed: _searchController.clear, icon: const Icon(Icons.close)),
             isDense: true, border: const OutlineInputBorder())),
           const SizedBox(height: 8),
-          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+          Row(children: [
+            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
             const Text('Sort by', style: TextStyle(color: Color(0xFF9AA8BD))),
             DropdownButton<_FileSort>(value: _sort, onChanged: (v) => setState(() => _sort = v ?? _sort),
               items: const [
@@ -664,6 +729,10 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
             FilterChip(selected: _showHidden, label: const Text('Show hidden'),
               onSelected: (v) => setState(() => _showHidden = v)),
             Text('${visible.length} items', style: const TextStyle(color: Color(0xFF9AA8BD), fontSize: 12)),
+            ]),
+            const Spacer(),
+            IconButton(tooltip: 'List view', onPressed: () => _setViewMode(false), icon: Icon(Icons.view_list_rounded, color: !_gridView ? Theme.of(context).colorScheme.primary : null)),
+            IconButton(tooltip: 'Grid view', onPressed: () => _setViewMode(true), icon: Icon(Icons.grid_view_rounded, color: _gridView ? Theme.of(context).colorScheme.primary : null)),
           ]),
         ],
         if (_loading) const LinearProgressIndicator(minHeight: 2),
@@ -682,7 +751,45 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           Expanded(child: visible.isEmpty && !_loading
             ? Center(child: Text(_searchController.text.isNotEmpty ? 'No files match your search.'
               : _entries.isEmpty ? 'This folder is empty.' : 'No visible items. Try Show hidden.'))
-            : ListView.separated(itemCount: visible.length,
+            : _gridView
+              ? GridView.builder(
+                  padding: const EdgeInsets.only(top: 8, bottom: 20),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 190, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.82),
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final e = visible[index];
+                    final categoryMode = _activeCategory != null;
+                    return Card(clipBehavior: Clip.antiAlias, child: InkWell(
+                      onTap: e.isDirectory ? () => _open(e) : () => _openFile(e),
+                      child: Padding(padding: const EdgeInsets.all(10), child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Expanded(child: Center(child: SizedBox(width: double.infinity, height: double.infinity,
+                            child: FittedBox(fit: BoxFit.contain, child: _fileLeading(e))))),
+                          const SizedBox(height: 8),
+                          Row(children: [Expanded(child: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600))),
+                            if (!categoryMode) PopupMenuButton<String>(padding: EdgeInsets.zero, iconSize: 19,
+                              onSelected: (action) {
+                                if (action == 'rename') _rename(e);
+                                if (action == 'copy' && !e.isDirectory) _copyFile(e);
+                                if (action == 'move_up' && _levels.length > 1) _moveToParent(e);
+                                if (action == 'trash') _moveToTrash(e);
+                              }, itemBuilder: (_) => [
+                                const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                                const PopupMenuItem(value: 'trash', child: Text('Move to Trash')),
+                                if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
+                                if (_levels.length > 1) const PopupMenuItem(value: 'move_up', child: Text('Move to parent')),
+                              ]),
+                          ]),
+                          Text(categoryMode ? '${_size(e.sizeBytes)} • ${_categoryPaths[e.id] ?? _levels.first.name}'
+                            : e.isDirectory ? 'Folder' : _size(e.sizeBytes), maxLines: 1,
+                            overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF9AA8BD))),
+                        ],
+                      )),
+                    ));
+                  })
+              : ListView.separated(itemCount: visible.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final e = visible[index];
