@@ -16,21 +16,15 @@ This guide is for the project owner. Do not send passwords, service-account JSON
 
 The Flutter app uses Firebase Identity Toolkit and Secure Token REST endpoints directly so the same email/password flow works on Android and Windows without a Firebase native plugin dependency. Passwords are sent only to Firebase over HTTPS and are not persisted by AUREON. The rotating refresh token is stored using flutter_secure_storage (Android Keystore-backed storage / Windows DPAPI-backed storage); ID tokens remain in memory. Signing out clears this device's local refresh token. It does not revoke the Firebase refresh token server-side.
 
-## 2. Configure AUREON with your own backend profile
+## 2. Shared backend configuration (maintainer-only)
 
-AUREON does not ship with a shared developer-hosted Firebase or Cloudflare backend. Each user must create and own their Firebase project and Cloudflare Worker/D1 deployment.
+AUREON uses one centrally operated Firebase project (`aureon-7f612`) and one Cloudflare Worker/D1 deployment for all end users. The Flutter app contains only public Firebase client configuration and the HTTPS Worker base URL. End users create/sign in to an AUREON Master Account and then connect their own cloud-provider accounts; they never create, paste, save or select Firebase/Cloudflare backend profiles.
 
-After building/installing the app:
+The production app is configured with the maintainer's Firebase Web API key, project ID and Worker URL. The Firebase Web API key is a public client identifier, not a server secret. Restrict it to the required Firebase Authentication APIs where compatible with Android and Windows clients. Never embed Firebase service-account credentials, Cloudflare API tokens or Worker root secrets in the app.
 
-1. Open **Account → Your backend**.
-2. Enter a profile name, Firebase Web API Key, Firebase Project ID and the HTTPS URL of your own deployed Cloudflare Worker.
-3. Save and use the profile, then create/sign in to the AUREON Master Account in that Firebase project.
-4. AUREON binds the saved profile to the Firebase issuer/project ID, authenticated UID and canonical Worker identity. A profile already bound to a different identity cannot be silently reused; create a separate profile for another identity.
-5. The active profile is saved locally and restored on later launches. Firebase refresh tokens are stored in secure storage under a project-and-UID-specific namespace, so tokens from one Firebase project cannot be reused against another.
+The shared Worker verifies Firebase ID tokens, derives the account UID from the signed token subject, and scopes every vault snapshot, recovery challenge, cooldown and audit operation to that UID. Never accept a client-supplied UID as the authorization identity. A successful app build does not prove the deployed Worker, D1 binding or root secret is healthy; the maintainer must verify `/health/ready` and perform authenticated cross-account isolation tests before onboarding users.
 
-The Firebase Web API Key, project ID and Worker URL are public client configuration—not secrets. Never enter or store service-account JSON, Firebase private keys, Cloudflare Worker Secrets, passwords, OAuth refresh tokens or recovery keys in a backend profile. Profile records remain device-local; they are not uploaded to a shared AUREON service.
-
-The preview CI intentionally has no owner backend configuration. A green preview build does not mean a Firebase project or Worker has been deployed or tested. Compile-time `AUREON_FIREBASE_API_KEY`, `AUREON_FIREBASE_PROJECT_ID` and `AUREON_CLOUDFLARE_API_URL` are not required for normal user setup; the app's default configuration is empty and fails closed until a user saves their own profile.
+The preview CI uses the same public client configuration as the release build, but does not prove the live Firebase/Cloudflare deployment is available. User-specific refresh tokens remain in platform secure storage, not in the shared Worker.
 
 
 ## 3. Cloudflare Workers + D1 (no paid domain required)
