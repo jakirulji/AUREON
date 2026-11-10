@@ -24,7 +24,8 @@ class _AureonHomePageState extends State<AureonHomePage>
   String? _error;
   bool _loading = true;
 
-  static const _mint = Color(0xFF64E6C2);
+  static const _accent = Color(0xFF8B7CFF);
+  static const _accentBlue = Color(0xFF65D5FF);
 
   @override
   void initState() {
@@ -154,34 +155,34 @@ class _AureonHomePageState extends State<AureonHomePage>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: widget.isDarkMode
-                    ? [const Color(0xFF173B3A), const Color(0xFF14243A), const Color(0xFF111A2E)]
-                    : [const Color(0xFFDDF7F0), const Color(0xFFEAF1FA), Colors.white],
+                    ? [const Color(0xFF24204A), const Color(0xFF172B4A), const Color(0xFF111A2E)]
+                    : [const Color(0xFFE8E5FF), const Color(0xFFE7F3FF), Colors.white],
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.isDarkMode ? const Color(0xFF31534F) : const Color(0xFFB9DDD3)),
+              border: Border.all(color: widget.isDarkMode ? const Color(0xFF514A83) : const Color(0xFFC9C5F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.phone_android_rounded, color: _mint, size: 19),
+                    const Icon(Icons.phone_android_rounded, color: _accent, size: 19),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text('DEVICE STORAGE',
                         style: TextStyle(fontSize: 11, letterSpacing: 1.3,
-                          fontWeight: FontWeight.w700, color: widget.isDarkMode ? const Color(0xFFB6D8D0) : const Color(0xFF42665E))),
+                          fontWeight: FontWeight.w700, color: widget.isDarkMode ? const Color(0xFFD0C9FF) : const Color(0xFF514A83))),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                       decoration: BoxDecoration(
-                        color: widget.isDarkMode ? const Color(0xFF163D35) : const Color(0xFFD0F1E6),
+                        color: widget.isDarkMode ? const Color(0xFF332D62) : const Color(0xFFE2DEFF),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: const Row(children: [
-                        Icon(Icons.circle, color: _mint, size: 7),
+                        Icon(Icons.circle, color: _accent, size: 7),
                         SizedBox(width: 6),
-                        Text('LIVE', style: TextStyle(color: _mint, fontSize: 10,
+                        Text('LIVE', style: TextStyle(color: _accent, fontSize: 10,
                           fontWeight: FontWeight.w800, letterSpacing: .8)),
                       ]),
                     ),
@@ -196,25 +197,25 @@ class _AureonHomePageState extends State<AureonHomePage>
                       letterSpacing: -.8)),
                   const SizedBox(height: 3),
                   Text('used of ${_formatMb(total!)}',
-                    style: TextStyle(color: widget.isDarkMode ? const Color(0xFFB7C7D8) : const Color(0xFF526579), fontSize: 13)),
+                    style: TextStyle(color: widget.isDarkMode ? const Color(0xFFC2CDE0) : const Color(0xFF526579), fontSize: 13)),
                   const SizedBox(height: 18),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: LinearProgressIndicator(
                       value: ratio,
                       minHeight: 10,
-                      backgroundColor: widget.isDarkMode ? const Color(0xFF344358) : const Color(0xFFD1E1E8),
-                      valueColor: const AlwaysStoppedAnimation<Color>(_mint),
+                      backgroundColor: widget.isDarkMode ? const Color(0xFF3A3B63) : const Color(0xFFD8DDF2),
+                      valueColor: const AlwaysStoppedAnimation<Color>(_accent),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       Text('${(ratio * 100).toStringAsFixed(1)}% used',
-                        style: const TextStyle(color: _mint, fontWeight: FontWeight.w700, fontSize: 12)),
+                        style: const TextStyle(color: _accent, fontWeight: FontWeight.w700, fontSize: 12)),
                       const Spacer(),
                       Text('${_formatMb(free!)} available',
-                        style: TextStyle(color: widget.isDarkMode ? const Color(0xFFCBD7E5) : const Color(0xFF526579), fontSize: 12)),
+                        style: TextStyle(color: widget.isDarkMode ? const Color(0xFFD6D2F2) : const Color(0xFF526579), fontSize: 12)),
                     ],
                   ),
                 ] else ...[
@@ -284,7 +285,7 @@ class _AureonHomePageState extends State<AureonHomePage>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.cloud_outlined, color: _mint, size: 25),
+                Icon(Icons.cloud_outlined, color: _accent, size: 25),
                 SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -315,7 +316,7 @@ class _AureonHomePageState extends State<AureonHomePage>
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline_rounded, color: _mint, size: 19),
+                Icon(Icons.info_outline_rounded, color: _accent, size: 19),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text('Device storage is read directly from the phone. Pull down to refresh; the dashboard also refreshes every 30 seconds and when the app returns to the foreground.',
@@ -343,7 +344,7 @@ class _AureonHomePageState extends State<AureonHomePage>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: _mint, size: 18),
+        Icon(icon, color: _accent, size: 18),
         const SizedBox(height: 11),
         Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
