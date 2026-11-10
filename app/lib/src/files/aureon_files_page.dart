@@ -83,12 +83,17 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     return 'aureon.files.cache.$identity';
   }
 
+  Future<Directory> _cacheDirectory() async {
+    final directory = Directory('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}aureon_cache');
+    if (!await directory.exists()) await directory.create(recursive: true);
+    return directory;
+  }
+
   Future<List<AureonLocalEntry>?> _readListingCache(String key) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(key);
-      if (raw == null) return null;
-      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final file = File('${(await _cacheDirectory()).path}${Platform.pathSeparator}$key.json');
+      if (!await file.exists()) return null;
+      final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final rows = (data['entries'] as List).map((item) => AureonLocalEntry.fromMap((item as Map).cast<Object?, Object?>())).toList();
       final paths = (data['paths'] as Map?)?.cast<String, String>() ?? <String, String>{};
       _categoryPaths
@@ -100,13 +105,13 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
 
   Future<void> _writeListingCache(String key, List<AureonLocalEntry> rows) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(key, jsonEncode({
+      final file = File('${(await _cacheDirectory()).path}${Platform.pathSeparator}$key.json');
+      await file.writeAsString(jsonEncode({
         'entries': rows.map((e) => {'id': e.id, 'name': e.name, 'isDirectory': e.isDirectory,
           'isHidden': e.isHidden, 'sizeBytes': e.sizeBytes, 'modifiedEpochMs': e.modifiedEpochMs,
           'isSystemTrash': e.isSystemTrash}).toList(),
         'paths': _categoryPaths,
-      }));
+      }), flush: false);
     } catch (_) { /* Cache failure must never block file browsing. */ }
   }
 
@@ -533,8 +538,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     final identity = base64Url.encode(utf8.encode('${root.rootId}|${entry.id}|${entry.sizeBytes}|${entry.modifiedEpochMs}')).replaceAll('=', '');
     return _thumbnailCache.putIfAbsent(identity, () async {
       try {
-        final directory = Directory('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}aureon_thumbnails');
-        if (!await directory.exists()) await directory.create(recursive: true);
+        final directory = await _cacheDirectory();
         final cachedFile = File('${directory.path}${Platform.pathSeparator}$identity.jpg');
         if (await cachedFile.exists()) return await cachedFile.readAsBytes();
         final bytes = await _files.getThumbnail(root: root, fileId: entry.id);
