@@ -305,7 +305,10 @@ void main() {
     });
     await tester.pumpWidget(const AureonApp());
     await tester.pumpAndSettle();
+    expect(find.byType(AureonHomePage), findsOneWidget);
+    expect(find.text('Storage overview'), findsOneWidget);
+    await tester.tap(find.text('Files').first);
+    await tester.pumpAndSettle();
     expect(find.byType(AureonFilesPage), findsOneWidget);
-    expect(find.text('Storage overview'), findsNothing);
   });
 }
