@@ -167,7 +167,7 @@ class _AureonHomePageState extends State<AureonHomePage>
                   children: [
                     const Icon(Icons.phone_android_rounded, color: _mint, size: 19),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text('DEVICE STORAGE',
                         style: TextStyle(fontSize: 11, letterSpacing: 1.3,
                           fontWeight: FontWeight.w700, color: widget.isDarkMode ? const Color(0xFFB6D8D0) : const Color(0xFF42665E))),
