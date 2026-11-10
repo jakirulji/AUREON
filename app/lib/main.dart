@@ -35,34 +35,22 @@ class AureonHome extends StatefulWidget {
 class _AureonHomeState extends State<AureonHome> {
   final _auth = AureonFirebaseAuthService();
   int selected = 0;
-  final _backendProfiles = AureonBackendProfileStore();
 
   @override
   void initState() {
     super.initState();
-    _restoreBackendProfile();
+    _auth.configureProfile(AureonBackendProfile.shared);
+    _restoreSession();
   }
 
-  Future<void> _restoreBackendProfile() async {
+  Future<void> _restoreSession() async {
     try {
-      final profile = await _backendProfiles.activeProfile();
-      if (profile != null && mounted) {
-        _auth.configureProfile(profile);
-        try {
-          await _auth.restoreSession();
-          final user = await _auth.reloadUser();
-          try {
-            final bound = await _backendProfiles.bindActiveProfile(user.localId);
-            _auth.acceptBoundProfile(bound);
-          } catch (_) {
-            await _auth.signOut();
-          }
-        } catch (_) {
-          // Temporary network failures must not erase the saved refresh token.
-        }
-      }
+      await _auth.restoreSession();
+      final user = await _auth.reloadUser();
+      _auth.acceptBoundProfile(AureonBackendProfile.shared.bindToUid(user.localId));
+      if (mounted) setState(() {});
     } catch (_) {
-      // The Account page presents a repairable profile-registry error.
+      // First launch or temporary network issue; Account page offers sign-in.
     }
   }
   static const labels = ['Home', 'Files', 'Cloud', 'Transfers', 'Account', 'Settings'];
