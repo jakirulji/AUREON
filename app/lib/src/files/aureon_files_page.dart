@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'aureon_operation_history.dart';
+import '../media/aureon_media_viewer.dart';
 
 enum _FileSort { name, largest, newest, type }
 class AureonFilesPage extends StatefulWidget {
@@ -508,14 +509,50 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   Future<void> _openFile(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null || entry.isDirectory) return;
+    final extension = _ext(entry.name);
+    final location = '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}';
+    const video = {'mp4','mkv','mov','avi','webm','3gp','m4v','mpeg','mpg','ts','m2ts','flv'};
+    const audio = {'mp3','m4a','aac','wav','flac','ogg','opus','wma','amr','aiff','alac'};
+    const images = {'jpg','jpeg','png','gif','webp','bmp','heic','heif','tif','tiff','dng'};
+    if (video.contains(extension) || audio.contains(extension)) {
+      final queue = _entries.where((item) => !item.isDirectory &&
+        (video.contains(_ext(item.name)) == video.contains(extension)) &&
+        (audio.contains(_ext(item.name)) == audio.contains(extension))).toList();
+      final start = queue.indexWhere((item) => item.id == entry.id);
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => AureonMediaViewerPage(
+          filePath: entry.id,
+          fileName: entry.name,
+          queue: queue.map((item) => AureonMediaItem(path: item.id, title: item.name)).toList(),
+          initialIndex: start < 0 ? 0 : start,
+          isVideo: video.contains(extension),
+        ),
+      ));
+      if (!mounted) return;
+      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: true);
+      return;
+    }
+    if (images.contains(extension)) {
+      final gallery = _entries.where((item) => !item.isDirectory && images.contains(_ext(item.name))).toList();
+      final start = gallery.indexWhere((item) => item.id == entry.id);
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => AureonImageViewerPage(
+          images: gallery.map((item) => AureonMediaItem(path: item.id, title: item.name)).toList(),
+          initialIndex: start < 0 ? 0 : start,
+        ),
+      ));
+      if (!mounted) return;
+      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: true);
+      return;
+    }
     try {
       await _files.openFile(root: root, fileId: entry.id);
-      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', succeeded: true);
+      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: true);
     } on PlatformException catch (error) {
-      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', succeeded: false, errorCode: error.code);
+      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: false, errorCode: error.code);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'Unable to open this file.')));
     } catch (error) {
-      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}', succeeded: false, errorCode: error.runtimeType.toString());
+      _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: false, errorCode: error.runtimeType.toString());
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }

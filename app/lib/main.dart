@@ -7,9 +7,14 @@ import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const AureonApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
+  runApp(const AureonApp());
+}
 
 class AureonApp extends StatefulWidget {
   const AureonApp({super.key});

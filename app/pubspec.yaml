@@ -17,6 +17,9 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   meta: ^1.16.0
   path_provider: ^2.1.5
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
   aureon_contracts:
     path: ../shared/aureon_contracts
 dev_dependencies:
