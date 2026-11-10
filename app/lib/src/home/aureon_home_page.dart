@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:disk_space_plus/disk_space_plus.dart';
 import 'package:flutter/material.dart';
+import '../files/aureon_operation_history.dart';
 
 class AureonHomePage extends StatefulWidget {
   const AureonHomePage({
@@ -27,6 +28,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   DateTime? _updated;
   String? _error;
   bool _loading = true;
+  List<AureonOperationRecord> _recentFiles = [];
 
   static const violet = Color(0xFF9B8CFF);
   static const ice = Color(0xFF8EDCFF);
@@ -47,6 +49,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refresh();
+    _loadRecentFiles();
     _timer = Timer.periodic(const Duration(seconds: 30), (_) => _refresh(showLoader: false));
   }
 
@@ -60,6 +63,19 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _refresh(showLoader: false);
+  }
+
+  Future<void> _loadRecentFiles() async {
+    try {
+      final records = await AureonOperationHistory.load();
+      if (!mounted) return;
+      final seen = <String>{};
+      final recent = records.where((row) => row.kind == 'open' && row.succeeded &&
+        seen.add('${row.itemName}| ${row.sourceLocation}')).take(4).toList();
+      setState(() => _recentFiles = recent);
+    } catch (_) {
+      if (mounted) setState(() => _recentFiles = []);
+    }
   }
 
   Future<void> _refresh({bool showLoader = true}) async {
@@ -136,6 +152,8 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
             },
           ),
           const SizedBox(height: 21),
+          _recentFilesCard(dark, muted),
+          const SizedBox(height: 13),
           _cloudCard(dark, muted),
           const SizedBox(height: 12),
           _privacyCard(dark, muted),
@@ -280,6 +298,56 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
         ),
       ),
     );
+  }
+
+  Widget _recentFilesCard(bool dark, Color muted) {
+    final surface = dark ? const Color(0xFF131D32) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Text('RECENT FILES', style: TextStyle(fontSize: 10, letterSpacing: 1.35, fontWeight: FontWeight.w900))),
+          Text('OPENED', style: TextStyle(color: muted, fontSize: 8, letterSpacing: .8, fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 10),
+        if (_recentFiles.isEmpty)
+          Row(children: [
+            Icon(Icons.history_rounded, color: muted, size: 19),
+            const SizedBox(width: 9),
+            Expanded(child: Text('Files you open in AUREON will appear here.', style: TextStyle(color: muted, fontSize: 10))),
+          ])
+        else
+          for (var i = 0; i < _recentFiles.length; i++) ...[
+            if (i > 0) Divider(height: 13, color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .55)),
+            Row(children: [
+              Container(width: 35, height: 35, decoration: BoxDecoration(
+                color: dark ? const Color(0xFF292443) : const Color(0xFFECE8FF), borderRadius: BorderRadius.circular(11)),
+                child: Icon(_recentIcon(_recentFiles[i].itemName), color: violet, size: 18)),
+              const SizedBox(width: 9),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_recentFiles[i].itemName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                Text(_recentFiles[i].sourceLocation, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: muted, fontSize: 9)),
+              ])),
+              Icon(Icons.more_horiz_rounded, color: muted, size: 18),
+            ]),
+          ],
+      ]),
+    );
+  }
+
+  IconData _recentIcon(String name) {
+    final dot = name.lastIndexOf('.');
+    final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+    if (const {'jpg','jpeg','png','gif','webp','heic'}.contains(ext)) return Icons.image_rounded;
+    if (const {'mp4','mkv','mov','avi','webm'}.contains(ext)) return Icons.movie_rounded;
+    if (const {'mp3','m4a','wav','flac','ogg'}.contains(ext)) return Icons.audio_file_rounded;
+    if (ext == 'pdf') return Icons.picture_as_pdf_rounded;
+    if (const {'zip','rar','7z','tar','gz'}.contains(ext)) return Icons.archive_rounded;
+    return Icons.insert_drive_file_rounded;
   }
 
   Widget _cloudCard(bool dark, Color muted) => Container(
