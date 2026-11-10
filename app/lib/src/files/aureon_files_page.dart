@@ -31,6 +31,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
   String? _error;
   _FileSort _sort = _FileSort.name;
   String? _activeCategory;
+  final Map<String, String> _categoryPaths = {};
 
   @override
   void initState() {
@@ -167,36 +168,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (root == null || _levels.isEmpty) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final rows = await _files.listChildren(root: root, parentId: _levels.last.id);
-      if (!mounted) return;
-      if (_activeCategory == 'downloads' && _levels.length == 1) {
-        AureonLocalEntry? downloads;
-        for (final entry in rows) {
-          if (entry.isDirectory &&
-              (entry.name.toLowerCase() == 'download' || entry.name.toLowerCase() == 'downloads')) {
-            downloads = entry;
-            break;
-          }
-        }
-        final downloadsFolder = downloads;
-        if (downloadsFolder != null) {
-          setState(() {
-            _levels.add(_Folder(downloadsFolder.name, downloadsFolder.id));
-            _entries = [];
-            _loading = false;
-            _activeCategory = null;
-          });
-          await _load();
-          return;
-        }
-        setState(() { _entries = rows; _loading = false; _activeCategory = null; });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('A Downloads folder was not found in this storage location.')),
-          );
-        }
+      if (_activeCategory != null) {
+        final results = await _scanCategory(root);
+        if (!mounted) return;
+        setState(() { _entries = results; _loading = false; });
         return;
       }
+      final rows = await _files.listChildren(root: root, parentId: _levels.last.id);
+      if (!mounted) return;
       setState(() { _entries = rows; _loading = false; });
     } on PlatformException catch (error) {
       _fail(switch (error.code) {
@@ -208,6 +187,44 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     } catch (error) { _fail(error.toString()); }
   }
 
+  Future<List<AureonLocalEntry>> _scanCategory(AureonLocalRoot root) async {
+    final queue = <({String id, String path, int depth, bool inDownloads})>[
+      (id: root.rootDocumentId, path: root.displayName, depth: 0, inDownloads: false),
+    ];
+    final visited = <String>{root.rootDocumentId};
+    final matches = <AureonLocalEntry>[];
+    _categoryPaths.clear();
+    var cursor = 0;
+    const maxDirectories = 10000;
+    const maxDepth = 32;
+    while (cursor < queue.length && visited.length <= maxDirectories) {
+      final current = queue[cursor++];
+      List<AureonLocalEntry> children;
+      try {
+        children = await _files.listChildren(root: root, parentId: current.id);
+      } on PlatformException {
+        if (current.depth == 0) rethrow;
+        continue;
+      }
+      for (final entry in children) {
+        if (entry.name == '.AUREON Trash (AUREON)') continue;
+        if (entry.isHidden && !_showHidden) continue;
+        if (entry.isDirectory) {
+          if (current.depth >= maxDepth || visited.contains(entry.id)) continue;
+          final isDownloadsFolder = entry.name.toLowerCase() == 'download' || entry.name.toLowerCase() == 'downloads';
+          if (_activeCategory != 'downloads' || current.inDownloads || isDownloadsFolder) {
+            visited.add(entry.id);
+            queue.add((id: entry.id, path: '${current.path} / ${entry.name}', depth: current.depth + 1, inDownloads: current.inDownloads || isDownloadsFolder));
+          }
+        } else {
+          final include = _activeCategory == 'downloads' ? current.inDownloads : _matchesCategory(entry);
+          if (include) { matches.add(entry); _categoryPaths[entry.id] = current.path; }
+        }
+      }
+    }
+    matches.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return matches;
+  }
   void _recordHistory({
     required String kind,
     required String itemName,
@@ -436,6 +453,12 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     if (!mounted) return;
     setState(() { _error = message; _loading = false; });
   }
+  String _categoryTitle(String category) => switch (category) {
+    'images' => 'Images', 'videos' => 'Videos', 'audio' => 'Audio',
+    'documents' => 'Documents', 'downloads' => 'Downloads', 'apks' => 'APKs',
+    'archives' => 'Archives', 'other' => 'Other files', _ => 'Files',
+  };
+
   static String _ext(String name) {
     final dot = name.lastIndexOf('.');
     return dot <= 0 ? '' : name.substring(dot + 1).toLowerCase();
@@ -531,7 +554,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           IconButton(tooltip: 'AUREON setup guide', onPressed: _openSetupGuide, icon: const Icon(Icons.menu_book_outlined)),
-          const Expanded(child: Text('Files', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
+          Expanded(child: Text(_activeCategory == null ? 'Files' : _categoryTitle(_activeCategory!), style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
           IconButton(tooltip: 'Operation history', onPressed: _openHistory, icon: const Icon(Icons.history)),
           if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
           OutlinedButton.icon(onPressed: _loading ? null : _choose,
@@ -547,11 +570,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           Row(children: [
             IconButton(onPressed: _levels.length > 1 && !_loading ? _up : null,
               icon: const Icon(Icons.arrow_upward), tooltip: 'Parent folder'),
-            Expanded(child: Text(_levels.map((x) => x.name).join(' / '), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(_activeCategory == null ? _levels.map((x) => x.name).join(' / ') : 'Searching all folders · ${_levels.first.name}', maxLines: 1, overflow: TextOverflow.ellipsis)),
             IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
           ]),
           TextField(controller: _searchController, decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.search), hintText: 'Search this folder',
+            prefixIcon: const Icon(Icons.search), hintText: _activeCategory == null ? 'Search this folder' : 'Search ${_categoryTitle(_activeCategory!)}',
             suffixIcon: _searchController.text.isEmpty ? null : IconButton(
               tooltip: 'Clear search', onPressed: _searchController.clear, icon: const Icon(Icons.close)),
             isDense: true, border: const OutlineInputBorder())),
@@ -592,11 +615,13 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                 final e = visible[index];
                 final sub = e.isDirectory ? 'Folder • ${_modified(e.modifiedEpochMs)}'
                   : '${_size(e.sizeBytes)} • ${_modified(e.modifiedEpochMs)}${e.isHidden ? ' • Hidden' : ''}';
+                final categoryMode = _activeCategory != null;
+                final subtitle = categoryMode ? '${_categoryPaths[e.id] ?? _levels.first.name} • ${_size(e.sizeBytes)}' : sub;
                 return Material(color: Colors.transparent, child: ListTile(
                   leading: Icon(e.isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined),
                   title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  trailing: PopupMenuButton<String>(
+                  subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  trailing: categoryMode ? null : PopupMenuButton<String>(
                     tooltip: 'Item actions',
                     onSelected: (action) {
                       if (action == 'rename') { _rename(e); }
