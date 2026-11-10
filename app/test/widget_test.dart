@@ -305,11 +305,15 @@ void main() {
       return null;
     });
     await tester.pumpWidget(const AureonApp());
-    await tester.pumpAndSettle();
+    // The app contains periodic/background activity, so settling every frame can
+    // time out even when the Home screen is ready. Pump the UI transitions only.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonHomePage), findsOneWidget);
     expect(find.text('Storage overview'), findsOneWidget);
     await tester.tap(find.text('Files').first);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonFilesPage), findsOneWidget);
   });
 }
