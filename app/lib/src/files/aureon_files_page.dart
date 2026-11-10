@@ -15,6 +15,24 @@ class AureonFilesPage extends StatefulWidget {
   @override
   State<AureonFilesPage> createState() => _AureonFilesPageState();
 }
+class _FileTypeIcon extends StatelessWidget {
+  const _FileTypeIcon({required this.icon, required this.tint});
+  final IconData icon;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 54,
+    height: 54,
+    decoration: BoxDecoration(
+      color: tint.withValues(alpha: 0.13),
+      borderRadius: BorderRadius.circular(11),
+      border: Border.all(color: tint.withValues(alpha: 0.24)),
+    ),
+    child: Icon(icon, color: tint, size: 27),
+  );
+}
+
 class _Folder {
   const _Folder(this.name, this.id);
   final String name;
