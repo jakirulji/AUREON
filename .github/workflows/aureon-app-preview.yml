@@ -302,7 +302,11 @@ jobs:
         run: |
           $releaseDir = Join-Path (Get-Location) "build/windows/x64/runner/Release"
           $exe = Join-Path $releaseDir "aureon.exe"
+          $appPayload = Join-Path $releaseDir "data/app.so"
           if (-not (Test-Path $exe)) { throw "AUREON executable is missing from the Windows release directory." }
+          if (-not (Test-Path $appPayload)) { throw "Flutter application payload data/app.so is missing from the Windows release directory." }
+          if ((Get-Item $exe).Length -lt 64KB) { throw "AUREON Windows launcher executable is unexpectedly small." }
+          if ((Get-Item $appPayload).Length -lt 1MB) { throw "Flutter application payload is unexpectedly small." }
           $previewDir = Join-Path $env:RUNNER_TEMP "aureon-windows-preview"
           New-Item -ItemType Directory -Force $previewDir | Out-Null
           $zipPath = Join-Path $previewDir "AUREON-Windows-Preview.zip"
@@ -312,8 +316,10 @@ jobs:
           $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
           try {
             $entry = $archive.Entries | Where-Object { $_.FullName -ieq "aureon.exe" } | Select-Object -First 1
+            $payload = $archive.Entries | Where-Object { $_.FullName -ieq "data/app.so" } | Select-Object -First 1
             if (-not $entry) { throw "Windows preview ZIP does not contain aureon.exe at its root." }
-            if ($entry.Length -lt 1MB) { throw "AUREON executable inside the preview ZIP is unexpectedly small." }
+            if ($entry.Length -lt 64KB) { throw "AUREON launcher executable inside the preview ZIP is unexpectedly small." }
+            if (-not $payload -or $payload.Length -lt 1MB) { throw "Windows preview ZIP does not contain a valid Flutter application payload." }
           } finally {
             $archive.Dispose()
           }
