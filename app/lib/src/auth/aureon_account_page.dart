@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
 
@@ -17,13 +15,6 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _emailLink = TextEditingController();
-  final _profileName = TextEditingController();
-  final _firebaseApiKey = TextEditingController();
-  final _firebaseProjectId = TextEditingController();
-  final _workerUrl = TextEditingController();
-  final _profileStore = AureonBackendProfileStore();
-  List<AureonBackendProfile> _profiles = const [];
-  AureonBackendProfile? _activeProfile;
   bool _busy = false;
   bool _createMode = false;
   bool _obscure = true;
@@ -40,142 +31,34 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _email.dispose();
     _password.dispose();
     _emailLink.dispose();
-    _profileName.dispose();
-    _firebaseApiKey.dispose();
-    _firebaseProjectId.dispose();
-    _workerUrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _openSetupGuide() async {
-    final guide = await rootBundle.loadString('assets/guides/firebase-cloudflare-setup.txt');
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Firebase & Cloudflare setup'),
-        content: SizedBox(
-          width: 620,
-          child: SingleChildScrollView(
-            child: SelectableText(guide, style: const TextStyle(fontSize: 12, height: 1.45)),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openOAuthGuide() async {
-    final guide = await rootBundle.loadString('assets/guides/google-drive-oauth-setup.txt');
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Google Drive OAuth setup & security'),
-        content: SizedBox(
-          width: 620,
-          child: SingleChildScrollView(
-            child: SelectableText(guide, style: const TextStyle(fontSize: 12, height: 1.45)),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
-        ],
-      ),
-    );
   }
 
   Future<void> _restore() async {
     try {
-      final profiles = await _profileStore.listProfiles();
-      final active = await _profileStore.activeProfile();
-      if (active != null) {
-        widget.auth.configureProfile(active);
-        _activeProfile = active;
-        _profileName.text = active.name;
-        _firebaseApiKey.text = active.firebaseApiKey;
-        _firebaseProjectId.text = active.firebaseProjectId;
-        _workerUrl.text = active.workerBaseUrl;
-      }
-      if (!mounted) return;
-      setState(() => _profiles = profiles);
-      if (active == null) {
-        setState(() => _status = 'Add your own Firebase project and Cloudflare Worker profile. AUREON does not provide a shared default backend.');
-        return;
+      final profile = AureonBackendProfile.shared;
+      if (!widget.auth.isConfigured) {
+        widget.auth.configureProfile(profile);
       }
       try {
         await widget.auth.restoreSession();
         final user = await widget.auth.reloadUser();
-        final bound = await _bindProfile(user.localId);
-        if (mounted) {
-          setState(() {
-          _activeProfile = bound;
-          _status = 'Signed in as ${user.email}. Backend profile “${bound.name}” is bound to this Firebase identity and Worker.';
-          });
-        }
+        final bound = profile.bindToUid(user.localId);
+        widget.auth.acceptBoundProfile(bound);
+        if (mounted) setState(() => _status = 'Signed in as ${user.email}. Connected to AUREON Central Backend.');
       } catch (_) {
-        if (mounted) setState(() => _status = 'Backend profile “${active.name}” is active. Sign in or create your AUREON account.');
+        if (mounted) setState(() => _status = 'AUREON Central Backend is ready. Create an account or sign in.');
       }
     } catch (error) {
-      if (mounted) setState(() => _status = 'Backend profile setup needs attention: $error');
+      if (mounted) setState(() => _status = 'AUREON connection needs attention: $error');
     }
   }
 
   Future<AureonBackendProfile> _bindProfile(String uid) async {
-    try {
-      final bound = await _profileStore.bindActiveProfile(uid);
-      widget.auth.acceptBoundProfile(bound);
-      return bound;
-    } catch (_) {
-      // A profile bound to another Firebase identity must never keep a live
-      // session attached to the wrong Worker/backend configuration.
-      await widget.auth.signOut();
-      rethrow;
-    }
+    final bound = AureonBackendProfile.shared.bindToUid(uid);
+    widget.auth.acceptBoundProfile(bound);
+    return bound;
   }
-
-  Future<void> _saveBackendProfile() => _run(() async {
-    if (widget.auth.currentUser != null) {
-      throw StateError('Sign out before changing backend profiles.');
-    }
-    final profile = await _profileStore.saveProfile(
-      name: _profileName.text,
-      firebaseApiKey: _firebaseApiKey.text,
-      firebaseProjectId: _firebaseProjectId.text,
-      workerBaseUrl: _workerUrl.text,
-    );
-    widget.auth.configureProfile(profile);
-    final profiles = await _profileStore.listProfiles();
-    if (mounted) {
-      setState(() {
-      _activeProfile = profile;
-      _profiles = profiles;
-      _status = 'Backend profile “${profile.name}” saved locally and selected. It will be bound to your Master Account after sign-in.';
-      });
-    }
-  });
-
-  Future<void> _activateBackendProfile(String id) => _run(() async {
-    if (widget.auth.currentUser != null) {
-      throw StateError('Sign out before switching backend profiles.');
-    }
-    await _profileStore.activateProfile(id);
-    final profile = await _profileStore.activeProfile();
-    if (profile == null) throw StateError('Selected backend profile could not be loaded.');
-    widget.auth.configureProfile(profile);
-    if (mounted) {
-      setState(() {
-      _activeProfile = profile;
-      _profileName.text = profile.name;
-      _firebaseApiKey.text = profile.firebaseApiKey;
-      _firebaseProjectId.text = profile.firebaseProjectId;
-      _workerUrl.text = profile.workerBaseUrl;
-      _status = 'Using backend profile “${profile.name}”.';
-      });
-    }
-  });
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -194,9 +77,6 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   }
 
   Future<void> _submit() => _run(() async {
-        if (_activeProfile == null || !widget.auth.isConfigured) {
-          throw StateError('Save and activate your own Firebase + Cloudflare backend profile first.');
-        }
         final email = _email.text.trim();
         final password = _password.text;
         if (email.isEmpty || password.isEmpty) {
@@ -216,9 +96,6 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       });
 
   Future<void> _sendPasswordlessLink() => _run(() async {
-        if (_activeProfile == null || !widget.auth.isConfigured) {
-          throw StateError('Save and activate your own Firebase + Cloudflare backend profile first.');
-        }
         final email = _email.text.trim();
         await widget.auth.sendPasswordlessSignInLink(email: email);
         if (mounted) {
@@ -227,9 +104,6 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       });
 
   Future<void> _completePasswordlessSignIn() => _run(() async {
-        if (_activeProfile == null || !widget.auth.isConfigured) {
-          throw StateError('Save and activate your own Firebase + Cloudflare backend profile first.');
-        }
         final email = _email.text.trim();
         final link = _emailLink.text.trim();
         if (link.isEmpty) throw StateError('Paste the complete sign-in link from your email.');
@@ -312,53 +186,14 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           style: TextStyle(color: Color(0xFF9AA8BD)),
         ),
         const SizedBox(height: 18),
-        if (!widget.auth.isConfigured)
-          _notice(
-            Icons.settings_suggest_outlined,
-            'Your own backend profile is required',
-            'AUREON has no shared developer-hosted backend. Add your Firebase Web API key, Firebase project ID and your Cloudflare Worker HTTPS URL below. These are client configuration values; never enter service-account JSON, Worker Secrets or private keys.',
-          ),
-        const SizedBox(height: 18),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : _openSetupGuide,
-          icon: const Icon(Icons.menu_book_outlined),
-          label: const Text('Read Firebase & Cloudflare setup guide'),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
+        _notice(Icons.cloud_done_outlined, 'AUREON Central Backend', 'Securely connected to the official AUREON Firebase and Cloudflare services. No backend setup is required.'),
         OutlinedButton.icon(
           onPressed: _busy ? null : _openOAuthGuide,
           icon: const Icon(Icons.key_outlined),
           label: const Text('Google Drive OAuth setup & security guide'),
         ),
-        const SizedBox(height: 18),
-        const Text('Your backend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        if (_profiles.isNotEmpty)
-          DropdownButtonFormField<String>(
-            initialValue: _activeProfile?.id,
-            decoration: const InputDecoration(labelText: 'Saved backend profile', border: OutlineInputBorder()),
-            items: _profiles.map((profile) => DropdownMenuItem(
-              value: profile.id, child: Text(profile.name),
-            )).toList(),
-            onChanged: _busy || widget.auth.currentUser != null ? null : (id) {
-              if (id != null) _activateBackendProfile(id);
-            },
-          ),
-        const SizedBox(height: 10),
-        _field(_profileName, 'Profile name (e.g. Personal)'),
-        const SizedBox(height: 10),
-        _field(_firebaseApiKey, 'Firebase Web API key'),
-        const SizedBox(height: 10),
-        _field(_firebaseProjectId, 'Firebase project ID'),
-        const SizedBox(height: 10),
-        _field(_workerUrl, 'Cloudflare Worker HTTPS URL', keyboardType: TextInputType.url),
-        const SizedBox(height: 8),
-        FilledButton.tonalIcon(
-          onPressed: _busy || widget.auth.currentUser != null ? null : _saveBackendProfile,
-          icon: const Icon(Icons.cloud_done_outlined),
-          label: const Text('Save & use this backend'),
-        ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         const Divider(),
         const SizedBox(height: 10),
         const Text('Master Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -377,7 +212,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: widget.auth.isConfigured && _activeProfile != null && !_busy
+            onPressed: widget.auth.isConfigured && !_busy
                 ? _sendPasswordlessLink
                 : null,
             icon: const Icon(Icons.mark_email_read_outlined),
@@ -478,23 +313,6 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       ],
     );
   }
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    bool obscure = false,
-    TextInputType? keyboardType,
-  }) =>
-      TextField(
-        controller: controller,
-        obscureText: obscure,
-        keyboardType: keyboardType,
-        autocorrect: false,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-      );
 
   Widget _notice(IconData icon, String title, String body) => Container(
         padding: const EdgeInsets.all(14),
