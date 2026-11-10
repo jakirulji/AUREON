@@ -310,7 +310,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonHomePage), findsOneWidget);
-    expect(find.text('Storage overview'), findsOneWidget);
+    expect(find.text('Everything, in one place.'), findsOneWidget);
     await tester.tap(find.text('Files').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
