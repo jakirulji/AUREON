@@ -117,15 +117,26 @@ class _AureonHomeState extends State<AureonHome> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
     final wide = constraints.maxWidth >= 760;
-    return Scaffold(
-      body: SafeArea(child: Row(children: [
-        if (wide) _sidebar(),
-        Expanded(child: _content(wide)),
-      ])),
-      bottomNavigationBar: wide ? null : NavigationBar(
-        selectedIndex: selected,
-        onDestinationSelected: (value) => setState(() { selected = value; if (value == 1) _fileCategory = null; }),
-        destinations: List.generate(labels.length, (i) => NavigationDestination(icon: Icon(icons[i]), label: labels[i])),
+    return PopScope<Object?>(
+      canPop: selected == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && selected != 0 && mounted) {
+          setState(() {
+            selected = 0;
+            _fileCategory = null;
+          });
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(child: Row(children: [
+          if (wide) _sidebar(),
+          Expanded(child: _content(wide)),
+        ])),
+        bottomNavigationBar: wide ? null : NavigationBar(
+          selectedIndex: selected,
+          onDestinationSelected: (value) => setState(() { selected = value; if (value == 1) _fileCategory = null; }),
+          destinations: List.generate(labels.length, (i) => NavigationDestination(icon: Icon(icons[i]), label: labels[i])),
+        ),
       ),
     );
   });
