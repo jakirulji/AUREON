@@ -108,7 +108,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             ? await widget.auth.createAccount(email: email, password: password)
             : await widget.auth.signIn(email: email, password: password);
         final user = await widget.auth.reloadUser();
-        final boundProfile = await _bindProfile(user.localId);
+        await _bindProfile(user.localId);
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
