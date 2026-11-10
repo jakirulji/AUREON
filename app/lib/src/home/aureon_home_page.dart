@@ -5,9 +5,16 @@ import 'package:disk_space_plus/disk_space_plus.dart';
 import 'package:flutter/material.dart';
 
 class AureonHomePage extends StatefulWidget {
-  const AureonHomePage({super.key, required this.isDarkMode, required this.onThemeChanged});
+  const AureonHomePage({
+    super.key,
+    required this.isDarkMode,
+    required this.onThemeChanged,
+    required this.onBrowseCategory,
+  });
   final bool isDarkMode;
   final ValueChanged<bool> onThemeChanged;
+  final ValueChanged<String> onBrowseCategory;
+
   @override
   State<AureonHomePage> createState() => _AureonHomePageState();
 }
@@ -23,6 +30,17 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
 
   static const violet = Color(0xFF9B8CFF);
   static const ice = Color(0xFF8EDCFF);
+
+  static const _categories = <_HomeCategory>[
+    _HomeCategory('Images', 'images', Icons.image_rounded, Color(0xFFD5A7FF), Color(0xFF302541)),
+    _HomeCategory('Videos', 'videos', Icons.movie_creation_rounded, Color(0xFF91BFFF), Color(0xFF202F4B)),
+    _HomeCategory('Audio', 'audio', Icons.graphic_eq_rounded, Color(0xFF9DE0DC), Color(0xFF203B40)),
+    _HomeCategory('Documents', 'documents', Icons.description_rounded, Color(0xFFAFC8FF), Color(0xFF25334B)),
+    _HomeCategory('Downloads', 'downloads', Icons.downloading_rounded, Color(0xFFA5D9BD), Color(0xFF233B37)),
+    _HomeCategory('APKs', 'apks', Icons.android_rounded, Color(0xFFE8C38C), Color(0xFF403526)),
+    _HomeCategory('Archives', 'archives', Icons.inventory_2_rounded, Color(0xFFC1B6FF), Color(0xFF302C4C)),
+    _HomeCategory('Other', 'other', Icons.insert_drive_file_rounded, Color(0xFF9EB7D8), Color(0xFF263448)),
+  ];
 
   @override
   void initState() {
@@ -88,41 +106,55 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
       onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 34),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
         children: [
           _header(dark, muted),
-          const SizedBox(height: 28),
-          const Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: violet, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
-          const SizedBox(height: 7),
-          const Text('Everything, in one place.', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -.8)),
-          const SizedBox(height: 6),
-          Text('A clear view of your digital space.', style: TextStyle(color: muted, fontSize: 13)),
           const SizedBox(height: 22),
-          _hero(dark, muted, used, ratio),
-          const SizedBox(height: 26),
-          _section('STORAGE INSIGHTS', 'DEVICE'),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _metric(Icons.storage_rounded, 'Total capacity', _total == null ? '—' : _format(_total!), dark)),
-            const SizedBox(width: 9),
-            Expanded(child: _metric(Icons.folder_open_rounded, 'Space used', used == null ? '—' : _format(used), dark)),
-            const SizedBox(width: 9),
-            Expanded(child: _metric(Icons.savings_outlined, 'Available', _free == null ? '—' : _format(_free!), dark)),
-          ]),
-          const SizedBox(height: 27),
-          _section('YOUR CLOUD', 'UNIFIED STORAGE'),
-          const SizedBox(height: 12),
-          _cloudCard(dark, muted),
+          Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: violet, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+          const SizedBox(height: 5),
+          const Text('Everything, in one place.', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -.7)),
+          const SizedBox(height: 4),
+          Text('Your files, beautifully organized.', style: TextStyle(color: muted, fontSize: 12)),
           const SizedBox(height: 18),
-          _privacyCard(dark, muted),
-          const SizedBox(height: 12),
+          _storageCard(dark, muted, used, ratio),
+          const SizedBox(height: 23),
           Row(children: [
-            Icon(Icons.sync_rounded, size: 14, color: muted),
-            const SizedBox(width: 7),
-            Expanded(child: Text(_updated == null ? 'Waiting for device data' : 'Updated ${TimeOfDay.fromDateTime(_updated!).format(context)}  ·  Auto-refresh 30s',
-              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 10))),
-            IconButton(visualDensity: VisualDensity.compact, tooltip: 'Refresh storage',
-              onPressed: _loading ? null : _refresh, icon: const Icon(Icons.refresh_rounded, size: 18)),
+            const Expanded(child: Text('BROWSE CATEGORIES', style: TextStyle(fontSize: 10, letterSpacing: 1.45, fontWeight: FontWeight.w900))),
+            Text('LOCAL FILES', style: TextStyle(color: muted, fontSize: 9, letterSpacing: .8, fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 11),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _categories.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4, crossAxisSpacing: 9, mainAxisSpacing: 9, childAspectRatio: .91,
+            ),
+            itemBuilder: (context, index) {
+              final category = _categories[index];
+              return _categoryTile(category, dark);
+            },
+          ),
+          const SizedBox(height: 21),
+          _cloudCard(dark, muted),
+          const SizedBox(height: 12),
+          _privacyCard(dark, muted),
+          const SizedBox(height: 10),
+          Row(children: [
+            Icon(Icons.sync_rounded, size: 13, color: muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text(
+              _updated == null ? (_error == null ? 'Waiting for device data' : 'Device storage data unavailable') :
+                'Updated ${TimeOfDay.fromDateTime(_updated!).format(context)} · Auto-refresh 30s',
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: muted, fontSize: 9),
+            )),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Refresh storage',
+              onPressed: _loading ? null : _refresh,
+              icon: const Icon(Icons.refresh_rounded, size: 17),
+            ),
           ]),
         ],
       ),
@@ -131,18 +163,18 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
 
   Widget _header(bool dark, Color muted) => Row(children: [
     Container(
-      width: 44, height: 44,
+      width: 42, height: 42,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
         gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [violet, Color(0xFF536DDB)]),
-        boxShadow: [BoxShadow(color: violet.withValues(alpha: dark ? .28 : .16), blurRadius: 18, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: violet.withValues(alpha: dark ? .30 : .17), blurRadius: 17, offset: const Offset(0, 5))],
       ),
-      child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 28),
+      child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 27),
     ),
-    const SizedBox(width: 12),
+    const SizedBox(width: 11),
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('AUREON', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 2.2)),
-      Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: muted, fontSize: 8, letterSpacing: 1.3, fontWeight: FontWeight.w700)),
+      const Text('AUREON', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 2.1)),
+      Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: muted, fontSize: 8, letterSpacing: 1.2, fontWeight: FontWeight.w700)),
     ])),
     _action(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, dark ? 'Light theme' : 'Dark theme',
       () => widget.onThemeChanged(!dark), dark),
@@ -153,151 +185,144 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   Widget _action(IconData icon, String tip, VoidCallback? tap, bool dark) => Material(
     color: dark ? const Color(0xFF1A2540) : Colors.white,
     shape: CircleBorder(side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
-    child: IconButton(tooltip: tip, onPressed: tap, icon: Icon(icon, size: 19),
-      constraints: const BoxConstraints.tightFor(width: 42, height: 42), padding: EdgeInsets.zero),
+    child: IconButton(tooltip: tip, onPressed: tap, icon: Icon(icon, size: 18),
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40), padding: EdgeInsets.zero),
   );
 
-  Widget _hero(bool dark, Color muted, double? used, double? ratio) {
-    final soft = dark ? const Color(0xFFC7C8E8) : const Color(0xFF52617D);
+  Widget _storageCard(bool dark, Color muted, double? used, double? ratio) {
     final foreground = dark ? Colors.white : const Color(0xFF171D39);
+    final soft = dark ? const Color(0xFFC7C8E8) : const Color(0xFF52617D);
     return Container(
+      padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(23),
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: dark ? const [Color(0xFF29234F), Color(0xFF202D55), Color(0xFF14263F)]
             : const [Color(0xFFE9E5FF), Color(0xFFE2F1FF), Color(0xFFF8FBFF)]),
         border: Border.all(color: dark ? const Color(0xFF514A83) : const Color(0xFFC9C5F0)),
-        boxShadow: [BoxShadow(color: violet.withValues(alpha: .11), blurRadius: 26, offset: const Offset(0, 11))],
+        boxShadow: [BoxShadow(color: violet.withValues(alpha: .10), blurRadius: 22, offset: const Offset(0, 8))],
       ),
-      child: Stack(children: [
-        Positioned(right: -38, top: -58, child: Container(width: 170, height: 170,
-          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: violet.withValues(alpha: .13), width: 25)))),
-        Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(color: dark ? const Color(0xFF40396D) : const Color(0xFFDCD7FF), borderRadius: BorderRadius.circular(30)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.phone_android_rounded, color: violet, size: 14),
-                const SizedBox(width: 6),
-                Text('DEVICE STORAGE', style: TextStyle(color: dark ? const Color(0xFFE0DAFF) : const Color(0xFF514A83), fontSize: 9, letterSpacing: 1, fontWeight: FontWeight.w900)),
-              ])),
-            const Spacer(),
-            const Icon(Icons.circle, color: Color(0xFF55D6A3), size: 7),
-            const SizedBox(width: 6),
-            Text('LIVE DATA', style: TextStyle(color: soft, fontSize: 9, letterSpacing: .8, fontWeight: FontWeight.w800)),
-          ]),
-          const SizedBox(height: 22),
-          Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('You are using', style: TextStyle(color: soft, fontSize: 12)),
-              const SizedBox(height: 6),
-              if (_loading && _total == null)
-                const SizedBox(width: 110, child: LinearProgressIndicator(minHeight: 3))
-              else
-                Text(used == null ? '—' : _format(used), style: TextStyle(color: foreground, fontSize: 31, fontWeight: FontWeight.w900, letterSpacing: -1)),
-              const SizedBox(height: 5),
-              Text(_total == null ? 'of device capacity' : 'of ${_format(_total!)} total', style: TextStyle(color: soft, fontSize: 12)),
-            ])),
-            const SizedBox(width: 12),
-            SizedBox(width: 108, height: 108, child: Stack(alignment: Alignment.center, children: [
-              SizedBox.expand(child: CircularProgressIndicator(value: ratio, strokeWidth: 9, strokeCap: StrokeCap.round,
-                backgroundColor: dark ? const Color(0xFF424366) : const Color(0xFFD0D5EC),
-                valueColor: const AlwaysStoppedAnimation<Color>(violet))),
-              Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(ratio == null ? '—' : '${(ratio * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(color: foreground, fontSize: 22, fontWeight: FontWeight.w900)),
-                Text('USED', style: TextStyle(color: soft, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
-              ]),
-            ])),
-          ]),
-          const SizedBox(height: 22),
-          Container(height: 1, color: dark ? Colors.white.withValues(alpha: .12) : const Color(0xFFBFC8E3)),
-          const SizedBox(height: 14),
-          Row(children: [
-            const Icon(Icons.check_circle_rounded, color: Color(0xFF55D6A3), size: 16),
-            const SizedBox(width: 7),
-            Expanded(child: Text('Available space', style: TextStyle(color: soft, fontSize: 11))),
-            Text(_free == null ? '—' : _format(_free!), style: TextStyle(color: foreground, fontSize: 13, fontWeight: FontWeight.w800)),
-          ]),
-          if (_error != null && _total == null) ...[
-            const SizedBox(height: 10),
-            Text('Storage data unavailable: $_error', style: TextStyle(color: soft, fontSize: 10)),
-          ],
-        ])),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.phone_android_rounded, color: violet, size: 15),
+          const SizedBox(width: 7),
+          Text('DEVICE STORAGE', style: TextStyle(color: soft, fontSize: 9, letterSpacing: 1.15, fontWeight: FontWeight.w900)),
+          const Spacer(),
+          const Icon(Icons.circle, color: Color(0xFF55D6A3), size: 6),
+          const SizedBox(width: 5),
+          Text('LIVE', style: TextStyle(color: soft, fontSize: 9, letterSpacing: .8, fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 13),
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Used storage', style: TextStyle(color: soft, fontSize: 11)),
+            const SizedBox(height: 3),
+            if (_loading && _total == null)
+              const SizedBox(width: 90, child: LinearProgressIndicator(minHeight: 3))
+            else
+              Text(used == null ? '—' : _format(used), style: TextStyle(color: foreground, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -.8)),
+            const SizedBox(height: 3),
+            Text(_total == null ? 'of device capacity' : 'of ${_format(_total!)} total', style: TextStyle(color: soft, fontSize: 10)),
+          ])),
+          SizedBox(width: 72, height: 72, child: Stack(alignment: Alignment.center, children: [
+            SizedBox.expand(child: CircularProgressIndicator(value: ratio, strokeWidth: 7, strokeCap: StrokeCap.round,
+              backgroundColor: dark ? const Color(0xFF424366) : const Color(0xFFD0D5EC),
+              valueColor: const AlwaysStoppedAnimation<Color>(violet))),
+            Text(ratio == null ? '—' : '${(ratio * 100).toStringAsFixed(0)}%',
+              style: TextStyle(color: foreground, fontSize: 17, fontWeight: FontWeight.w900)),
+          ])),
+        ]),
+        const SizedBox(height: 13),
+        Container(height: 1, color: dark ? Colors.white.withValues(alpha: .12) : const Color(0xFFBFC8E3)),
+        const SizedBox(height: 10),
+        Row(children: [
+          Icon(Icons.check_circle_rounded, color: const Color(0xFF55D6A3), size: 14),
+          const SizedBox(width: 6),
+          Expanded(child: Text('Available space', style: TextStyle(color: soft, fontSize: 10))),
+          Text(_free == null ? '—' : _format(_free!), style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w800)),
+        ]),
+        if (_error != null && _total == null) ...[
+          const SizedBox(height: 7),
+          Text('Storage details unavailable on this device.', style: TextStyle(color: soft, fontSize: 10)),
+        ],
       ]),
     );
   }
 
-  Widget _section(String title, String trailing) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-    return Row(children: [
-      Text(title, style: TextStyle(color: muted, fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.w900)),
-      const Spacer(),
-      Text(trailing, style: TextStyle(color: muted, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: .7)),
-    ]);
-  }
-
-  Widget _metric(IconData icon, String label, String value, bool dark) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 112),
-      padding: const EdgeInsets.fromLTRB(11, 13, 9, 12),
-      decoration: BoxDecoration(color: dark ? const Color(0xFF131D32) : Colors.white,
-        borderRadius: BorderRadius.circular(17), border: Border.all(color: scheme.outlineVariant.withValues(alpha: .75))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, color: violet, size: 18),
-        const SizedBox(height: 12),
-        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-          child: Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: -.3))),
-        const SizedBox(height: 4),
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant)),
-      ]),
+  Widget _categoryTile(_HomeCategory category, bool dark) {
+    final tile = dark ? const Color(0xFF131D32) : Colors.white;
+    return Material(
+      color: tile,
+      borderRadius: BorderRadius.circular(17),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(17),
+        onTap: () => widget.onBrowseCategory(category.key),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75)),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              width: 43, height: 43,
+              decoration: BoxDecoration(
+                color: category.background.withValues(alpha: dark ? .95 : .62),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: category.foreground.withValues(alpha: dark ? .10 : .07), blurRadius: 12)],
+              ),
+              child: Icon(category.icon, color: category.foreground, size: 23),
+            ),
+            const SizedBox(height: 7),
+            Text(category.label, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      ),
     );
   }
 
   Widget _cloudCard(bool dark, Color muted) => Container(
-    padding: const EdgeInsets.all(17),
+    padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(color: dark ? const Color(0xFF131D32) : Colors.white,
-      borderRadius: BorderRadius.circular(20), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75))),
-    child: Column(children: [
-      Row(children: [
-        Container(width: 43, height: 43, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14),
-          gradient: const LinearGradient(colors: [violet, Color(0xFF536DDB)])),
-          child: const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 23)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('AUREON Cloud Pool', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 3),
-          Text('One space for all your clouds', style: TextStyle(color: muted, fontSize: 11)),
-        ])),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-          decoration: BoxDecoration(color: dark ? const Color(0xFF40351E) : const Color(0xFFFFF1D5), borderRadius: BorderRadius.circular(30)),
-          child: const Text('IN SETUP', style: TextStyle(color: Color(0xFFE8B95E), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: .6))),
-      ]),
-      const SizedBox(height: 15),
-      Container(width: double.infinity, padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: dark ? const Color(0xFF1A2740) : const Color(0xFFF3F5FC), borderRadius: BorderRadius.circular(13)),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Icon(Icons.info_outline_rounded, color: ice, size: 17),
-          const SizedBox(width: 9),
-          Expanded(child: Text('Connect your cloud providers to see combined capacity and account-level storage here. Live cloud totals are not available yet.',
-            style: TextStyle(color: muted, fontSize: 11, height: 1.45))),
-        ])),
+      borderRadius: BorderRadius.circular(19), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75))),
+    child: Row(children: [
+      Container(width: 42, height: 42, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(colors: [violet, Color(0xFF536DDB)])),
+        child: const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 22)),
+      const SizedBox(width: 11),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('AUREON Cloud Pool', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 3),
+        Text('Unified storage · setup required', style: TextStyle(color: muted, fontSize: 10)),
+      ])),
+      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(color: dark ? const Color(0xFF40351E) : const Color(0xFFFFF1D5), borderRadius: BorderRadius.circular(30)),
+        child: const Text('IN SETUP', style: TextStyle(color: Color(0xFFE8B95E), fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: .5))),
     ]),
   );
 
   Widget _privacyCard(bool dark, Color muted) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(color: dark ? const Color(0xFF102B2C) : const Color(0xFFEAF8F5),
-      borderRadius: BorderRadius.circular(17), border: Border.all(color: dark ? const Color(0xFF24504C) : const Color(0xFFCBE9E0))),
+      borderRadius: BorderRadius.circular(16), border: Border.all(color: dark ? const Color(0xFF24504C) : const Color(0xFFCBE9E0))),
     child: Row(children: [
-      const Icon(Icons.shield_moon_rounded, color: Color(0xFF55C9A3), size: 22),
-      const SizedBox(width: 11),
+      const Icon(Icons.shield_moon_rounded, color: Color(0xFF55C9A3), size: 21),
+      const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Your space. Your control.', style: TextStyle(color: dark ? const Color(0xFFB7F1DE) : const Color(0xFF176A56), fontSize: 12, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 3),
-        Text('AUREON is designed around secure, unified file management.', style: TextStyle(color: muted, fontSize: 10, height: 1.35)),
+        Text('Your space. Your control.', style: TextStyle(color: dark ? const Color(0xFFB7F1DE) : const Color(0xFF176A56), fontSize: 11, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 2),
+        Text('Secure, unified file management.', style: TextStyle(color: muted, fontSize: 9)),
       ])),
     ]),
   );
+}
+
+class _HomeCategory {
+  const _HomeCategory(this.label, this.key, this.icon, this.foreground, this.background);
+  final String label;
+  final String key;
+  final IconData icon;
+  final Color foreground;
+  final Color background;
 }
