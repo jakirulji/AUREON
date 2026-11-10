@@ -14,14 +14,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('aureon/local_files');
+  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+  Directory? testCacheDirectory;
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    testCacheDirectory = await Directory.systemTemp.createTemp('aureon-widget-cache-');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (call) async {
+      if (call.method == 'getApplicationSupportDirectory') return testCacheDirectory!.path;
+      return null;
+    });
   });
 
-  tearDown(() {
+  tearDown(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, null);
+    final directory = testCacheDirectory;
+    if (directory != null && await directory.exists()) await directory.delete(recursive: true);
   });
 
   testWidgets('Files page browses a user-selected folder and saves bookmark', (tester) async {
