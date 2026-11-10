@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
 
@@ -32,6 +33,26 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _password.dispose();
     _emailLink.dispose();
     super.dispose();
+  }
+
+  Future<void> _openOAuthGuide() async {
+    final guide = await rootBundle.loadString('assets/guides/google-drive-oauth-setup.txt');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Google Drive OAuth setup & security'),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: SelectableText(guide, style: const TextStyle(fontSize: 12, height: 1.45)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   Future<void> _restore() async {
