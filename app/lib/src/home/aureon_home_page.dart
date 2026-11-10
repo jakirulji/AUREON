@@ -170,12 +170,12 @@ class _AureonHomePageState extends State<AureonHomePage>
                     const Expanded(
                       child: Text('DEVICE STORAGE',
                         style: TextStyle(fontSize: 11, letterSpacing: 1.3,
-                          fontWeight: FontWeight.w700, color: Color(0xFFB6D8D0))),
+                          fontWeight: FontWeight.w700, color: widget.isDarkMode ? const Color(0xFFB6D8D0) : const Color(0xFF42665E))),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF163D35),
+                        color: widget.isDarkMode ? const Color(0xFF163D35) : const Color(0xFFD0F1E6),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: const Row(children: [
@@ -311,7 +311,7 @@ class _AureonHomePageState extends State<AureonHomePage>
             decoration: BoxDecoration(
               color: panel,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF26334A)),
+              border: Border.all(color: panelBorder),
             ),
             child: Row(
               children: [
