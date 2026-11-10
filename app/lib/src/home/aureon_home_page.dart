@@ -71,9 +71,9 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   }
 
   String _format(double mb) {
-    if (mb >= 1024 * 1024) return '\${(mb / (1024 * 1024)).toStringAsFixed(2)} TB';
-    if (mb >= 1024) return '\${(mb / 1024).toStringAsFixed(1)} GB';
-    return '\${mb.toStringAsFixed(0)} MB';
+    if (mb >= 1024 * 1024) return '${(mb / (1024 * 1024)).toStringAsFixed(2)} TB';
+    if (mb >= 1024) return '${(mb / 1024).toStringAsFixed(1)} GB';
+    return '${mb.toStringAsFixed(0)} MB';
   }
 
   @override
@@ -119,7 +119,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
           Row(children: [
             Icon(Icons.sync_rounded, size: 14, color: muted),
             const SizedBox(width: 7),
-            Expanded(child: Text(_updated == null ? 'Waiting for device data' : 'Updated \${TimeOfDay.fromDateTime(_updated!).format(context)}  ·  Auto-refresh 30s',
+            Expanded(child: Text(_updated == null ? 'Waiting for device data' : 'Updated ${TimeOfDay.fromDateTime(_updated!).format(context)}  ·  Auto-refresh 30s',
               maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 10))),
             IconButton(visualDensity: VisualDensity.compact, tooltip: 'Refresh storage',
               onPressed: _loading ? null : _refresh, icon: const Icon(Icons.refresh_rounded, size: 18)),
@@ -196,7 +196,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
               else
                 Text(used == null ? '—' : _format(used), style: TextStyle(color: foreground, fontSize: 31, fontWeight: FontWeight.w900, letterSpacing: -1)),
               const SizedBox(height: 5),
-              Text(_total == null ? 'of device capacity' : 'of \${_format(_total!)} total', style: TextStyle(color: soft, fontSize: 12)),
+              Text(_total == null ? 'of device capacity' : 'of ${_format(_total!)} total', style: TextStyle(color: soft, fontSize: 12)),
             ])),
             const SizedBox(width: 12),
             SizedBox(width: 108, height: 108, child: Stack(alignment: Alignment.center, children: [
@@ -204,7 +204,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
                 backgroundColor: dark ? const Color(0xFF424366) : const Color(0xFFD0D5EC),
                 valueColor: const AlwaysStoppedAnimation<Color>(violet))),
               Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(ratio == null ? '—' : '\${(ratio * 100).toStringAsFixed(0)}%',
+                Text(ratio == null ? '—' : '${(ratio * 100).toStringAsFixed(0)}%',
                   style: TextStyle(color: foreground, fontSize: 22, fontWeight: FontWeight.w900)),
                 Text('USED', style: TextStyle(color: soft, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
               ]),
