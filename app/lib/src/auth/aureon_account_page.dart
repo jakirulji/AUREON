@@ -112,7 +112,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
-              : 'Signed in as ${user.email}. Backend profile “${boundProfile.name}” is identity-bound. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
+              : 'Signed in as ${user.email}. AUREON Central Backend is connected. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
         }
       });
 
@@ -133,7 +133,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         final boundProfile = await _bindProfile(user.localId);
         _emailLink.clear();
         if (mounted) {
-          setState(() => _status = 'Passwordless sign-in completed for ${session.user.email}. Backend profile “${boundProfile.name}” is identity-bound. Email link sign-in verified the email address.');
+          setState(() => _status = 'Passwordless sign-in completed for ${session.user.email}. AUREON Central Backend is connected. Email link sign-in verified the email address.');
         }
       });
 
