@@ -734,7 +734,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
             Text('${visible.length} items', style: const TextStyle(color: Color(0xFF9AA8BD), fontSize: 12)),
             IconButton(tooltip: 'List view', onPressed: () => _setViewMode(false), icon: Icon(Icons.view_list_rounded, color: !_gridView ? Theme.of(context).colorScheme.primary : null)),
             IconButton(tooltip: 'Grid view', onPressed: () => _setViewMode(true), icon: Icon(Icons.grid_view_rounded, color: _gridView ? Theme.of(context).colorScheme.primary : null)),
-          ]),),
+          ]),
         ],
         if (_loading) const LinearProgressIndicator(minHeight: 2),
         if (_error != null) Padding(padding: const EdgeInsets.all(10), child: Row(children: [
