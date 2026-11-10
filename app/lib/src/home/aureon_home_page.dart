@@ -122,7 +122,7 @@ class _AureonHomePageState extends State<AureonHomePage>
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -150,7 +150,7 @@ class _AureonHomePageState extends State<AureonHomePage>
           Container(
             padding: const EdgeInsets.all(19),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: widget.isDarkMode
@@ -235,14 +235,14 @@ class _AureonHomePageState extends State<AureonHomePage>
                 ],
                 const SizedBox(height: 13),
                 Row(children: [
-                  const Icon(Icons.sync, size: 14, color: _muted),
+                  Icon(Icons.sync, size: 14, color: muted),
                   const SizedBox(width: 6),
                   Expanded(child: Text(_updatedLabel, maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: muted, fontSize: 11))),
                   const SizedBox(width: 8),
-                  const Text('Refresh · 30s',
-                    style: TextStyle(color: _muted, fontSize: 10)),
+                  Text('Refresh · 30s',
+                    style: TextStyle(color: muted, fontSize: 10)),
                 ]),
               ],
             ),
@@ -270,9 +270,9 @@ class _AureonHomePageState extends State<AureonHomePage>
             ],
           ),
           const SizedBox(height: 22),
-          const Text('CLOUD STORAGE',
+          Text('CLOUD STORAGE',
             style: TextStyle(fontSize: 11, letterSpacing: 1.3,
-              color: _muted, fontWeight: FontWeight.w800)),
+              color: muted, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(16),
@@ -281,7 +281,7 @@ class _AureonHomePageState extends State<AureonHomePage>
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: panelBorder),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.cloud_outlined, color: _mint, size: 25),
@@ -294,7 +294,7 @@ class _AureonHomePageState extends State<AureonHomePage>
                         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       SizedBox(height: 5),
                       Text('Live provider capacity will appear here when cloud-account OAuth and provider storage APIs are connected. No cloud totals are fabricated.',
-                        style: TextStyle(color: _muted, fontSize: 12, height: 1.45)),
+                        style: TextStyle(color: muted, fontSize: 12, height: 1.45)),
                       SizedBox(height: 9),
                       Text('PROVIDER CONNECTION PENDING',
                         style: TextStyle(color: Color(0xFFFFD27A), fontSize: 10,
@@ -309,17 +309,17 @@ class _AureonHomePageState extends State<AureonHomePage>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _panel,
+              color: panel,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFF26334A)),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.info_outline_rounded, color: _mint, size: 19),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text('Device storage is read directly from the phone. Pull down to refresh; the dashboard also refreshes every 30 seconds and when the app returns to the foreground.',
-                    style: TextStyle(color: _muted, fontSize: 11, height: 1.4)),
+                    style: TextStyle(color: muted, fontSize: 11, height: 1.4)),
                 ),
               ],
             ),
@@ -336,9 +336,9 @@ class _AureonHomePageState extends State<AureonHomePage>
   }) => Container(
     padding: const EdgeInsets.fromLTRB(11, 13, 8, 13),
     decoration: BoxDecoration(
-      color: _panel,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFF26334A)),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
