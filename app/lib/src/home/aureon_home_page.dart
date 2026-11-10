@@ -31,8 +31,6 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   List<AureonOperationRecord> _recentFiles = [];
 
   static const violet = Color(0xFF9B8CFF);
-  static const ice = Color(0xFF8EDCFF);
-
   static const _categories = <_HomeCategory>[
     _HomeCategory('Images', 'images', Icons.image_rounded, Color(0xFFD5A7FF), Color(0xFF302541)),
     _HomeCategory('Videos', 'videos', Icons.movie_creation_rounded, Color(0xFF91BFFF), Color(0xFF202F4B)),
