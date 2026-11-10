@@ -135,7 +135,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
         gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [violet, Color(0xFF536DDB)]),
-        boxShadow: [BoxShadow(color: violet.withOpacity(dark ? .28 : .16), blurRadius: 18, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: violet.withValues(alpha: dark ? .28 : .16), blurRadius: 18, offset: const Offset(0, 6))],
       ),
       child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 28),
     ),
@@ -167,11 +167,11 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
           colors: dark ? const [Color(0xFF29234F), Color(0xFF202D55), Color(0xFF14263F)]
             : const [Color(0xFFE9E5FF), Color(0xFFE2F1FF), Color(0xFFF8FBFF)]),
         border: Border.all(color: dark ? const Color(0xFF514A83) : const Color(0xFFC9C5F0)),
-        boxShadow: [BoxShadow(color: violet.withOpacity(.11), blurRadius: 26, offset: const Offset(0, 11))],
+        boxShadow: [BoxShadow(color: violet.withValues(alpha: .11), blurRadius: 26, offset: const Offset(0, 11))],
       ),
       child: Stack(children: [
         Positioned(right: -38, top: -58, child: Container(width: 170, height: 170,
-          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: violet.withOpacity(.13), width: 25)))),
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: violet.withValues(alpha: .13), width: 25)))),
         Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -211,7 +211,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
             ])),
           ]),
           const SizedBox(height: 22),
-          Container(height: 1, color: dark ? Colors.white.withOpacity(.12) : const Color(0xFFBFC8E3)),
+          Container(height: 1, color: dark ? Colors.white.withValues(alpha: .12) : const Color(0xFFBFC8E3)),
           const SizedBox(height: 14),
           Row(children: [
             const Icon(Icons.check_circle_rounded, color: Color(0xFF55D6A3), size: 16),
@@ -243,7 +243,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
       constraints: const BoxConstraints(minHeight: 112),
       padding: const EdgeInsets.fromLTRB(11, 13, 9, 12),
       decoration: BoxDecoration(color: dark ? const Color(0xFF131D32) : Colors.white,
-        borderRadius: BorderRadius.circular(17), border: Border.all(color: scheme.outlineVariant.withOpacity(.75))),
+        borderRadius: BorderRadius.circular(17), border: Border.all(color: scheme.outlineVariant.withValues(alpha: .75))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(icon, color: violet, size: 18),
         const SizedBox(height: 12),
@@ -258,7 +258,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   Widget _cloudCard(bool dark, Color muted) => Container(
     padding: const EdgeInsets.all(17),
     decoration: BoxDecoration(color: dark ? const Color(0xFF131D32) : Colors.white,
-      borderRadius: BorderRadius.circular(20), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(.75))),
+      borderRadius: BorderRadius.circular(20), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75))),
     child: Column(children: [
       Row(children: [
         Container(width: 43, height: 43, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14),
