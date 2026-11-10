@@ -37,7 +37,7 @@ class _AureonBackupPageState extends State<AureonBackupPage> {
   ManualRecoveryKeySet? _keySet;
   VaultRecoveryBundle? _vaultBundle;
   bool _busy = false;
-  String _status = 'Local recovery tools are ready. Cloudflare vault sync and recovery are available after Firebase and Worker profile setup.';
+  String _status = 'Local recovery tools are ready. Cloudflare vault sync and recovery use the AUREON Central Backend after you sign in.';
   List<String> _restoreConflicts = const [];
 
   @override
