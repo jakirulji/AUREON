@@ -7,6 +7,8 @@ import android.media.MediaMetadataRetriever
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.FileProvider
@@ -466,9 +468,9 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                     if (scaled !== it) scaled.recycle()
                     output.toByteArray().takeIf { data -> data.isNotEmpty() && data.size <= MAX_THUMBNAIL_BYTES }
                 }
-                result.success(bytes)
+                Handler(Looper.getMainLooper()).post { result.success(bytes) }
             } catch (_: Exception) {
-                result.success(null)
+                Handler(Looper.getMainLooper()).post { result.success(null) }
             } finally {
                 bitmap?.recycle()
             }
