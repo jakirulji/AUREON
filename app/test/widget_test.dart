@@ -5,6 +5,7 @@ import 'package:aureon/main.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
 import 'package:aureon/src/files/aureon_operation_history.dart';
+import 'package:aureon/src/home/aureon_home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
