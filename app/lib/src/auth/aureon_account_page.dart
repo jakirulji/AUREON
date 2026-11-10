@@ -254,7 +254,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           ),
           const SizedBox(height: 8),
           FilledButton.tonalIcon(
-            onPressed: widget.auth.isConfigured && _activeProfile != null && !_busy
+            onPressed: widget.auth.isConfigured && !_busy
                 ? _completePasswordlessSignIn
                 : null,
             icon: const Icon(Icons.login),
