@@ -59,7 +59,7 @@ class _AureonAppState extends State<AureonApp> {
       brightness: Brightness.light,
       scaffoldBackgroundColor: const Color(0xFFF4F7FB),
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF087F70),
+        seedColor: const Color(0xFF6755D9),
         brightness: Brightness.light,
         surface: Colors.white,
       ),
@@ -69,7 +69,7 @@ class _AureonAppState extends State<AureonApp> {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: const Color(0xFF0B1020),
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF64E6C2),
+        seedColor: const Color(0xFF8B7CFF),
         brightness: Brightness.dark,
         surface: const Color(0xFF111A2E),
       ),
@@ -140,7 +140,7 @@ class _AureonHomeState extends State<AureonHome> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Row(children: [
-          Icon(Icons.all_inclusive, color: Color(0xFF64E6C2), size: 30),
+          Icon(Icons.all_inclusive, color: Color(0xFF8B7CFF), size: 30),
           SizedBox(width: 10),
           Text('AUREON', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: 2)),
         ]),
