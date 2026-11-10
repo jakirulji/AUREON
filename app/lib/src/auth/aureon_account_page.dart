@@ -130,7 +130,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (link.isEmpty) throw StateError('Paste the complete sign-in link from your email.');
         final session = await widget.auth.signInWithEmailLink(email: email, emailLink: link);
         final user = await widget.auth.reloadUser();
-        final boundProfile = await _bindProfile(user.localId);
+        await _bindProfile(user.localId);
         _emailLink.clear();
         if (mounted) {
           setState(() => _status = 'Passwordless sign-in completed for ${session.user.email}. AUREON Central Backend is connected. Email link sign-in verified the email address.');
