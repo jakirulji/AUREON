@@ -355,8 +355,8 @@ async function recoverVault(request: Request, env: Env, identity: FirebaseIdenti
     env.DB.prepare("INSERT INTO security_audit_events (event_id,user_id,vault_id,event_type,generation,created_at_ms,details_json) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM recovery_challenges WHERE challenge_id=? AND user_id=? AND vault_id=? AND challenge_sha256=? AND expires_at_ms>=?)")
       .bind(base64Url(randomBytes(18)), identity.uid, vaultId, "vault.recovery.completed", row.generation, now,
         JSON.stringify({ method: "cloudflare-device-bound" }), challengeId, identity.uid, vaultId, challengeRow.challenge_sha256, now),
-    env.DB.prepare("DELETE FROM recovery_challenges WHERE challenge_id=? AND challenge_sha256=? AND expires_at_ms>=?")
-      .bind(challengeId, challengeRow.challenge_sha256, now),
+    env.DB.prepare("DELETE FROM recovery_challenges WHERE challenge_id=? AND user_id=? AND vault_id=? AND challenge_sha256=? AND expires_at_ms>=?")
+      .bind(challengeId, identity.uid, vaultId, challengeRow.challenge_sha256, now),
     env.DB.prepare("INSERT INTO recovery_cooldowns (user_id,vault_id,next_allowed_at_ms) VALUES (?,?,?) ON CONFLICT(user_id,vault_id) DO UPDATE SET next_allowed_at_ms=excluded.next_allowed_at_ms")
       .bind(identity.uid, vaultId, now + RECOVERY_COOLDOWN_MS),
   ]);
