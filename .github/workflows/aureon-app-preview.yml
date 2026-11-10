@@ -167,14 +167,6 @@ jobs:
           disable-linux-hw-accel: false
           script: cd "${{ runner.temp }}/aureon-android" && test -f pubspec.yaml && flutter test integration_test/transfer_bridge_test.dart
 
-      - name: Upload Android debug APK
-        uses: actions/upload-artifact@v6
-        with:
-          name: AUREON-Android-Debug-APK
-          path: ${{ runner.temp }}/aureon-android/build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
-
   windows-validation:
     name: Analyze, test and compile Windows
     runs-on: windows-latest
