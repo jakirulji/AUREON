@@ -208,14 +208,11 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       }
       for (final entry in children) {
         if (entry.name == '.AUREON Trash (AUREON)') continue;
-        if (entry.isHidden && !_showHidden) continue;
         if (entry.isDirectory) {
           if (current.depth >= maxDepth || visited.contains(entry.id)) continue;
           final isDownloadsFolder = entry.name.toLowerCase() == 'download' || entry.name.toLowerCase() == 'downloads';
-          if (_activeCategory != 'downloads' || current.inDownloads || isDownloadsFolder) {
-            visited.add(entry.id);
-            queue.add((id: entry.id, path: '${current.path} / ${entry.name}', depth: current.depth + 1, inDownloads: current.inDownloads || isDownloadsFolder));
-          }
+          visited.add(entry.id);
+          queue.add((id: entry.id, path: '${current.path} / ${entry.name}', depth: current.depth + 1, inDownloads: current.inDownloads || isDownloadsFolder));
         } else {
           final include = _activeCategory == 'downloads' ? current.inDownloads : _matchesCategory(entry);
           if (include) { matches.add(entry); _categoryPaths[entry.id] = current.path; }
