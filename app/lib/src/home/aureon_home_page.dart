@@ -5,7 +5,10 @@ import 'package:disk_space_plus/disk_space_plus.dart';
 import 'package:flutter/material.dart';
 
 class AureonHomePage extends StatefulWidget {
-  const AureonHomePage({super.key});
+  const AureonHomePage({super.key, required this.isDarkMode, required this.onThemeChanged});
+
+  final bool isDarkMode;
+  final ValueChanged<bool> onThemeChanged;
 
   @override
   State<AureonHomePage> createState() => _AureonHomePageState();
@@ -22,8 +25,6 @@ class _AureonHomePageState extends State<AureonHomePage>
   bool _loading = true;
 
   static const _mint = Color(0xFF64E6C2);
-  static const _muted = Color(0xFF9AA8BD);
-  static const _panel = Color(0xFF111A2E);
 
   @override
   void initState() {
@@ -102,6 +103,10 @@ class _AureonHomePageState extends State<AureonHomePage>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurfaceVariant;
+    final panel = scheme.surface;
+    final panelBorder = scheme.outlineVariant;
     final total = _totalMb;
     final free = _freeMb;
     final used = total != null && free != null ? (total - free).clamp(0, total).toDouble() : null;
@@ -122,12 +127,17 @@ class _AureonHomePageState extends State<AureonHomePage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Your Digital Universe',
-                      style: TextStyle(color: _muted, fontSize: 12, letterSpacing: .4)),
+                      style: TextStyle(color: muted, fontSize: 12, letterSpacing: .4)),
                     SizedBox(height: 5),
                     Text('Storage overview',
                       style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: widget.isDarkMode ? 'Switch to light theme' : 'Switch to dark theme',
+                onPressed: () => widget.onThemeChanged(!widget.isDarkMode),
+                icon: Icon(widget.isDarkMode ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
               ),
               IconButton(
                 tooltip: 'Refresh storage information',
@@ -143,10 +153,12 @@ class _AureonHomePageState extends State<AureonHomePage>
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF173B3A), Color(0xFF14243A), Color(0xFF111A2E)],
+                colors: widget.isDarkMode
+                    ? [const Color(0xFF173B3A), const Color(0xFF14243A), const Color(0xFF111A2E)]
+                    : [const Color(0xFFDDF7F0), const Color(0xFFEAF1FA), Colors.white],
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF31534F)),
+              border: Border.all(color: widget.isDarkMode ? const Color(0xFF31534F) : const Color(0xFFB9DDD3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,14 +196,14 @@ class _AureonHomePageState extends State<AureonHomePage>
                       letterSpacing: -.8)),
                   const SizedBox(height: 3),
                   Text('used of ${_formatMb(total!)}',
-                    style: const TextStyle(color: Color(0xFFB7C7D8), fontSize: 13)),
+                    style: TextStyle(color: widget.isDarkMode ? const Color(0xFFB7C7D8) : const Color(0xFF526579), fontSize: 13)),
                   const SizedBox(height: 18),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: LinearProgressIndicator(
                       value: ratio,
                       minHeight: 10,
-                      backgroundColor: const Color(0xFF344358),
+                      backgroundColor: widget.isDarkMode ? const Color(0xFF344358) : const Color(0xFFD1E1E8),
                       valueColor: const AlwaysStoppedAnimation<Color>(_mint),
                     ),
                   ),
@@ -202,7 +214,7 @@ class _AureonHomePageState extends State<AureonHomePage>
                         style: const TextStyle(color: _mint, fontWeight: FontWeight.w700, fontSize: 12)),
                       const Spacer(),
                       Text('${_formatMb(free!)} available',
-                        style: const TextStyle(color: Color(0xFFCBD7E5), fontSize: 12)),
+                        style: TextStyle(color: widget.isDarkMode ? const Color(0xFFCBD7E5) : const Color(0xFF526579), fontSize: 12)),
                     ],
                   ),
                 ] else ...[
@@ -210,7 +222,7 @@ class _AureonHomePageState extends State<AureonHomePage>
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
                   const SizedBox(height: 7),
                   Text(_error ?? 'Waiting for Android storage information.',
-                    style: const TextStyle(color: Color(0xFFB7C7D8), fontSize: 12)),
+                    style: TextStyle(color: widget.isDarkMode ? const Color(0xFFB7C7D8) : const Color(0xFF526579), fontSize: 12)),
                   const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -227,7 +239,7 @@ class _AureonHomePageState extends State<AureonHomePage>
                   const SizedBox(width: 6),
                   Expanded(child: Text(_updatedLabel, maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: _muted, fontSize: 11))),
+                    style: TextStyle(color: muted, fontSize: 11))),
                   const SizedBox(width: 8),
                   const Text('Refresh · 30s',
                     style: TextStyle(color: _muted, fontSize: 10)),
@@ -265,9 +277,9 @@ class _AureonHomePageState extends State<AureonHomePage>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _panel,
+              color: panel,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF26334A)),
+              border: Border.all(color: panelBorder),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,7 +349,7 @@ class _AureonHomePageState extends State<AureonHomePage>
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
         const SizedBox(height: 3),
         Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 10, color: _muted)),
+          style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],
     ),
   );
