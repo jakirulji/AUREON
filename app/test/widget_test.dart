@@ -123,6 +123,7 @@ void main() {
   });
 
   testWidgets('Category shortcuts recursively find matching files across storage', (tester) async {
+    final thumbnailCalls = <MethodCall>[];
     SharedPreferences.setMockInitialValues({
       'aureon.saved_local_root': jsonEncode({
         'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Internal storage',
@@ -130,6 +131,7 @@ void main() {
     });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'getThumbnail') { thumbnailCalls.add(call); return null; }
       if (call.method == 'listChildren') {
         final parent = (call.arguments as Map)['parentId'];
         if (parent == 'root-doc') {
@@ -154,6 +156,8 @@ void main() {
     expect(find.text('notes.txt'), findsNothing);
     expect(find.text('holiday.mp4'), findsNothing);
     expect(find.textContaining('Internal storage / Pictures'), findsOneWidget);
+    await tester.pump();
+    expect(thumbnailCalls.any((call) => (call.arguments as Map)['fileId'] == 'photo'), isTrue);
   });
   testWidgets('Files page creates a folder using the selected parent', (tester) async {
     final calls = <MethodCall>[];
@@ -359,5 +363,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonFilesPage), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(AureonHomePage), findsOneWidget);
   });
 }
