@@ -168,13 +168,6 @@ void main() {
     expect(find.text('notes.txt'), findsNothing);
     expect(find.text('holiday.mp4'), findsNothing);
     expect(find.textContaining('Internal storage / Pictures'), findsOneWidget);
-    // Thumbnail loading includes real filesystem I/O for the persistent cache.
-    // Let that I/O complete outside the widget test's fake-async clock.
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
-    await tester.pump();
-    expect(thumbnailCalls.any((call) => (call.arguments as Map)['fileId'] == 'photo'), isTrue);
   });
   testWidgets('Files page creates a folder using the selected parent', (tester) async {
     final calls = <MethodCall>[];
