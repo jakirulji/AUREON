@@ -170,8 +170,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
       final rows = await _files.listChildren(root: root, parentId: _levels.last.id);
       if (!mounted) return;
       if (_activeCategory == 'downloads' && _levels.length == 1) {
-        final downloads = rows.where((entry) => entry.isDirectory &&
-          (entry.name.toLowerCase() == 'download' || entry.name.toLowerCase() == 'downloads')).firstOrNull;
+        AureonLocalEntry? downloads;
+        for (final entry in rows) {
+          if (entry.isDirectory &&
+              (entry.name.toLowerCase() == 'download' || entry.name.toLowerCase() == 'downloads')) {
+            downloads = entry;
+            break;
+          }
+        }
         if (downloads != null) {
           setState(() {
             _levels.add(_Folder(downloads.name, downloads.id));
