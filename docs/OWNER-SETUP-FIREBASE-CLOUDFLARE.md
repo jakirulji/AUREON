@@ -69,7 +69,7 @@ npx wrangler deploy
 
 9. Open /health/ready on the deployed Worker. It must return HTTP 200 and {"ready":true} before enabling the app's Cloudflare URL.
 
-The wrangler.toml D1 database ID remains a placeholder until the owner copies the ID of their existing `aureon-db` database into it. The Firebase project ID is already set to this owner's `aureon-7f612` project. Do not deploy while the D1 ID placeholder remains.
+The `wrangler.toml` currently points to D1 database ID `eec1ed1f-048e-4774-8c4d-0d1b08c0b5c4`. Before deployment, the maintainer must confirm that this is the intended `aureon-db` resource in the Cloudflare account. The Worker is pinned to Firebase project `aureon-7f612`; do not change one side without updating and reviewing the other.
 
 ## 4. Recovery secret custody and production cautions
 
