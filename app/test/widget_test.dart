@@ -122,6 +122,35 @@ void main() {
     expect(find.text('alpha.txt'), findsNothing);
   });
 
+  testWidgets('Category shortcuts recursively find matching files across storage', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'aureon.saved_local_root': jsonEncode({
+        'rootId': 'root', 'rootDocumentId': 'root-doc', 'displayName': 'Internal storage',
+      }),
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'listChildren') {
+        final parent = (call.arguments as Map)['parentId'];
+        if (parent == 'root-doc') return [
+          {'id': 'pictures', 'name': 'Pictures', 'isDirectory': true},
+          {'id': 'note', 'name': 'notes.txt', 'isDirectory': false, 'sizeBytes': 20},
+        ];
+        if (parent == 'pictures') return [
+          {'id': 'photo', 'name': 'holiday.jpg', 'isDirectory': false, 'sizeBytes': 100},
+          {'id': 'clip', 'name': 'holiday.mp4', 'isDirectory': false, 'sizeBytes': 200},
+        ];
+      }
+      return null;
+    });
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: AureonFilesPage(initialCategory: 'images'))));
+    await tester.pumpAndSettle();
+    expect(find.text('Images'), findsOneWidget);
+    expect(find.text('holiday.jpg'), findsOneWidget);
+    expect(find.text('notes.txt'), findsNothing);
+    expect(find.text('holiday.mp4'), findsNothing);
+    expect(find.textContaining('Internal storage / Pictures'), findsOneWidget);
+  });
   testWidgets('Files page creates a folder using the selected parent', (tester) async {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
