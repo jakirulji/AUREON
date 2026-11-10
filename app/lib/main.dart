@@ -63,7 +63,6 @@ class _AureonAppState extends State<AureonApp> {
         brightness: Brightness.light,
         surface: Colors.white,
       ),
-      cardTheme: CardThemeData(color: Colors.white, elevation: 0),
     ),
     darkTheme: ThemeData(
       useMaterial3: true,
@@ -130,41 +129,63 @@ class _AureonHomeState extends State<AureonHome> {
     );
   });
 
-  Widget _sidebar() => Container(
-    width: 230,
-    padding: const EdgeInsets.fromLTRB(18, 24, 12, 18),
-    decoration: const BoxDecoration(color: Color(0xFF0E1628), border: Border(right: BorderSide(color: Color(0xFF202C42)))),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Row(children: [Icon(Icons.all_inclusive, color: Color(0xFF64E6C2), size: 30), SizedBox(width: 10), Text('AUREON', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: 2))]),
-      const Padding(padding: EdgeInsets.only(left: 40, top: 6), child: Text('YOUR DIGITAL UNIVERSE', style: TextStyle(fontSize: 9, letterSpacing: 1.2, color: Color(0xFF8492AA)))),
-      const SizedBox(height: 34),
-      for (var i = 0; i < labels.length; i++)
+  Widget _sidebar() {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 230,
+      padding: const EdgeInsets.fromLTRB(18, 24, 12, 18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(right: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.all_inclusive, color: Color(0xFF64E6C2), size: 30),
+          SizedBox(width: 10),
+          Text('AUREON', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: 2)),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 40, top: 6),
+          child: Text('YOUR DIGITAL UNIVERSE',
+            style: TextStyle(fontSize: 9, letterSpacing: 1.2, color: scheme.onSurfaceVariant)),
+        ),
+        const SizedBox(height: 34),
+        for (var i = 0; i < labels.length; i++)
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              dense: true,
+              selected: selected == i,
+              selectedTileColor: scheme.primaryContainer,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              leading: Icon(icons[i], color: selected == i ? scheme.primary : scheme.onSurfaceVariant),
+              title: Text(labels[i], style: TextStyle(fontSize: 13,
+                color: selected == i ? scheme.onPrimaryContainer : scheme.onSurface)),
+              onTap: () => setState(() => selected = i),
+            ),
+          ),
+        const Spacer(),
+        Divider(color: scheme.outlineVariant),
         Material(
           color: Colors.transparent,
           child: ListTile(
-            dense: true,
-            selected: selected == i,
-            selectedTileColor: const Color(0xFF18352F),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            leading: Icon(icons[i], color: selected == i ? const Color(0xFF64E6C2) : const Color(0xFF9AA8BD)),
-            title: Text(labels[i], style: TextStyle(fontSize: 13, color: selected == i ? const Color(0xFF64E6C2) : const Color(0xFFCBD4E2))),
-            onTap: () => setState(() => selected = i),
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              backgroundColor: scheme.secondaryContainer,
+              child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined,
+                color: scheme.primary),
+            ),
+            title: Text(_auth.currentUser?.email ?? 'Local profile',
+              style: const TextStyle(fontSize: 12)),
+            subtitle: Text(_auth.currentUser == null ? 'Not signed in' :
+              (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'),
+              style: const TextStyle(fontSize: 11)),
+            onTap: () => setState(() => selected = 4),
           ),
         ),
-      const Spacer(),
-      const Divider(color: Color(0xFF26334A)),
-      Material(
-        color: Colors.transparent,
-        child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(backgroundColor: const Color(0xFF243A4A), child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined, color: const Color(0xFF64E6C2))),
-          title: Text(_auth.currentUser?.email ?? 'Local profile', style: const TextStyle(fontSize: 12)),
-          subtitle: Text(_auth.currentUser == null ? 'Not signed in' : (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'), style: const TextStyle(fontSize: 11)),
-          onTap: () => setState(() => selected = 4),
-        ),
-      ),
-    ]),
-  );
+      ]),
+    );
+  }
 
   // Home provides live device storage metrics; Files remains the local file workspace.
   Widget _content(bool wide) {
