@@ -311,6 +311,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonHomePage), findsOneWidget);
     expect(find.text('Everything, in one place.'), findsOneWidget);
+    expect(find.text('BROWSE CATEGORIES'), findsOneWidget);
+    for (final category in ['Images', 'Videos', 'Audio', 'Documents', 'Downloads', 'APKs', 'Archives', 'Other']) {
+      expect(find.text(category), findsOneWidget);
+    }
+    await tester.tap(find.text('Videos').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(AureonFilesPage), findsOneWidget);
+    await tester.tap(find.text('Home').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Files').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
