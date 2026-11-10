@@ -177,10 +177,10 @@ jobs:
           "$APKSIGNER" verify --verbose "$APK"
           echo "Signed APK verification passed."
 
-      - name: Upload final test APK
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v6
         with:
-          name: AUREON-Android-Test-APK
+          name: AUREON-Android-Signed-Release-APK
           path: ${{ runner.temp }}/aureon-android/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
