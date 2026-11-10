@@ -103,7 +103,7 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
           _section('STORAGE INSIGHTS', 'DEVICE'),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: _metric(Icons.database_rounded, 'Total capacity', _total == null ? '—' : _format(_total!), dark)),
+            Expanded(child: _metric(Icons.storage_rounded, 'Total capacity', _total == null ? '—' : _format(_total!), dark)),
             const SizedBox(width: 9),
             Expanded(child: _metric(Icons.folder_open_rounded, 'Space used', used == null ? '—' : _format(used), dark)),
             const SizedBox(width: 9),
