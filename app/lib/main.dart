@@ -7,8 +7,35 @@ import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'src/media/aureon_media_viewer.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+final GlobalKey<NavigatorState> _aureonNavigatorKey = GlobalKey<NavigatorState>();
+const MethodChannel _openWithChannel = MethodChannel('aureon/open_with');
+
+void _openWithPayload(Map<String, dynamic> payload) {
+  final kind = payload['kind'] as String?;
+  final path = payload['path'] as String?;
+  final name = payload['name'] as String? ?? 'Media';
+  if (kind == null || path == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final navigator = _aureonNavigatorKey.currentState;
+    if (navigator == null) return;
+    if (kind == 'image') {
+      navigator.push(MaterialPageRoute<void>(builder: (_) => AureonImageViewerPage(
+        images: [AureonMediaItem(path: path, title: name)], initialIndex: 0,
+      )));
+    } else if (kind == 'video' || kind == 'audio') {
+      navigator.push(MaterialPageRoute<void>(builder: (_) => AureonMediaViewerPage(
+        filePath: path, fileName: name,
+        queue: [AureonMediaItem(path: path, title: name)],
+        initialIndex: 0, isVideo: kind == 'video',
+      )));
+    }
+  });
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +58,21 @@ class _AureonAppState extends State<AureonApp> {
   void initState() {
     super.initState();
     _restoreTheme();
+    _openWithChannel.setMethodCallHandler((call) async {
+      if (call.method == 'openWith' && call.arguments is Map) {
+        _openWithPayload(Map<String, dynamic>.from(call.arguments as Map));
+      }
+    });
+    _restorePendingOpenWith();
+  }
+
+  Future<void> _restorePendingOpenWith() async {
+    try {
+      final payload = await _openWithChannel.invokeMapMethod<String, dynamic>('getPendingOpenWith');
+      if (payload != null) _openWithPayload(payload);
+    } catch (_) {
+      // Open-with channel is only installed on Android.
+    }
   }
 
   Future<void> _restoreTheme() async {
@@ -57,6 +99,7 @@ class _AureonAppState extends State<AureonApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'AUREON',
+    navigatorKey: _aureonNavigatorKey,
     debugShowCheckedModeBanner: false,
     themeMode: _themeMode,
     theme: ThemeData(
