@@ -21,6 +21,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity-alias android:name=".AureonVideoPlayer" android:targetActivity=".MainActivity" android:label="AUREON Video Player" android:exported="true" />
+        <activity-alias android:name=".AureonAudioPlayer" android:targetActivity=".MainActivity" android:label="AUREON Audio Player" android:exported="true" />
+        <activity-alias android:name=".AureonImageViewer" android:targetActivity=".MainActivity" android:label="AUREON Image" android:exported="true" />
         <meta-data android:name="flutterEmbedding" android:value="2" />
     </application>
 </manifest>
