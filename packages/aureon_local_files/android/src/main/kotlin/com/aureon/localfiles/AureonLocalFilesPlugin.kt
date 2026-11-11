@@ -490,7 +490,30 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            activity.startActivity(Intent.createChooser(intent, "Open with"))
+            val extension = file.extension.lowercase()
+            val kind = when (extension) {
+                in VIDEO_EXTENSIONS -> "video"
+                in AUDIO_EXTENSIONS -> "audio"
+                in IMAGE_EXTENSIONS -> "image"
+                else -> null
+            }
+            val chooser = Intent.createChooser(intent, "Open with")
+            if (kind != null) {
+                val alias = when (kind) {
+                    "video" -> "AureonVideoPlayer"
+                    "audio" -> "AureonAudioPlayer"
+                    else -> "AureonImageViewer"
+                }
+                val aureonChoice = Intent(intent).apply {
+                    component = android.content.ComponentName(activity.packageName, activity.packageName + "." + alias)
+                    putExtra("aureon_open_with", true)
+                    putExtra("aureon_kind", kind)
+                    putExtra("aureon_path", file.canonicalPath)
+                    putExtra("aureon_name", file.name)
+                }
+                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(aureonChoice))
+            }
+            activity.startActivity(chooser)
             result.success(null)
         } catch (error: Exception) { result.error("open_failed", error.message, null) }
     }
@@ -498,7 +521,8 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     companion object {
         private const val MAX_THUMBNAIL_BYTES = 512 * 1024
         private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "heif")
-        private val VIDEO_EXTENSIONS = setOf("mp4", "mkv", "mov", "webm", "3gp", "avi", "m4v")
+        private val VIDEO_EXTENSIONS = setOf("mp4", "mkv", "mov", "webm", "3gp", "avi", "m4v", "mpeg", "mpg", "ts", "m2ts", "flv")
+        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "wma", "amr", "aiff", "alac")
         private const val REQUEST_ALL_FILES_ACCESS = 0xA0E1
         private const val PICK_ROOT_REQUEST = 0xA0E0
     }
