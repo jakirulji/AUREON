@@ -210,8 +210,8 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                           final max = duration.inMilliseconds.toDouble().clamp(1, double.infinity);
                           return Column(children: [
                             Slider(
-                              value: position.inMilliseconds.toDouble().clamp(0, max),
-                              max: max,
+                              value: position.inMilliseconds.toDouble().clamp(0, max).toDouble(),
+                              max: max.toDouble(),
                               onChanged: (value) => _player.seek(Duration(milliseconds: value.round())),
                             ),
                             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -276,7 +276,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                           stream: _player.stream.volume,
                           initialData: 100,
                           builder: (context, snapshot) => Slider(
-                            value: (snapshot.data ?? 100).clamp(0, 100),
+                            value: (snapshot.data ?? 100).clamp(0, 100).toDouble(),
                             max: 100,
                             onChanged: _player.setVolume,
                           ),
@@ -295,7 +295,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                               children: [
                                 const ListTile(title: Text('Playback speed')),
                                 for (final speed in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
-                                  ListTile(title: Text('${speed}×'), onTap: () {
+                                  ListTile(title: Text('$speed×'), onTap: () {
                                     _player.setRate(speed);
                                     Navigator.pop(context);
                                   }),
