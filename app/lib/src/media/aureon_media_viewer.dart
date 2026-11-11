@@ -338,7 +338,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                         icon: const Icon(Icons.speed, color: Colors.white),
                         onSelected: _player.setRate,
                         itemBuilder: (_) => [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map(
-                          (speed) => PopupMenuItem(value: speed, child: Text('${speed}×')),
+                          (speed) => PopupMenuItem(value: speed, child: Text('$speed×')),
                         ).toList(),
                       ),
                     ),
