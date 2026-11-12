@@ -38,7 +38,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.47.9"
           cache: true
 
       - name: Export Flutter SDK path
@@ -94,7 +94,7 @@ jobs:
           source = source.replace(agp_line, re.sub(r'version ".*?"', f'version "{agp_version}"', agp_line), 1)
           wrapper = root / "gradle" / "wrapper" / "gradle-wrapper.properties"
           wrapper_text = wrapper.read_text()
-          wrapper.write_text(re.sub(r"distributionUrl=.*", "distributionUrl=https\\://downloads.gradle.org/distributions/gradle-8.13-all.zip", wrapper_text))
+          wrapper.write_text(re.sub(r"distributionUrl=.*", "distributionUrl=https\\://downloads.gradle.org/distributions/gradle-8.14.3-all.zip", wrapper_text))
           kotlin_version = "2.3.10"
           source = source.replace(kotlin_line, f'    id("com.android.library") version "{agp_version}" apply false\n    ' + kotlin_line, 1)
           pinned = re.sub(r'version ".*?"', f'version "{kotlin_version}"', kotlin_line)
