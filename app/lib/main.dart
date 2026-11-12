@@ -184,7 +184,7 @@ class _AureonHomeState extends State<AureonHome> {
       child: Scaffold(
         body: SafeArea(child: Row(children: [
           if (wide) _sidebar(),
-          Expanded(child: _content(wide)),
+          Expanded(child: _content()),
         ])),
         bottomNavigationBar: wide ? null : NavigationBar(
           selectedIndex: selected,
@@ -319,12 +319,11 @@ class _AureonHomeState extends State<AureonHome> {
     );
   }
 
-  Widget _content(bool wide) {
+  Widget _content() {
     switch (selected) {
       case 0:
         return AureonHomePage(
           isDarkMode: widget.themeMode == ThemeMode.dark,
-          onThemeChanged: (dark) => widget.onThemeChanged(dark ? ThemeMode.dark : ThemeMode.light),
           onBrowseCategory: (category) => setState(() {
             _fileCategory = category;
             selected = 1;
