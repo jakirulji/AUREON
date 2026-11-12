@@ -105,7 +105,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
     final current = _player.state.position;
     final next = (current.inMilliseconds + seconds * 1000)
         .clamp(0, duration.inMilliseconds > 0 ? duration.inMilliseconds : 1 << 30);
-    await _player.seek(Duration(milliseconds: next));
+    await _player.seek(Duration(milliseconds: next.toInt()));
     _scheduleControlsHide();
   }
 
@@ -401,7 +401,10 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                               tooltip: 'Playback speed',
                               initialValue: _player.state.rate,
                               color: const Color(0xFF171C2B),
-                              onSelected: (speed) => _player.setRate(speed),
+                              onSelected: (speed) async {
+                                await _player.setRate(speed);
+                                if (mounted) setState(() {});
+                              },
                               itemBuilder: (_) => [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0, 4.0]
                                   .map((speed) => PopupMenuItem(
                                     value: speed,
