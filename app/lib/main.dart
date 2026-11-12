@@ -310,7 +310,7 @@ class _AureonHomeState extends State<AureonHome> {
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
             builder: (_) => const Scaffold(
-              appBar: AppBar(title: Text('Transfers')),
+              appBar: AppBar(title: const Text('Transfers')),
               body: AureonTransfersPage(),
             ),
           )),
