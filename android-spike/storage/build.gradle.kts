@@ -20,9 +20,9 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
-    sourceSets.getByName("test").resources.srcDir(
-        rootProject.file("../shared/contract-fixtures")
-    )
+    sourceSets.named("test") {
+        resources.srcDir(rootProject.file("../shared/contract-fixtures"))
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
