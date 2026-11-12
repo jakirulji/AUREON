@@ -189,7 +189,35 @@ class _AureonHomePageState extends State<AureonHomePage>
     return 'Live device storage · Auto-refresh every 30 seconds';
   }
 
-  Widget _header() => Row(children: [
+  Widget _header() => Stack(clipBehavior: Clip.none, children: [
+    Positioned(
+      top: -24,
+      right: 12,
+      child: IgnorePointer(
+        child: Container(
+          width: 205,
+          height: 78,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(100),
+            gradient: RadialGradient(
+              colors: [
+                const Color(0xFF7655F5).withValues(alpha: _dark ? .30 : .18),
+                const Color(0xFF4B8DFF).withValues(alpha: _dark ? .12 : .10),
+                Colors.transparent,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF7655F5).withValues(alpha: _dark ? .22 : .12),
+                blurRadius: 38,
+                spreadRadius: 7,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    Row(children: [
     Container(
       width: 47,
       height: 47,
@@ -224,6 +252,7 @@ class _AureonHomePageState extends State<AureonHomePage>
         child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
     ),
+    ]),
   ]);
 
   Widget _headerAction(IconData icon, String tip, VoidCallback onTap, {bool dot = false}) =>
@@ -327,7 +356,7 @@ class _AureonHomePageState extends State<AureonHomePage>
   }
 
   Widget _categoryTile(_HomeCategory category) => Material(
-    color: _dark ? category.darkBackground : category.lightBackground,
+    color: Colors.transparent,
     borderRadius: BorderRadius.circular(19),
     child: InkWell(
       borderRadius: BorderRadius.circular(19),
@@ -336,8 +365,28 @@ class _AureonHomePageState extends State<AureonHomePage>
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(19),
-          border: Border.all(color: category.color.withValues(alpha: _dark ? .35 : .16)),
-          boxShadow: [BoxShadow(color: category.color.withValues(alpha: .07), blurRadius: 10, offset: const Offset(0, 3))],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _dark
+              ? [
+                  Color.alphaBlend(category.color.withValues(alpha: .17), category.darkBackground),
+                  category.darkBackground,
+                ]
+              : [
+                  Color.alphaBlend(Colors.white.withValues(alpha: .26), category.lightBackground),
+                  category.lightBackground,
+                ],
+          ),
+          border: Border.all(color: category.color.withValues(alpha: _dark ? .30 : .20)),
+          boxShadow: [
+            BoxShadow(
+              color: category.color.withValues(alpha: _dark ? .13 : .10),
+              blurRadius: 13,
+              spreadRadius: .3,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(category.icon, color: category.color, size: 29),
@@ -373,9 +422,19 @@ class _AureonHomePageState extends State<AureonHomePage>
     final name = record.itemName;
     final dot = name.lastIndexOf('.');
     final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
-    final icon = _recentIcon(ext);
     final path = record.sourceLocation;
-    final isImage = const {'jpg','jpeg','png','gif','webp','heic','bmp'}.contains(ext);
+    final imageExtensions = const {'jpg','jpeg','png','gif','webp','heic','bmp'};
+    final isImage = imageExtensions.contains(ext);
+    final file = File(path);
+    final exists = path.isNotEmpty && file.existsSync();
+    final fileBytes = exists ? _safeFileSize(file) : null;
+    final icon = _recentIcon(ext);
+    final iconColor = _recentIconColor(ext);
+    final occurredAt = DateTime.fromMillisecondsSinceEpoch(record.occurredAtMs).toLocal();
+    final details = [
+      if (fileBytes != null) _formatBytes(fileBytes),
+      _relativeTime(occurredAt),
+    ].join(' • ');
     return Material(
       color: _surface,
       borderRadius: BorderRadius.circular(17),
@@ -384,22 +443,38 @@ class _AureonHomePageState extends State<AureonHomePage>
         onTap: widget.onOpenFiles,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: _line),
+            boxShadow: [
+              BoxShadow(
+                color: _dark
+                  ? const Color(0xFF687BCE).withValues(alpha: .07)
+                  : const Color(0xFF6B78B8).withValues(alpha: .07),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
           child: Row(children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SizedBox(
-                width: 37, height: 37,
-                child: isImage && File(path).existsSync()
-                  ? Image.file(File(path), fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _fileIcon(icon))
-                  : _fileIcon(icon),
+                width: 39, height: 39,
+                child: isImage && exists
+                  ? Image.file(
+                      file,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _fileIcon(icon, color: iconColor),
+                    )
+                  : _fileIcon(icon, color: iconColor),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w700)),
-              Text(path, maxLines: 1, overflow: TextOverflow.ellipsis,
+              Text(details.isEmpty ? path : details, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: _muted, fontSize: 9)),
             ])),
             Icon(Icons.more_vert_rounded, color: _muted, size: 19),
@@ -409,9 +484,46 @@ class _AureonHomePageState extends State<AureonHomePage>
     );
   }
 
-  Widget _fileIcon(IconData icon) => Container(
-    color: _dark ? const Color(0xFF29254E) : const Color(0xFFECE9FF),
-    child: Icon(icon, color: _violet, size: 21),
+  int? _safeFileSize(File file) {
+    try {
+      return file.lengthSync();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    if (bytes >= 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '$bytes B';
+  }
+
+  String _relativeTime(DateTime date) {
+    final difference = DateTime.now().difference(date);
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inHours < 1) return '${difference.inMinutes}m ago';
+    if (difference.inDays < 1) return '${difference.inHours}h ago';
+    if (difference.inDays < 7) return '${difference.inDays}d ago';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Color _recentIconColor(String ext) {
+    if (ext == 'pdf') return const Color(0xFFE53935);
+    if (const {'jpg','jpeg','png','gif','webp','heic','bmp'}.contains(ext)) return const Color(0xFFE84CB7);
+    if (const {'mp4','mkv','mov','avi','webm'}.contains(ext)) return const Color(0xFF2875DF);
+    if (const {'mp3','m4a','wav','flac','ogg'}.contains(ext)) return const Color(0xFF079B70);
+    if (const {'zip','rar','7z','tar','gz'}.contains(ext)) return const Color(0xFFE89A22);
+    if (const {'doc','docx','txt','rtf'}.contains(ext)) return const Color(0xFF2875DF);
+    if (const {'xls','xlsx','csv'}.contains(ext)) return const Color(0xFF159B69);
+    if (const {'ppt','pptx'}.contains(ext)) return const Color(0xFFE66B36);
+    if (const {'apk','aab'}.contains(ext)) return const Color(0xFF249B68);
+    return _violet;
+  }
+
+  Widget _fileIcon(IconData icon, {Color? color}) => Container(
+    color: (color ?? _violet).withValues(alpha: _dark ? .18 : .12),
+    child: Icon(icon, color: color ?? _violet, size: 23),
   );
 
   IconData _recentIcon(String ext) {
