@@ -9,7 +9,6 @@ class AureonHomePage extends StatefulWidget {
   const AureonHomePage({
     super.key,
     required this.isDarkMode,
-    required this.onThemeChanged,
     required this.onBrowseCategory,
     required this.onOpenFiles,
     required this.onOpenProfile,
@@ -17,7 +16,6 @@ class AureonHomePage extends StatefulWidget {
   });
 
   final bool isDarkMode;
-  final ValueChanged<bool> onThemeChanged;
   final ValueChanged<String> onBrowseCategory;
   final VoidCallback onOpenFiles;
   final VoidCallback onOpenProfile;
@@ -33,7 +31,6 @@ class _AureonHomePageState extends State<AureonHomePage>
   Timer? _timer;
   double? _total;
   double? _free;
-  DateTime? _updated;
   bool _loading = true;
   List<AureonOperationRecord> _recentFiles = [];
 
@@ -170,7 +167,7 @@ class _AureonHomePageState extends State<AureonHomePage>
             Icon(Icons.sync_rounded, size: 13, color: _muted),
             const SizedBox(width: 6),
             Expanded(child: Text(
-              _updatedLabel(ratio),
+              _updatedLabel(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: _muted, fontSize: 9),
@@ -187,7 +184,7 @@ class _AureonHomePageState extends State<AureonHomePage>
     );
   }
 
-  String _updatedLabel(double? ratio) {
+  String _updatedLabel() {
     if (_total == null) return _loading ? 'Updating device storage…' : 'Device storage data unavailable';
     return 'Live device storage · Auto-refresh every 30 seconds';
   }
