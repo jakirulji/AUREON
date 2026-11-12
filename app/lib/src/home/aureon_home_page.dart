@@ -13,38 +13,47 @@ class AureonHomePage extends StatefulWidget {
     required this.onBrowseCategory,
     required this.onOpenFiles,
     required this.onOpenProfile,
+    required this.onOpenCloud,
   });
+
   final bool isDarkMode;
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<String> onBrowseCategory;
   final VoidCallback onOpenFiles;
   final VoidCallback onOpenProfile;
+  final VoidCallback onOpenCloud;
 
   @override
   State<AureonHomePage> createState() => _AureonHomePageState();
 }
 
-class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObserver {
+class _AureonHomePageState extends State<AureonHomePage>
+    with WidgetsBindingObserver {
   final DiskSpacePlus _disk = DiskSpacePlus();
   Timer? _timer;
   double? _total;
   double? _free;
   DateTime? _updated;
-  String? _error;
   bool _loading = true;
   List<AureonOperationRecord> _recentFiles = [];
 
-  static const violet = Color(0xFF9B8CFF);
+  static const _violet = Color(0xFF8057F5);
   static const _categories = <_HomeCategory>[
-    _HomeCategory('Images', 'images', Icons.image_rounded, Color(0xFFD5A7FF), Color(0xFF302541)),
-    _HomeCategory('Videos', 'videos', Icons.movie_creation_rounded, Color(0xFF91BFFF), Color(0xFF202F4B)),
-    _HomeCategory('Audio', 'audio', Icons.graphic_eq_rounded, Color(0xFF9DE0DC), Color(0xFF203B40)),
-    _HomeCategory('Documents', 'documents', Icons.description_rounded, Color(0xFFAFC8FF), Color(0xFF25334B)),
-    _HomeCategory('Downloads', 'downloads', Icons.downloading_rounded, Color(0xFFA5D9BD), Color(0xFF233B37)),
-    _HomeCategory('APKs', 'apks', Icons.android_rounded, Color(0xFFE8C38C), Color(0xFF403526)),
-    _HomeCategory('Archives', 'archives', Icons.inventory_2_rounded, Color(0xFFC1B6FF), Color(0xFF302C4C)),
-    _HomeCategory('Other', 'other', Icons.insert_drive_file_rounded, Color(0xFF9EB7D8), Color(0xFF263448)),
+    _HomeCategory('Images', 'images', Icons.image_rounded, Color(0xFFE84CB7), Color(0xFFFFD9ED), Color(0xFF51214A)),
+    _HomeCategory('Videos', 'videos', Icons.movie_creation_rounded, Color(0xFF2875DF), Color(0xFFDCEBFF), Color(0xFF1C355C)),
+    _HomeCategory('Audio', 'audio', Icons.music_note_rounded, Color(0xFF079B70), Color(0xFFD7F7EB), Color(0xFF173F39)),
+    _HomeCategory('Documents', 'documents', Icons.description_rounded, Color(0xFF8050DF), Color(0xFFE9DFFF), Color(0xFF33265B)),
+    _HomeCategory('Downloads', 'downloads', Icons.download_rounded, Color(0xFF0AA878), Color(0xFFD8F7E9), Color(0xFF1B493C)),
+    _HomeCategory('APKs', 'apks', Icons.android_rounded, Color(0xFF9B5A16), Color(0xFFFFE8C8), Color(0xFF49351F)),
+    _HomeCategory('Archives', 'archives', Icons.inventory_2_rounded, Color(0xFF7650D8), Color(0xFFE9DFFF), Color(0xFF30254F)),
+    _HomeCategory('Other', 'other', Icons.folder_rounded, Color(0xFF2875D8), Color(0xFFDCEBFF), Color(0xFF20395E)),
   ];
+
+  bool get _dark => widget.isDarkMode;
+  Color get _ink => _dark ? const Color(0xFFF5F4FF) : const Color(0xFF111832);
+  Color get _muted => _dark ? const Color(0xFF9DA9C8) : const Color(0xFF65718E);
+  Color get _surface => _dark ? const Color(0xFF111A31) : Colors.white;
+  Color get _line => _dark ? const Color(0xFF273454) : const Color(0xFFE3E8F5);
 
   @override
   void initState() {
@@ -64,7 +73,10 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refresh(showLoader: false);
+    if (state == AppLifecycleState.resumed) {
+      _refresh(showLoader: false);
+      _loadRecentFiles();
+    }
   }
 
   Future<void> _loadRecentFiles() async {
@@ -72,8 +84,9 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
       final records = await AureonOperationHistory.load();
       if (!mounted) return;
       final seen = <String>{};
-      final recent = records.where((row) => row.kind == 'open' && row.succeeded &&
-        seen.add('${row.itemName}| ${row.sourceLocation}')).take(4).toList();
+      final recent = records.where((row) =>
+        row.kind == 'open' && row.succeeded &&
+        seen.add('${row.itemName}|${row.sourceLocation}')).take(3).toList();
       setState(() => _recentFiles = recent);
     } catch (_) {
       if (mounted) setState(() => _recentFiles = []);
@@ -81,99 +94,92 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
   }
 
   Future<void> _refresh({bool showLoader = true}) async {
-    if (showLoader && mounted) setState(() { _loading = true; _error = null; });
+    if (showLoader && mounted) setState(() => _loading = true);
     try {
       if (!Platform.isAndroid && !Platform.isIOS) {
-        throw UnsupportedError('Live device storage metrics are currently enabled on Android.');
+        throw UnsupportedError('Live device storage metrics are available on mobile.');
       }
-      final values = await Future.wait<double?>([_disk.getTotalDiskSpace, _disk.getFreeDiskSpace]);
+      final values = await Future.wait<double?>([
+        _disk.getTotalDiskSpace,
+        _disk.getFreeDiskSpace,
+      ]);
       final total = values[0];
       final free = values[1];
       if (total == null || free == null || total <= 0 || free < 0) {
-        throw StateError('The device did not return valid storage information.');
+        throw StateError('Invalid device storage information.');
       }
       if (!mounted) return;
       setState(() {
         _total = total;
         _free = free.clamp(0, total);
-        _updated = DateTime.now();
-        _error = null;
         _loading = false;
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _error = e.toString(); _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   String _format(double mb) {
-    if (mb >= 1024 * 1024) return '${(mb / (1024 * 1024)).toStringAsFixed(2)} TB';
+    if (mb >= 1024 * 1024) return '${(mb / (1024 * 1024)).toStringAsFixed(1)} TB';
     if (mb >= 1024) return '${(mb / 1024).toStringAsFixed(1)} GB';
     return '${mb.toStringAsFixed(0)} MB';
   }
 
   @override
   Widget build(BuildContext context) {
-    final dark = widget.isDarkMode;
-    final scheme = Theme.of(context).colorScheme;
-    final muted = scheme.onSurfaceVariant;
-    final used = _total != null && _free != null ? (_total! - _free!).clamp(0, _total!).toDouble() : null;
-    final ratio = _total != null && used != null ? (used / _total!).clamp(0.0, 1.0).toDouble() : null;
+    final used = _total != null && _free != null
+        ? (_total! - _free!).clamp(0, _total!).toDouble() : null;
+    final ratio = _total != null && used != null
+        ? (used / _total!).clamp(0.0, 1.0).toDouble() : null;
 
     return RefreshIndicator(
       onRefresh: _refresh,
+      color: _violet,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+        padding: const EdgeInsets.fromLTRB(17, 13, 17, 24),
         children: [
-          _header(dark, muted),
+          _header(),
+          const SizedBox(height: 17),
+          _storageCard(used, ratio),
           const SizedBox(height: 22),
-          Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: violet, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
-          const SizedBox(height: 5),
-          const Text('Everything, in one place.', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -.7)),
-          const SizedBox(height: 4),
-          Text('Your files, beautifully organized.', style: TextStyle(color: muted, fontSize: 12)),
-          const SizedBox(height: 18),
-          _storageCard(dark, muted, used, ratio),
-          const SizedBox(height: 23),
-          Row(children: [
-            const Expanded(child: Text('BROWSE CATEGORIES', style: TextStyle(fontSize: 10, letterSpacing: 1.45, fontWeight: FontWeight.w900))),
-            Text('LOCAL FILES', style: TextStyle(color: muted, fontSize: 9, letterSpacing: .8, fontWeight: FontWeight.w700)),
-          ]),
-          const SizedBox(height: 11),
+          _sectionHeading('Browse Categories', 'View All', widget.onOpenFiles,
+            Icons.grid_view_rounded),
+          const SizedBox(height: 12),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _categories.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4, crossAxisSpacing: 9, mainAxisSpacing: 9, childAspectRatio: .91,
+              crossAxisCount: 4,
+              crossAxisSpacing: 9,
+              mainAxisSpacing: 9,
+              childAspectRatio: .82,
             ),
-            itemBuilder: (context, index) {
-              final category = _categories[index];
-              return _categoryTile(category, dark);
-            },
+            itemBuilder: (context, index) => _categoryTile(_categories[index]),
           ),
-          const SizedBox(height: 21),
-          _recentFilesCard(dark, muted),
-          const SizedBox(height: 13),
-          _cloudCard(dark, muted),
-          const SizedBox(height: 12),
-          _privacyCard(dark, muted),
+          const SizedBox(height: 22),
+          _sectionHeading('Recent Files', 'See All', widget.onOpenFiles,
+            Icons.access_time_rounded),
           const SizedBox(height: 10),
+          _recentFilesCard(),
+          const SizedBox(height: 13),
+          _cloudCard(),
+          const SizedBox(height: 18),
           Row(children: [
-            Icon(Icons.sync_rounded, size: 13, color: muted),
+            Icon(Icons.sync_rounded, size: 13, color: _muted),
             const SizedBox(width: 6),
             Expanded(child: Text(
-              _updated == null ? (_error == null ? 'Waiting for device data' : 'Device storage data unavailable') :
-                'Updated ${TimeOfDay.fromDateTime(_updated!).format(context)} · Auto-refresh 30s',
-              maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: muted, fontSize: 9),
+              _updatedLabel(ratio),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: _muted, fontSize: 9),
             )),
             IconButton(
               visualDensity: VisualDensity.compact,
               tooltip: 'Refresh storage',
               onPressed: _loading ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded, size: 17),
+              icon: Icon(Icons.refresh_rounded, size: 17, color: _muted),
             ),
           ]),
         ],
@@ -181,178 +187,238 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
     );
   }
 
-  Widget _header(bool dark, Color muted) => Row(children: [
+  String _updatedLabel(double? ratio) {
+    if (_total == null) return _loading ? 'Updating device storage…' : 'Device storage data unavailable';
+    return 'Live device storage · Auto-refresh every 30 seconds';
+  }
+
+  Widget _header() => Row(children: [
     Container(
-      width: 42, height: 42,
+      width: 47,
+      height: 47,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [violet, Color(0xFF536DDB)]),
-        boxShadow: [BoxShadow(color: violet.withValues(alpha: dark ? .30 : .17), blurRadius: 17, offset: const Offset(0, 5))],
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFB18AFF), Color(0xFF6939E8), Color(0xFF3E64D9)],
+        ),
+        boxShadow: [BoxShadow(color: _violet.withValues(alpha: .28), blurRadius: 15, offset: const Offset(0, 5))],
       ),
-      child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 27),
+      child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 32),
     ),
-    const SizedBox(width: 11),
+    const SizedBox(width: 10),
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('AUREON', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 2.1)),
-      Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: muted, fontSize: 8, letterSpacing: 1.2, fontWeight: FontWeight.w700)),
+      Text('AUREON', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: .5)),
+      Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: _muted, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: .6)),
     ])),
-    _action(Icons.search_rounded, 'Search files', widget.onOpenFiles, dark),
-    const SizedBox(width: 5),
-    _action(Icons.notifications_none_rounded, 'Notifications', () {
+    _headerAction(Icons.search_rounded, 'Search files', widget.onOpenFiles),
+    _headerAction(Icons.notifications_none_rounded, 'Notifications', () {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You are all caught up.')),
       );
-    }, dark),
-    const SizedBox(width: 5),
-    _action(Icons.person_outline_rounded, 'Profile', widget.onOpenProfile, dark),
-    const SizedBox(width: 5),
-    _action(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, dark ? 'Light theme' : 'Dark theme',
-      () => widget.onThemeChanged(!dark), dark),
+    }, dot: true),
+    const SizedBox(width: 3),
+    GestureDetector(
+      onTap: widget.onOpenProfile,
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: const Color(0xFF5579D8),
+        child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+      ),
+    ),
   ]);
 
-  Widget _action(IconData icon, String tip, VoidCallback? tap, bool dark) => Material(
-    color: dark ? const Color(0xFF1A2540) : Colors.white,
-    shape: CircleBorder(side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
-    child: IconButton(tooltip: tip, onPressed: tap, icon: Icon(icon, size: 18),
-      constraints: const BoxConstraints.tightFor(width: 40, height: 40), padding: EdgeInsets.zero),
-  );
-
-  Widget _storageCard(bool dark, Color muted, double? used, double? ratio) {
-    final foreground = dark ? Colors.white : const Color(0xFF171D39);
-    final soft = dark ? const Color(0xFFC7C8E8) : const Color(0xFF52617D);
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(23),
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: dark ? const [Color(0xFF29234F), Color(0xFF202D55), Color(0xFF14263F)]
-            : const [Color(0xFFE9E5FF), Color(0xFFE2F1FF), Color(0xFFF8FBFF)]),
-        border: Border.all(color: dark ? const Color(0xFF514A83) : const Color(0xFFC9C5F0)),
-        boxShadow: [BoxShadow(color: violet.withValues(alpha: .10), blurRadius: 22, offset: const Offset(0, 8))],
+  Widget _headerAction(IconData icon, String tip, VoidCallback onTap, {bool dot = false}) =>
+    Stack(clipBehavior: Clip.none, children: [
+      IconButton(
+        onPressed: onTap,
+        tooltip: tip,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(icon, color: _ink, size: 24),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(Icons.phone_android_rounded, color: violet, size: 15),
-          const SizedBox(width: 7),
-          Text('DEVICE STORAGE', style: TextStyle(color: soft, fontSize: 9, letterSpacing: 1.15, fontWeight: FontWeight.w900)),
-          const Spacer(),
-          const Icon(Icons.circle, color: Color(0xFF55D6A3), size: 6),
-          const SizedBox(width: 5),
-          Text('LIVE', style: TextStyle(color: soft, fontSize: 9, letterSpacing: .8, fontWeight: FontWeight.w800)),
+      if (dot) Positioned(right: 7, top: 7, child: Container(
+        width: 8, height: 8,
+        decoration: const BoxDecoration(color: Color(0xFFFF455D), shape: BoxShape.circle),
+      )),
+    ]);
+
+  Widget _sectionHeading(String title, String action, VoidCallback onTap, IconData icon) =>
+    Row(children: [
+      Icon(icon, color: _ink, size: 19),
+      const SizedBox(width: 8),
+      Expanded(child: Text(title, style: TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w800))),
+      TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(foregroundColor: _violet, padding: const EdgeInsets.symmetric(horizontal: 3)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(action, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 3),
+          const Icon(Icons.arrow_forward_rounded, size: 16),
         ]),
-        const SizedBox(height: 13),
+      ),
+    ]);
+
+  Widget _storageCard(double? used, double? ratio) {
+    final cardColors = _dark
+      ? const [Color(0xFF20234D), Color(0xFF182B4B), Color(0xFF111E3B)]
+      : const [Color(0xFFFFFFFF), Color(0xFFF1F3FF), Color(0xFFE8F2FF)];
+    final soft = _dark ? const Color(0xFFC5C9E8) : const Color(0xFF65718E);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(17, 15, 17, 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: cardColors),
+        border: Border.all(color: _dark ? const Color(0xFF414A83) : const Color(0xFFDDE2F5)),
+        boxShadow: [BoxShadow(color: _violet.withValues(alpha: _dark ? .15 : .09), blurRadius: 22, offset: const Offset(0, 8))],
+      ),
+      child: Column(children: [
         Row(children: [
+          Icon(Icons.storage_rounded, color: _ink, size: 18),
+          const SizedBox(width: 7),
+          Expanded(child: Text('Storage Overview', style: TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w800))),
+          TextButton(
+            onPressed: widget.onOpenCloud,
+            style: TextButton.styleFrom(foregroundColor: _violet, padding: EdgeInsets.zero),
+            child: const Row(children: [Text('View Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)), SizedBox(width: 4), Icon(Icons.arrow_forward_rounded, size: 15)]),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          SizedBox(
+            width: 94, height: 94,
+            child: Stack(alignment: Alignment.center, children: [
+              SizedBox.expand(child: CircularProgressIndicator(
+                value: ratio,
+                strokeWidth: 9,
+                strokeCap: StrokeCap.round,
+                backgroundColor: _dark ? const Color(0xFF343B70) : const Color(0xFFDDE3F8),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4D8DF4)),
+              )),
+              Icon(Icons.storage_rounded, color: _dark ? const Color(0xFFD3D6FF) : const Color(0xFF202C5A), size: 31),
+            ]),
+          ),
+          const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(used == null ? '—' : _format(used),
+              style: TextStyle(color: _ink, fontSize: 29, fontWeight: FontWeight.w900, letterSpacing: -1)),
             Text('Used storage', style: TextStyle(color: soft, fontSize: 11)),
             const SizedBox(height: 3),
-            if (_loading && _total == null)
-              const SizedBox(width: 90, child: LinearProgressIndicator(minHeight: 3))
-            else
-              Text(used == null ? '—' : _format(used), style: TextStyle(color: foreground, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -.8)),
-            const SizedBox(height: 3),
-            Text(_total == null ? 'of device capacity' : 'of ${_format(_total!)} total', style: TextStyle(color: soft, fontSize: 10)),
+            Text(_total == null ? 'of device capacity' : 'of ${_format(_total!)} total',
+              style: TextStyle(color: soft, fontSize: 11)),
           ])),
-          SizedBox(width: 72, height: 72, child: Stack(alignment: Alignment.center, children: [
-            SizedBox.expand(child: CircularProgressIndicator(value: ratio, strokeWidth: 7, strokeCap: StrokeCap.round,
-              backgroundColor: dark ? const Color(0xFF424366) : const Color(0xFFD0D5EC),
-              valueColor: const AlwaysStoppedAnimation<Color>(violet))),
-            Text(ratio == null ? '—' : '${(ratio * 100).toStringAsFixed(0)}%',
-              style: TextStyle(color: foreground, fontSize: 17, fontWeight: FontWeight.w900)),
+          Container(width: 1, height: 57, color: _line),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_free == null ? '—' : _format(_free!),
+              style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w800)),
+            Text('Available', style: TextStyle(color: soft, fontSize: 11)),
           ])),
         ]),
-        const SizedBox(height: 13),
-        Container(height: 1, color: dark ? Colors.white.withValues(alpha: .12) : const Color(0xFFBFC8E3)),
-        const SizedBox(height: 10),
-        Row(children: [
-          Icon(Icons.check_circle_rounded, color: const Color(0xFF55D6A3), size: 14),
-          const SizedBox(width: 6),
-          Expanded(child: Text('Available space', style: TextStyle(color: soft, fontSize: 10))),
-          Text(_free == null ? '—' : _format(_free!), style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w800)),
-        ]),
-        if (_error != null && _total == null) ...[
-          const SizedBox(height: 7),
-          Text('Storage details unavailable on this device.', style: TextStyle(color: soft, fontSize: 10)),
-        ],
+        const SizedBox(height: 14),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: LinearProgressIndicator(
+            minHeight: 9,
+            value: ratio,
+            backgroundColor: _dark ? const Color(0xFF303A66) : const Color(0xFFD9E0F4),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9360F6)),
+          ),
+        ),
       ]),
     );
   }
 
-  Widget _categoryTile(_HomeCategory category, bool dark) {
-    final tile = dark ? const Color(0xFF131D32) : Colors.white;
+  Widget _categoryTile(_HomeCategory category) => Material(
+    color: _dark ? category.darkBackground : category.lightBackground,
+    borderRadius: BorderRadius.circular(19),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(19),
+      onTap: () => widget.onBrowseCategory(category.key),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: category.color.withValues(alpha: _dark ? .35 : .16)),
+          boxShadow: [BoxShadow(color: category.color.withValues(alpha: .07), blurRadius: 10, offset: const Offset(0, 3))],
+        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(category.icon, color: category.color, size: 29),
+          const SizedBox(height: 8),
+          Text(category.label, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: _dark ? Colors.white : const Color(0xFF17203C), fontSize: 10, fontWeight: FontWeight.w700)),
+        ]),
+      ),
+    ),
+  );
+
+  Widget _recentFilesCard() => Column(children: [
+    if (_recentFiles.isEmpty)
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(17),
+        decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
+        child: Row(children: [
+          Icon(Icons.history_rounded, color: _muted, size: 22),
+          const SizedBox(width: 10),
+          Expanded(child: Text('Files you open in AUREON will appear here.',
+            style: TextStyle(color: _muted, fontSize: 11))),
+        ]),
+      )
+    else
+      for (var i = 0; i < _recentFiles.length; i++) ...[
+        if (i > 0) const SizedBox(height: 7),
+        _recentFileRow(_recentFiles[i]),
+      ],
+  ]);
+
+  Widget _recentFileRow(AureonOperationRecord record) {
+    final name = record.itemName;
+    final dot = name.lastIndexOf('.');
+    final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+    final icon = _recentIcon(ext);
+    final path = record.sourceLocation;
+    final isImage = const {'jpg','jpeg','png','gif','webp','heic','bmp'}.contains(ext);
     return Material(
-      color: tile,
+      color: _surface,
       borderRadius: BorderRadius.circular(17),
       child: InkWell(
         borderRadius: BorderRadius.circular(17),
-        onTap: () => widget.onBrowseCategory(category.key),
+        onTap: widget.onOpenFiles,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75)),
-          ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Container(
-              width: 43, height: 43,
-              decoration: BoxDecoration(
-                color: category.background.withValues(alpha: dark ? .95 : .62),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: category.foreground.withValues(alpha: dark ? .10 : .07), blurRadius: 12)],
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 37, height: 37,
+                child: isImage && File(path).existsSync()
+                  ? Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fileIcon(icon))
+                  : _fileIcon(icon),
               ),
-              child: Icon(category.icon, color: category.foreground, size: 23),
             ),
-            const SizedBox(height: 7),
-            Text(category.label, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w700)),
+              Text(path, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: _muted, fontSize: 9)),
+            ])),
+            Icon(Icons.more_vert_rounded, color: _muted, size: 19),
           ]),
         ),
       ),
     );
   }
 
-  Widget _recentFilesCard(bool dark, Color muted) {
-    final surface = dark ? const Color(0xFF131D32) : Colors.white;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Expanded(child: Text('RECENT FILES', style: TextStyle(fontSize: 10, letterSpacing: 1.35, fontWeight: FontWeight.w900))),
-          Text('OPENED', style: TextStyle(color: muted, fontSize: 8, letterSpacing: .8, fontWeight: FontWeight.w800)),
-        ]),
-        const SizedBox(height: 10),
-        if (_recentFiles.isEmpty)
-          Row(children: [
-            Icon(Icons.history_rounded, color: muted, size: 19),
-            const SizedBox(width: 9),
-            Expanded(child: Text('Files you open in AUREON will appear here.', style: TextStyle(color: muted, fontSize: 10))),
-          ])
-        else
-          for (var i = 0; i < _recentFiles.length; i++) ...[
-            if (i > 0) Divider(height: 13, color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .55)),
-            Row(children: [
-              Container(width: 35, height: 35, decoration: BoxDecoration(
-                color: dark ? const Color(0xFF292443) : const Color(0xFFECE8FF), borderRadius: BorderRadius.circular(11)),
-                child: Icon(_recentIcon(_recentFiles[i].itemName), color: violet, size: 18)),
-              const SizedBox(width: 9),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_recentFiles[i].itemName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                Text(_recentFiles[i].sourceLocation, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: muted, fontSize: 9)),
-              ])),
-              Icon(Icons.more_horiz_rounded, color: muted, size: 18),
-            ]),
-          ],
-      ]),
-    );
-  }
+  Widget _fileIcon(IconData icon) => Container(
+    color: _dark ? const Color(0xFF29254E) : const Color(0xFFECE9FF),
+    child: Icon(icon, color: _violet, size: 21),
+  );
 
-  IconData _recentIcon(String name) {
-    final dot = name.lastIndexOf('.');
-    final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
-    if (const {'jpg','jpeg','png','gif','webp','heic'}.contains(ext)) return Icons.image_rounded;
+  IconData _recentIcon(String ext) {
+    if (const {'jpg','jpeg','png','gif','webp','heic','bmp'}.contains(ext)) return Icons.image_rounded;
     if (const {'mp4','mkv','mov','avi','webm'}.contains(ext)) return Icons.movie_rounded;
     if (const {'mp3','m4a','wav','flac','ogg'}.contains(ext)) return Icons.audio_file_rounded;
     if (ext == 'pdf') return Icons.picture_as_pdf_rounded;
@@ -360,47 +426,46 @@ class _AureonHomePageState extends State<AureonHomePage> with WidgetsBindingObse
     return Icons.insert_drive_file_rounded;
   }
 
-  Widget _cloudCard(bool dark, Color muted) => Container(
-    padding: const EdgeInsets.all(15),
-    decoration: BoxDecoration(color: dark ? const Color(0xFF131D32) : Colors.white,
-      borderRadius: BorderRadius.circular(19), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .75))),
-    child: Row(children: [
-      Container(width: 42, height: 42, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14),
-        gradient: const LinearGradient(colors: [violet, Color(0xFF536DDB)])),
-        child: const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 22)),
-      const SizedBox(width: 11),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('AUREON Cloud Pool', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 3),
-        Text('Unified storage · setup required', style: TextStyle(color: muted, fontSize: 10)),
-      ])),
-      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(color: dark ? const Color(0xFF40351E) : const Color(0xFFFFF1D5), borderRadius: BorderRadius.circular(30)),
-        child: const Text('IN SETUP', style: TextStyle(color: Color(0xFFE8B95E), fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: .5))),
-    ]),
-  );
-
-  Widget _privacyCard(bool dark, Color muted) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(color: dark ? const Color(0xFF102B2C) : const Color(0xFFEAF8F5),
-      borderRadius: BorderRadius.circular(16), border: Border.all(color: dark ? const Color(0xFF24504C) : const Color(0xFFCBE9E0))),
-    child: Row(children: [
-      const Icon(Icons.shield_moon_rounded, color: Color(0xFF55C9A3), size: 21),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Your space. Your control.', style: TextStyle(color: dark ? const Color(0xFFB7F1DE) : const Color(0xFF176A56), fontSize: 11, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text('Secure, unified file management.', style: TextStyle(color: muted, fontSize: 9)),
-      ])),
-    ]),
+  Widget _cloudCard() => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(20),
+    child: InkWell(
+      onTap: widget.onOpenCloud,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight,
+            colors: [Color(0xFF38209D), Color(0xFF6545E7), Color(0xFF3859D9)]),
+          boxShadow: [BoxShadow(color: _violet.withValues(alpha: .22), blurRadius: 18, offset: const Offset(0, 6))],
+        ),
+        child: Row(children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .13), shape: BoxShape.circle),
+            child: const Icon(Icons.cloud_sync_rounded, color: Colors.white, size: 27),
+          ),
+          const SizedBox(width: 11),
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Cloud Pool', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
+            SizedBox(height: 3),
+            Text('Connect your cloud accounts', style: TextStyle(color: Color(0xFFD9D3FF), fontSize: 10)),
+          ])),
+          const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 23),
+        ]),
+      ),
+    ),
   );
 }
 
 class _HomeCategory {
-  const _HomeCategory(this.label, this.key, this.icon, this.foreground, this.background);
+  const _HomeCategory(this.label, this.key, this.icon, this.color,
+      this.lightBackground, this.darkBackground);
   final String label;
   final String key;
   final IconData icon;
-  final Color foreground;
-  final Color background;
+  final Color color;
+  final Color lightBackground;
+  final Color darkBackground;
 }
