@@ -391,7 +391,7 @@ class _AureonHomePageState extends State<AureonHomePage>
               child: SizedBox(
                 width: 37, height: 37,
                 child: isImage && File(path).existsSync()
-                  ? Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fileIcon(icon))
+                  ? Image.file(File(path), fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _fileIcon(icon))
                   : _fileIcon(icon),
               ),
             ),
