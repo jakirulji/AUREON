@@ -105,7 +105,7 @@ class _AureonAppState extends State<AureonApp> {
     theme: ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: const Color(0xFFF4F7FB),
+      scaffoldBackgroundColor: const Color(0xFFF4F6FC),
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF6755D9),
         brightness: Brightness.light,
@@ -115,7 +115,7 @@ class _AureonAppState extends State<AureonApp> {
     darkTheme: ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: const Color(0xFF0B1020),
+      scaffoldBackgroundColor: const Color(0xFF090F20),
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF8B7CFF),
         brightness: Brightness.dark,
@@ -159,8 +159,14 @@ class _AureonHomeState extends State<AureonHome> {
       // First launch or temporary network issue; Account page offers sign-in.
     }
   }
-  static const labels = ['Home', 'Files', 'Cloud', 'Transfers', 'Account', 'Settings'];
-  static const icons = [Icons.home_outlined, Icons.folder_outlined, Icons.cloud_outlined, Icons.swap_vert, Icons.person_outline, Icons.settings_outlined];
+
+  static const labels = ['Home', 'Browse', 'Cloud', 'Settings'];
+  static const icons = [
+    Icons.home_outlined,
+    Icons.folder_outlined,
+    Icons.cloud_outlined,
+    Icons.settings_outlined,
+  ];
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
@@ -182,8 +188,12 @@ class _AureonHomeState extends State<AureonHome> {
         ])),
         bottomNavigationBar: wide ? null : NavigationBar(
           selectedIndex: selected,
-          onDestinationSelected: (value) => setState(() { selected = value; if (value == 1) _fileCategory = null; }),
-          destinations: List.generate(labels.length, (i) => NavigationDestination(icon: Icon(icons[i]), label: labels[i])),
+          onDestinationSelected: (value) => setState(() {
+            selected = value;
+            if (value == 1) _fileCategory = null;
+          }),
+          destinations: List.generate(labels.length,
+            (i) => NavigationDestination(icon: Icon(icons[i]), label: labels[i])),
         ),
       ),
     );
@@ -221,33 +231,94 @@ class _AureonHomeState extends State<AureonHome> {
               leading: Icon(icons[i], color: selected == i ? scheme.primary : scheme.onSurfaceVariant),
               title: Text(labels[i], style: TextStyle(fontSize: 13,
                 color: selected == i ? scheme.onPrimaryContainer : scheme.onSurface)),
-              onTap: () => setState(() { selected = i; if (i == 1) _fileCategory = null; }),
+              onTap: () => setState(() {
+                selected = i;
+                if (i == 1) _fileCategory = null;
+              }),
             ),
           ),
         const Spacer(),
         Divider(color: scheme.outlineVariant),
-        Material(
-          color: Colors.transparent,
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(
-              backgroundColor: scheme.secondaryContainer,
-              child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined,
-                color: scheme.primary),
-            ),
-            title: Text(_auth.currentUser?.email ?? 'Local profile',
-              style: const TextStyle(fontSize: 12)),
-            subtitle: Text(_auth.currentUser == null ? 'Not signed in' :
-              (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'),
-              style: const TextStyle(fontSize: 11)),
-            onTap: () => setState(() => selected = 4),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(
+            backgroundColor: scheme.secondaryContainer,
+            child: Icon(_auth.currentUser == null ? Icons.person_outline : Icons.verified_user_outlined,
+              color: scheme.primary),
           ),
+          title: Text(_auth.currentUser?.email ?? 'Local profile', style: const TextStyle(fontSize: 12)),
+          subtitle: Text(_auth.currentUser == null ? 'Not signed in' :
+            (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'),
+            style: const TextStyle(fontSize: 11)),
+          onTap: _openAccount,
         ),
       ]),
     );
   }
 
-  // Home provides live device storage metrics; Files remains the local file workspace.
+  void _openAccount() => Navigator.of(context).push(MaterialPageRoute<void>(
+    builder: (_) => Scaffold(
+      appBar: AppBar(title: const Text('AUREON Account')),
+      body: AureonAccountPage(auth: _auth),
+    ),
+  ));
+
+  void _openBackup() => Navigator.of(context).push(MaterialPageRoute<void>(
+    builder: (_) => Scaffold(
+      appBar: AppBar(title: const Text('Backup & Restore')),
+      body: AureonBackupPage(auth: _auth),
+    ),
+  ));
+
+  Widget _settingsPage() {
+    final dark = widget.themeMode == ThemeMode.dark;
+    final scheme = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 30),
+      children: [
+        Text('Settings', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 5),
+        Text('Personalize and manage your AUREON experience.',
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+        const SizedBox(height: 20),
+        Card(child: SwitchListTile(
+          secondary: Icon(dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, color: scheme.primary),
+          title: const Text('Dark appearance'),
+          subtitle: Text(dark ? 'Dark theme is enabled' : 'Light theme is enabled'),
+          value: dark,
+          onChanged: (value) => widget.onThemeChanged(value ? ThemeMode.dark : ThemeMode.light),
+        )),
+        const SizedBox(height: 10),
+        Card(child: ListTile(
+          leading: Icon(Icons.person_outline_rounded, color: scheme.primary),
+          title: const Text('AUREON Account'),
+          subtitle: const Text('Sign in and manage your account'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: _openAccount,
+        )),
+        Card(child: ListTile(
+          leading: Icon(Icons.backup_rounded, color: scheme.primary),
+          title: const Text('Backup & Restore'),
+          subtitle: const Text('Manage backup and recovery'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: _openBackup,
+        )),
+        Card(child: ListTile(
+          leading: Icon(Icons.swap_vert_rounded, color: scheme.primary),
+          title: const Text('Transfers'),
+          subtitle: const Text('View upload and download activity'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(
+              appBar: AppBar(title: Text('Transfers')),
+              body: AureonTransfersPage(),
+            ),
+          )),
+        )),
+      ],
+    );
+  }
+
   Widget _content(bool wide) {
     switch (selected) {
       case 0:
@@ -258,22 +329,21 @@ class _AureonHomeState extends State<AureonHome> {
             _fileCategory = category;
             selected = 1;
           }),
-          onOpenFiles: () => setState(() { _fileCategory = null; selected = 1; }),
-          onOpenProfile: () => setState(() => selected = 4),
+          onOpenFiles: () => setState(() {
+            _fileCategory = null;
+            selected = 1;
+          }),
+          onOpenProfile: () => setState(() => selected = 3),
+          onOpenCloud: () => setState(() => selected = 2),
         );
       case 1:
         return AureonFilesPage(initialCategory: _fileCategory);
       case 2:
         return const AureonVirtualFoldersPage();
       case 3:
-        return const AureonTransfersPage();
-      case 4:
-        return AureonAccountPage(auth: _auth);
-      case 5:
-        return AureonBackupPage(auth: _auth);
+        return _settingsPage();
       default:
-        return const Center(child: Text('Select a section from the navigation.'));
+        return const SizedBox.shrink();
     }
   }
 }
-
