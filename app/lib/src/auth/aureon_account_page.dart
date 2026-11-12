@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
