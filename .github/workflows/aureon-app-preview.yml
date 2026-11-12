@@ -84,7 +84,11 @@ jobs:
           kotlin_line = next((line.strip() for line in source.splitlines() if 'id("org.jetbrains.kotlin.android")' in line), None)
           if not agp_line or not kotlin_line:
               raise SystemExit("Could not determine Android Gradle Plugin/Kotlin versions from generated Flutter host.")
-          agp_version = agp_line.split('version "')[1].split('"')[0]
+          agp_version = "8.13.2"
+          source = source.replace(agp_line, re.sub(r'version ".*?"', f'version "{agp_version}"', agp_line), 1)
+          wrapper = root / "gradle" / "wrapper" / "gradle-wrapper.properties"
+          wrapper_text = wrapper.read_text()
+          wrapper.write_text(re.sub(r"distributionUrl=.*", "distributionUrl=https\\://downloads.gradle.org/distributions/gradle-8.13-all.zip", wrapper_text))
           # Room 2.8.5's KAPT metadata reader supports Kotlin metadata up to 2.3.
           # Flutter stable may generate a newer Kotlin plugin (2.4.x), which
           # makes Room annotation processing fail before Kotlin compilation.
