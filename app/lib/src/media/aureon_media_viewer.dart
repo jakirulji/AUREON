@@ -110,18 +110,19 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
   }
 
   Future<void> _pickSubtitle() async {
-    final result = await FilePicker.platform.pickFiles(
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['srt', 'ass', 'ssa', 'vtt', 'sub'],
     );
-    if (result == null || result.files.single.path == null) return;
+    if (files.isEmpty || files.single.path == null) return;
+    final subtitle = files.single;
     await _player.setSubtitleTrack(SubtitleTrack.uri(
-      Uri.file(result.files.single.path!).toString(),
-      title: result.files.single.name,
+      Uri.file(subtitle.path!).toString(),
+      title: subtitle.name,
     ));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Loaded subtitle: ${result.files.single.name}')),
+        SnackBar(content: Text('Loaded subtitle: ${subtitle.name}')),
       );
     }
   }
@@ -394,7 +395,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                               initialData: _player.state.duration,
                               builder: (context, durationSnapshot) {
                                 final duration = durationSnapshot.data ?? Duration.zero;
-                                final max = duration.inMilliseconds.toDouble().clamp(1, double.infinity);
+                                final max = duration.inMilliseconds.toDouble().clamp(1.0, double.infinity).toDouble();
                                 return Slider(
                                   value: position.inMilliseconds.toDouble().clamp(0, max).toDouble(),
                                   max: max,
@@ -426,7 +427,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
                               itemBuilder: (_) => [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0, 4.0]
                                   .map((speed) => PopupMenuItem(
                                     value: speed,
-                                    child: Text('${speed}×', style: const TextStyle(color: Colors.white)),
+                                    child: Text('$speed×', style: const TextStyle(color: Colors.white)),
                                   )).toList(),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
