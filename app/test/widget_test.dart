@@ -355,8 +355,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonHomePage), findsOneWidget);
-    expect(find.text('Everything, in one place.'), findsOneWidget);
-    expect(find.text('BROWSE CATEGORIES'), findsOneWidget);
+    expect(find.text('Browse Categories'), findsOneWidget);
     for (final category in ['Images', 'Videos', 'Audio', 'Documents', 'Downloads', 'APKs', 'Archives', 'Other']) {
       expect(find.text(category), findsOneWidget);
     }
