@@ -96,7 +96,7 @@ jobs:
           # Android storage spike toolchain until Room's processor supports it.
           kotlin_version = "2.3.10"
           pinned_kotlin_line = re.sub(r'version ".*?"', f'version "{kotlin_version}"', kotlin_line)
-          source = source.replace(agp_line, agp_line + f'\n    id("com.android.library") version "{agp_version}" apply false', 1)
+          source = source.replace(kotlin_line, f'    id("com.android.library") version "{agp_version}" apply false\n    ' + kotlin_line, 1)
           source = source.replace(kotlin_line, pinned_kotlin_line + f'\n    id("org.jetbrains.kotlin.kapt") version "{kotlin_version}" apply false', 1)
           source += '\ninclude(":aureon_storage")\nproject(":aureon_storage").projectDir = file("aureon_storage")\n'
           settings.write_text(source)
