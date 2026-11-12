@@ -203,17 +203,35 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.screenshot_monitor_outlined),
-            title: const Text('Capture current frame'),
-            onTap: () async {
+            leading: const Icon(Icons.volume_up_rounded),
+            title: const Text('Playback volume'),
+            subtitle: Text('${_player.state.volume.round()}%'),
+            onTap: () {
               Navigator.pop(sheetContext);
-              final bytes = await _player.screenshot();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(bytes == null ? 'Frame capture is unavailable.' :
-                    'Frame captured (${bytes.length} bytes).'),
-                ));
-              }
+              showModalBottomSheet<void>(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                    child: StreamBuilder<double>(
+                      stream: _player.stream.volume,
+                      initialData: _player.state.volume,
+                      builder: (context, snapshot) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Playback volume'),
+                          Slider(
+                            value: (snapshot.data ?? 100).clamp(0, 100).toDouble(),
+                            max: 100,
+                            onChanged: _player.setVolume,
+                          ),
+                          Text('${(snapshot.data ?? 100).round()}%'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
             },
           ),
         ]),
