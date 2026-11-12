@@ -239,7 +239,9 @@ class _AureonHomeState extends State<AureonHome> {
           ),
         const Spacer(),
         Divider(color: scheme.outlineVariant),
-        ListTile(
+        Material(
+          color: Colors.transparent,
+          child: ListTile(
           contentPadding: EdgeInsets.zero,
           leading: CircleAvatar(
             backgroundColor: scheme.secondaryContainer,
@@ -251,6 +253,7 @@ class _AureonHomeState extends State<AureonHome> {
             (_auth.currentUser!.emailVerified ? 'Verified account' : 'Verify email'),
             style: const TextStyle(fontSize: 11)),
           onTap: _openAccount,
+          ),
         ),
       ]),
     );
