@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "android-spike/storage/**"
+      - "android-spike/pigeon/**"
       - "packages/aureon_local_files/**"
       - "shared/aureon_contracts/**"
       - ".github/workflows/aureon-android-release.yml"
