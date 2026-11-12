@@ -366,7 +366,7 @@ void main() {
     await tester.tap(find.text('Home').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Files').first);
+    await tester.tap(find.text('Browse').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(AureonFilesPage), findsOneWidget);
