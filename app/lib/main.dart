@@ -309,7 +309,7 @@ class _AureonHomeState extends State<AureonHome> {
           subtitle: const Text('View upload and download activity'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => const Scaffold(
+            builder: (_) => Scaffold(
               appBar: AppBar(title: const Text('Transfers')),
               body: AureonTransfersPage(),
             ),
