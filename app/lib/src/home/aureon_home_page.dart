@@ -36,14 +36,14 @@ class _AureonHomePageState extends State<AureonHomePage>
 
   static const _violet = Color(0xFF8057F5);
   static const _categories = <_HomeCategory>[
-    _HomeCategory('Images', 'images', Icons.image_rounded, Color(0xFFE84CB7), Color(0xFFFFD9ED), Color(0xFF51214A)),
-    _HomeCategory('Videos', 'videos', Icons.movie_creation_rounded, Color(0xFF2875DF), Color(0xFFDCEBFF), Color(0xFF1C355C)),
-    _HomeCategory('Audio', 'audio', Icons.music_note_rounded, Color(0xFF079B70), Color(0xFFD7F7EB), Color(0xFF173F39)),
-    _HomeCategory('Documents', 'documents', Icons.description_rounded, Color(0xFF8050DF), Color(0xFFE9DFFF), Color(0xFF33265B)),
-    _HomeCategory('Downloads', 'downloads', Icons.download_rounded, Color(0xFF0AA878), Color(0xFFD8F7E9), Color(0xFF1B493C)),
-    _HomeCategory('APKs', 'apks', Icons.android_rounded, Color(0xFF9B5A16), Color(0xFFFFE8C8), Color(0xFF49351F)),
-    _HomeCategory('Archives', 'archives', Icons.inventory_2_rounded, Color(0xFF7650D8), Color(0xFFE9DFFF), Color(0xFF30254F)),
-    _HomeCategory('Other', 'other', Icons.folder_rounded, Color(0xFF2875D8), Color(0xFFDCEBFF), Color(0xFF20395E)),
+    _HomeCategory('Images', 'images', Color(0xFFE84CB7), Color(0xFFFFD9ED), Color(0xFF51214A)),
+    _HomeCategory('Videos', 'videos', Color(0xFF2875DF), Color(0xFFDCEBFF), Color(0xFF1C355C)),
+    _HomeCategory('Audio', 'audio', Color(0xFF079B70), Color(0xFFD7F7EB), Color(0xFF173F39)),
+    _HomeCategory('Documents', 'documents', Color(0xFF8050DF), Color(0xFFE9DFFF), Color(0xFF33265B)),
+    _HomeCategory('Downloads', 'downloads', Color(0xFF0AA878), Color(0xFFD8F7E9), Color(0xFF1B493C)),
+    _HomeCategory('APKs', 'apks', Color(0xFF9B5A16), Color(0xFFFFE8C8), Color(0xFF49351F)),
+    _HomeCategory('Archives', 'archives', Color(0xFF7650D8), Color(0xFFE9DFFF), Color(0xFF30254F)),
+    _HomeCategory('Other', 'other', Color(0xFF2875D8), Color(0xFFDCEBFF), Color(0xFF20395E)),
   ];
 
   bool get _dark => widget.isDarkMode;
@@ -189,71 +189,56 @@ class _AureonHomePageState extends State<AureonHomePage>
     return 'Live device storage · Auto-refresh every 30 seconds';
   }
 
-  Widget _header() => Stack(clipBehavior: Clip.none, children: [
-    Positioned(
-      top: -24,
-      right: 12,
-      child: IgnorePointer(
-        child: Container(
-          width: 205,
-          height: 78,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(100),
-            gradient: RadialGradient(
-              colors: [
-                const Color(0xFF7655F5).withValues(alpha: _dark ? .30 : .18),
-                const Color(0xFF4B8DFF).withValues(alpha: _dark ? .12 : .10),
-                Colors.transparent,
-              ],
+  Widget _header() => SizedBox(
+    height: 66,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: -28, right: -25, top: -24, bottom: -12,
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _HeaderWavePainter(dark: _dark),
+              child: const SizedBox.expand(),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7655F5).withValues(alpha: _dark ? .22 : .12),
-                blurRadius: 38,
-                spreadRadius: 7,
-              ),
-            ],
           ),
         ),
-      ),
-    ),
-    Row(children: [
-    Container(
-      width: 47,
-      height: 47,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFB18AFF), Color(0xFF6939E8), Color(0xFF3E64D9)],
+        Align(
+          alignment: Alignment.center,
+          child: Row(children: [
+            SizedBox(
+              width: 49, height: 49,
+              child: CustomPaint(painter: _AureonMarkPainter()),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('AUREON', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: .5)),
+                Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: _muted, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: .6)),
+              ],
+            )),
+            _headerAction(Icons.search_rounded, 'Search files', widget.onOpenFiles),
+            _headerAction(Icons.notifications_none_rounded, 'Notifications', () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('You are all caught up.')),
+              );
+            }, dot: true),
+            const SizedBox(width: 3),
+            GestureDetector(
+              onTap: widget.onOpenProfile,
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFF5579D8),
+                child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ]),
         ),
-        boxShadow: [BoxShadow(color: _violet.withValues(alpha: .28), blurRadius: 15, offset: const Offset(0, 5))],
-      ),
-      child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 32),
+      ],
     ),
-    const SizedBox(width: 10),
-    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('AUREON', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: .5)),
-      Text('YOUR DIGITAL UNIVERSE', style: TextStyle(color: _muted, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: .6)),
-    ])),
-    _headerAction(Icons.search_rounded, 'Search files', widget.onOpenFiles),
-    _headerAction(Icons.notifications_none_rounded, 'Notifications', () {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are all caught up.')),
-      );
-    }, dot: true),
-    const SizedBox(width: 3),
-    GestureDetector(
-      onTap: widget.onOpenProfile,
-      child: CircleAvatar(
-        radius: 18,
-        backgroundColor: const Color(0xFF5579D8),
-        child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-      ),
-    ),
-    ]),
-  ]);
+  );
 
   Widget _headerAction(IconData icon, String tip, VoidCallback onTap, {bool dot = false}) =>
     Stack(clipBehavior: Clip.none, children: [
@@ -357,40 +342,24 @@ class _AureonHomePageState extends State<AureonHomePage>
 
   Widget _categoryTile(_HomeCategory category) => Material(
     color: Colors.transparent,
-    borderRadius: BorderRadius.circular(19),
+    borderRadius: BorderRadius.circular(17),
     child: InkWell(
-      borderRadius: BorderRadius.circular(19),
+      borderRadius: BorderRadius.circular(17),
       onTap: () => widget.onBrowseCategory(category.key),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(19),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: _dark
-              ? [
-                  Color.alphaBlend(category.color.withValues(alpha: .17), category.darkBackground),
-                  category.darkBackground,
-                ]
-              : [
-                  Color.alphaBlend(Colors.white.withValues(alpha: .26), category.lightBackground),
-                  category.lightBackground,
-                ],
-          ),
-          border: Border.all(color: category.color.withValues(alpha: _dark ? .30 : .20)),
-          boxShadow: [
-            BoxShadow(
-              color: category.color.withValues(alpha: _dark ? .13 : .10),
-              blurRadius: 13,
-              spreadRadius: .3,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: _dark
+              ? Color.alphaBlend(category.color.withValues(alpha: .12), const Color(0xFF17213B))
+              : Color.alphaBlend(category.lightBackground.withValues(alpha: .62), Colors.white),
+          borderRadius: BorderRadius.circular(17),
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(category.icon, color: category.color, size: 29),
-          const SizedBox(height: 8),
+          SizedBox(
+            width: 39, height: 39,
+            child: CustomPaint(painter: _CategoryGlyphPainter(category.key, category.color)),
+          ),
+          const SizedBox(height: 7),
           Text(category.label, maxLines: 1, overflow: TextOverflow.ellipsis,
             style: TextStyle(color: _dark ? Colors.white : const Color(0xFF17203C), fontSize: 10, fontWeight: FontWeight.w700)),
         ]),
@@ -568,13 +537,169 @@ class _AureonHomePageState extends State<AureonHomePage>
   );
 }
 
+
 class _HomeCategory {
-  const _HomeCategory(this.label, this.key, this.icon, this.color,
+  const _HomeCategory(this.label, this.key, this.color,
       this.lightBackground, this.darkBackground);
   final String label;
   final String key;
-  final IconData icon;
   final Color color;
   final Color lightBackground;
   final Color darkBackground;
+}
+
+class _HeaderWavePainter extends CustomPainter {
+  const _HeaderWavePainter({required this.dark});
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final glow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.72, 0.42),
+        radius: 1.05,
+        colors: [
+          const Color(0xFF8057F5).withValues(alpha: dark ? .28 : .20),
+          const Color(0xFF438CFF).withValues(alpha: dark ? .15 : .12),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, glow);
+
+    final wave1 = Path()
+      ..moveTo(0, size.height * .68)
+      ..cubicTo(size.width * .20, size.height * .10, size.width * .43, size.height * 1.10, size.width * .68, size.height * .48)
+      ..cubicTo(size.width * .82, size.height * .12, size.width * .93, size.height * .20, size.width, size.height * .02);
+    final wave2 = Path()
+      ..moveTo(0, size.height * .88)
+      ..cubicTo(size.width * .22, size.height * .36, size.width * .43, size.height * 1.12, size.width * .70, size.height * .68)
+      ..cubicTo(size.width * .84, size.height * .42, size.width * .94, size.height * .44, size.width, size.height * .28);
+    final p1 = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.35
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF9878FF).withValues(alpha: dark ? .34 : .27);
+    final p2 = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .9
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF62A5FF).withValues(alpha: dark ? .28 : .22);
+    canvas.drawPath(wave1, p1);
+    canvas.drawPath(wave2, p2);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeaderWavePainter oldDelegate) => oldDelegate.dark != dark;
+}
+
+class _AureonMarkPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final shadow = Paint()
+      ..color = const Color(0xFF7554EF).withValues(alpha: .20)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9);
+    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width * .43, shadow);
+    final bg = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [Color(0xFFB18AFF), Color(0xFF6939E8), Color(0xFF3E64D9)],
+      ).createShader(rect);
+    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width * .46, bg);
+    final mark = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.1
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..color = Colors.white;
+    final path = Path()
+      ..moveTo(size.width * .22, size.height * .57)
+      ..cubicTo(size.width * .32, size.height * .28, size.width * .43, size.height * .28, size.width * .51, size.height * .50)
+      ..cubicTo(size.width * .61, size.height * .77, size.width * .73, size.height * .73, size.width * .80, size.height * .44)
+      ..moveTo(size.width * .22, size.height * .57)
+      ..cubicTo(size.width * .34, size.height * .80, size.width * .44, size.height * .75, size.width * .52, size.height * .51)
+      ..cubicTo(size.width * .61, size.height * .25, size.width * .73, size.height * .27, size.width * .80, size.height * .44);
+    canvas.drawPath(path, mark);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AureonMarkPainter oldDelegate) => false;
+}
+
+class _CategoryGlyphPainter extends CustomPainter {
+  const _CategoryGlyphPainter(this.kind, this.color);
+  final String kind;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.shortestSide;
+    final center = Offset(size.width / 2, size.height / 2);
+    final fill = Paint()..color = color.withValues(alpha: .14);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.35
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final solid = Paint()..color = color;
+    final r = Rect.fromCenter(center: center, width: s * .62, height: s * .62);
+
+    switch (kind) {
+      case 'images':
+        canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(8)), fill);
+        canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(8)), stroke);
+        canvas.drawCircle(Offset(center.dx + s*.12, center.dy - s*.12), s*.055, solid);
+        final p = Path()..moveTo(r.left+s*.06,r.bottom-s*.08)..lineTo(center.dx-s*.02,center.dy+s*.02)..lineTo(center.dx+s*.09,center.dy-s*.02)..lineTo(r.right-s*.05,r.bottom-s*.08);
+        canvas.drawPath(p, stroke);
+        break;
+      case 'videos':
+        canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(8)), fill);
+        canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(8)), stroke);
+        final play = Path()..moveTo(center.dx-s*.09,center.dy-s*.14)..lineTo(center.dx+s*.17,center.dy)..lineTo(center.dx-s*.09,center.dy+s*.14)..close();
+        canvas.drawPath(play, Paint()..color=color..style=PaintingStyle.fill);
+        break;
+      case 'audio':
+        final p = Path()..moveTo(center.dx-s*.27,center.dy-s*.04)..lineTo(center.dx-s*.12,center.dy-s*.04)..lineTo(center.dx+s*.02,center.dy-s*.22)..lineTo(center.dx+s*.02,center.dy+s*.22)..lineTo(center.dx-s*.12,center.dy+s*.04)..lineTo(center.dx-s*.27,center.dy+s*.04)..close();
+        canvas.drawPath(p, Paint()..color=color..style=PaintingStyle.fill);
+        canvas.drawArc(Rect.fromCircle(center:center,radius:s*.20), -0.9, 1.8, false, stroke);
+        canvas.drawArc(Rect.fromCircle(center:center,radius:s*.30), -0.9, 1.8, false, stroke);
+        break;
+      case 'documents':
+        final p = Path()..moveTo(r.left+s*.08,r.top)..lineTo(r.right-s*.17,r.top)..lineTo(r.right,r.top+s*.17)..lineTo(r.right,r.bottom)..lineTo(r.left,r.bottom)..lineTo(r.left,r.top+s*.08)..close();
+        canvas.drawPath(p, fill); canvas.drawPath(p, stroke);
+        for (var i=0;i<3;i++) { final y=r.top+s*(.25+i*.13); canvas.drawLine(Offset(r.left+s*.12,y),Offset(r.right-s*.12,y),stroke); }
+        break;
+      case 'downloads':
+        canvas.drawLine(Offset(center.dx, r.top),Offset(center.dx,center.dy+s*.10),stroke);
+        final arrow=Path()..moveTo(center.dx-s*.14,center.dy)..lineTo(center.dx,center.dy+s*.15)..lineTo(center.dx+s*.14,center.dy);
+        canvas.drawPath(arrow,stroke);
+        final tray=Path()..moveTo(r.left+s*.04,center.dy+s*.10)..lineTo(r.left+s*.04,r.bottom)..lineTo(r.right-s*.04,r.bottom)..lineTo(r.right-s*.04,center.dy+s*.10);
+        canvas.drawPath(tray,stroke);
+        break;
+      case 'apks':
+        final head=Rect.fromCenter(center:Offset(center.dx,center.dy-s*.14),width:s*.38,height:s*.27);
+        canvas.drawArc(head,3.14,3.14,false,stroke);
+        canvas.drawLine(Offset(center.dx-s*.19,center.dy-s*.14),Offset(center.dx-s*.19,center.dy+s*.22),stroke);
+        canvas.drawLine(Offset(center.dx+s*.19,center.dy-s*.14),Offset(center.dx+s*.19,center.dy+s*.22),stroke);
+        canvas.drawLine(Offset(center.dx-s*.19,center.dy+s*.22),Offset(center.dx+s*.19,center.dy+s*.22),stroke);
+        canvas.drawLine(Offset(center.dx-s*.12,center.dy-s*.30),Offset(center.dx-s*.20,center.dy-s*.39),stroke);
+        canvas.drawLine(Offset(center.dx+s*.12,center.dy-s*.30),Offset(center.dx+s*.20,center.dy-s*.39),stroke);
+        break;
+      case 'archives':
+        final box=RRect.fromRectAndRadius(r, const Radius.circular(5));
+        canvas.drawRRect(box,fill); canvas.drawRRect(box,stroke);
+        canvas.drawLine(Offset(r.left,center.dy-s*.08),Offset(r.right,center.dy-s*.08),stroke);
+        canvas.drawLine(Offset(center.dx-s*.11,center.dy+s*.04),Offset(center.dx+s*.11,center.dy+s*.04),stroke);
+        break;
+      default:
+        final folder=Path()..moveTo(r.left,r.top+s*.12)..lineTo(center.dx-s*.06,r.top+s*.12)..lineTo(center.dx+s*.04,r.top+s*.23)..lineTo(r.right,r.top+s*.23)..lineTo(r.right,r.bottom)..lineTo(r.left,r.bottom)..close();
+        canvas.drawPath(folder,fill); canvas.drawPath(folder,stroke);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryGlyphPainter oldDelegate) =>
+      oldDelegate.kind != kind || oldDelegate.color != color;
 }
