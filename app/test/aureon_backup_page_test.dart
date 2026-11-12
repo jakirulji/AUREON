@@ -15,6 +15,8 @@ void main() {
     await tester.pumpWidget(const AureonApp());
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Backup & Restore').first);
+    await tester.pumpAndSettle();
     expect(find.text('Recovery & backups'), findsOneWidget);
     expect(find.text('Generate five recovery keys'), findsOneWidget);
 
