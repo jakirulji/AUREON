@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:aureon/src/backup/aureon_metadata_store.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folder_store.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
