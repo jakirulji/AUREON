@@ -188,8 +188,8 @@ jobs:
         run: |
           APK="$RUNNER_TEMP/aureon-android/build/app/outputs/flutter-apk/app-release.apk"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          echo "Register this SHA-1 in the Google Auth Platform Android OAuth client for package com.aureon.backup:"
-          "$APKSIGNER" verify --print-certs "$APK" | grep -E "Signer #1 certificate SHA-1 digest:"
+          echo "Signing certificate details for package com.aureon.backup (register the SHA-1 in the Google Auth Platform Android OAuth client if needed):"
+          "$APKSIGNER" verify --print-certs "$APK" 2>&1
 
       - name: Upload signed release APK
         uses: actions/upload-artifact@v6
