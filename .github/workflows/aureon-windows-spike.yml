@@ -23,7 +23,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Configure CMake
         run: cmake -S windows-spike -B windows-spike/build -A x64
       - name: Build native adapter
