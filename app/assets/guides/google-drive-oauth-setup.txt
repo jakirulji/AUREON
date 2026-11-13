@@ -3,108 +3,138 @@ AUREON — GOOGLE DRIVE OAUTH SETUP & SECURITY GUIDE
 
 STATUS
 ------
-This is the one-time AUREON application-owner setup guide. Google Drive OAuth
-authorization, callback handling, token exchange/refresh and personal-Worker
-credential sync are NOT connected in the current app build yet. Do not treat
-these instructions as proof that Connect Google Drive is already working.
+Google Drive OAuth and Drive API calls are NOT implemented in the current app
+build. This guide records the approved zero-server-access design. Do not treat
+these instructions as proof that Connect Google Drive already works.
 
-ARCHITECTURE — WHICH CLOUD PROJECT DOES WHAT?
----------------------------------------------
-1. AUREON's Google Cloud project owns the Google Drive API enablement,
-   OAuth consent screen, app verification and Android/Windows OAuth client
-   registrations. This is one AUREON application configuration.
-2. Each AUREON user owns a separate Firebase project and Cloudflare
-   Worker/D1 backend. The user's personal Worker is the destination for that
-   user's encrypted provider credential vault and metadata.
-3. The central backend-recovery directory (when implemented) is only for
-   locating the user's personal backend. It must never store provider tokens,
-   passwords, file contents or vault plaintext.
-4. Users must never enter Google passwords, OTPs, backup codes or session
-   cookies into AUREON. Google login and consent happen on Google's own page.
-
-ONE-TIME AUREON APP OWNER SETUP
--------------------------------
-1. Open https://console.cloud.google.com/ using the Google account that owns
-   AUREON's application project.
-2. Select the AUREON Google Cloud project. Do not ask each end user to create
-   a separate Google Cloud project for Drive linking.
-3. Open APIs & Services > Library. Search for Google Drive API and enable it.
-4. Open Google Auth Platform > Branding. Configure the AUREON app name,
-   support email, app logo, developer contact email, homepage, privacy policy
-   and terms of service. Use domains owned and verifiable by the app owner.
-5. Open Google Auth Platform > Audience. Choose External for a public consumer
-   app. During development, add only approved test-user email addresses.
-6. Open Google Auth Platform > Data Access. Declare only the scopes that the
-   released feature actually uses. The initial product proposal is:
-     https://www.googleapis.com/auth/drive.readonly
-     https://www.googleapis.com/auth/drive.file
-   drive.readonly enables reading the existing Drive library; drive.file alone
-   is limited to files created/opened/shared with the app and does not provide
-   a full existing-Drive listing. If AUREON later edits arbitrary pre-existing
-   Drive files/folders, the broader drive scope may be required. Do not request
-   it until the feature and review path are approved.
-7. Open Google Auth Platform > Clients and create platform-specific clients:
-   - Android: select Android, enter the exact AUREON Android package name and
-     the SHA-1 signing certificate fingerprint for the release signing key.
-   - Windows: select Desktop app. Desktop native clients are public clients;
-     use Authorization Code + PKCE. Never treat a desktop client secret as a
-     confidential server secret.
-8. Save the generated client IDs in the AUREON project’s approved secure
-   configuration/release process. A client ID is not a password. Never commit
-   private signing keys, refresh tokens or any real client secret to Git.
-9. Test the consent flow with a dedicated test Google account. Confirm granted
-   scopes, account subject, cancellation, denied consent, expired access token,
-   refresh-token rotation and revoked-consent behavior.
-10. Before public release, complete Google's applicable OAuth verification.
-    Sensitive/restricted Drive scopes can require verification; restricted
-    scope data stored/transmitted by a server may trigger an independent
-    security-assessment requirement. Confirm the current Google policy before
-    production submission.
-
-RUNTIME FLOW — WHAT A USER WILL DO IN AUREON
---------------------------------------------
-1. The user signs into their AUREON Master Account.
-2. The user opens Cloud > Add provider > Google Drive.
-3. AUREON opens the system browser / supported Google authorization UI.
-4. The user selects a Google account and reviews the requested permissions.
-5. Google returns an authorization response to the registered native-app
-   callback. AUREON validates state and PKCE before accepting the result.
-6. AUREON identifies the provider account using Google's stable account
-   subject/identity, not display-name matching.
-7. The resulting refresh credential is encrypted and synchronized only to
-   that signed-in user's own Cloudflare Worker/D1 backend. It must not be sent
-   to a shared AUREON token database or another user's Worker.
-8. Short-lived access tokens are used only for provider API operations and
-   should remain in memory as much as possible. Refresh must handle rotation,
-   invalid_grant, revocation and provider throttling.
-9. If authorization is cancelled or expires, AUREON marks the provider as
-   requiring reauthorization. It must not delete local originals or queued
-   uploads.
-
-IMPORTANT: THE PERSONAL WORKER IS NOT THE GOOGLE OAUTH CLIENT
+SECURITY DECISION — GOOGLE DRIVE DATA MUST STAY ON THE DEVICE
 -------------------------------------------------------------
-The personal Worker stores that user's encrypted provider credential record
-and supports that user's vault restore. It is not where the user creates a
-Google OAuth consent screen or a new Google client ID. The callback/token
-exchange design must be implemented and security-reviewed before asking users
-to connect accounts. The exact callback transport must be fixed in code and
-must not accept an arbitrary callback URL supplied by a user.
+For the public multi-user release, Google Drive access must be performed by
+the native AUREON client on the user's device.
 
-WHAT USERS MUST NEVER DO
-------------------------
-- Never paste a Google password, OTP, backup code or session cookie into AUREON.
-- Never send refresh tokens, OAuth client secrets, Firebase service-account
-  JSON, Cloudflare API tokens, Worker root secrets or recovery keys in chat.
-- Never deploy a sample/Hello World Worker and assume it implements OAuth.
-- Never enable auto-upload by default or delete provider originals after upload.
+The following Google-derived material MUST NOT be sent to AUREON's central
+backend, a user's Cloudflare Worker/D1 database, analytics, crash reporting,
+or any other third-party server:
+- Google OAuth authorization codes, access tokens or refresh tokens.
+- Drive file contents, file names, file IDs, MIME types, parents, timestamps,
+  permissions, thumbnails, change tokens, or other Drive metadata.
+- AUREON indexes, folder maps, or sync records derived from Drive contents.
 
-OFFICIAL GOOGLE REFERENCES
---------------------------
-OAuth overview:
-https://developers.google.com/identity/protocols/oauth2
-Desktop OAuth + PKCE:
-https://developers.google.com/identity/protocols/oauth2/native-app
-Drive API scopes and verification:
+The Cloudflare Worker may continue to handle AUREON Master Account/backend
+functions, but it must not proxy Google Drive API calls, exchange Google auth
+codes, refresh Google tokens, or receive Google Drive data. Do not put Google
+credentials or Drive-derived metadata in the existing encrypted provider
+vault. Client-side encryption does not make sending restricted Drive data to
+a third-party server an approved exception.
+
+WHY THIS DESIGN
+---------------
+Google classifies https://www.googleapis.com/auth/drive and
+https://www.googleapis.com/auth/drive.readonly as Restricted scopes. Public
+apps requesting them still need Google's applicable OAuth verification.
+Google's security-assessment requirement applies when the app stores/transmits
+restricted data on servers or can access that data from/through a third-party
+server. Keeping all Drive operations and Drive-derived data on-device is
+intended to avoid that server-side assessment trigger; it does NOT remove
+Restricted Scope verification or guarantee Google's approval.
+
+PLATFORM FLOWS
+--------------
+Android:
+- Use Google's Android AuthorizationClient / supported Android authorization
+  APIs to request Drive authorization on-device.
+- Request the minimum runtime scope needed for the user's action. For AUREON's
+  full existing-Drive management requirement, the intended scope is:
+  https://www.googleapis.com/auth/drive
+- Obtain short-lived access tokens on-device and call Drive API directly.
+- Re-run AuthorizationClient.authorize() when needed; Google documents that
+  previously granted permissions can be reused without prompting while the
+  grant remains valid. Do not request offline server access or send an auth
+  code to a backend.
+- Do not persist Google refresh tokens. Keep access tokens in memory and use
+  the Google authorization client token cache/reauthorization behavior.
+- Associate the Android OAuth client with the exact package name and release
+  signing SHA-1 fingerprint.
+
+Windows (later platform):
+- Use the native Desktop app OAuth client and Google's installed-app flow with
+  the external system browser and PKCE.
+- Exchange the authorization code in the Windows client, never in a Worker.
+- Store any locally required credential material only in Windows-protected
+  local credential storage. Never sync it to AUREON's backend.
+- Confirm the current Google desktop-client policy and token lifecycle before
+  implementation; do not reuse a Web client secret in a desktop app.
+
+SCOPES AND USER REQUIREMENTS
+----------------------------
+- The user's requirement is to list and manage all existing Drive files, not
+  only files individually opened with AUREON.
+- drive.file is non-sensitive but is limited to files created/opened/shared
+  with the app; it does NOT satisfy full-library access on its own.
+- drive.readonly provides full-library read/download but cannot upload, edit,
+  move, rename or delete.
+- drive provides full-library read/write/manage access and is the intended
+  scope if all requested AUREON file-management actions remain in scope.
+- Do not request both drive and drive.readonly; drive already covers the
+  read/write operations. Do not request broader scopes for unrelated features.
+
+DATA AND CROSS-DEVICE BEHAVIOR
+------------------------------
+- Drive file content and Drive-derived metadata/indexes remain local to each
+  device.
+- AUREON Master Account sign-in does not silently transfer Google authorization
+  between devices. Each device obtains its own local Google authorization.
+- Do not promise automatic restoration of Google tokens on a new device.
+- A portable AUREON metadata backup may be exported/imported as a user-
+  controlled encrypted file. It must not be uploaded to the AUREON Worker.
+  Any future cloud sync of Drive-derived metadata requires a separate policy
+  review before implementation.
+- Google Drive originals must never be deleted automatically after upload.
+
+OWNER SETUP
+-----------
+1. Keep the AUREON Google Cloud project: aureon-7f612.
+2. Keep Google Drive API enabled.
+3. Keep OAuth app type External for a public consumer app.
+4. Keep the public homepage, privacy policy, terms, and authorized domain
+   accurate and accessible.
+5. In Data Access, declare only the scope actually used by the released build.
+   The intended full-access scope is https://www.googleapis.com/auth/drive.
+6. Android OAuth client: exact application ID plus the release signing SHA-1.
+7. Windows OAuth client: Desktop app type, created when Windows integration
+   is ready.
+8. Do not submit the app for verification until the real native OAuth flow,
+   Drive operations, disconnect/revoke behavior, and privacy disclosures are
+   implemented and demonstrable.
+
+RELEASE GATES — DO NOT SKIP
+---------------------------
+- Confirm Google accepts AUREON as a permitted Drive application type. The
+  product's backup/sync and file-management features must be demonstrated.
+- Complete the Restricted Scope verification for a public app.
+- Confirm with Google whether the final client-only implementation is outside
+  the annual third-party security-assessment requirement. Never assume this
+  exemption solely from architecture notes.
+- Provide a demo video showing user consent, full-Drive file listing and the
+  actual on-device data flow.
+- Update the Privacy Policy to describe the shipped behavior precisely and
+  satisfy Google's Limited Use requirements.
+- Test authorization denial, cancellation, revoked access, token expiry,
+  offline mode, multiple Google accounts, and device migration.
+
+OFFICIAL REFERENCES
+-------------------
+Restricted-scope verification:
+https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification
+
+Drive API scopes and permitted application types:
 https://developers.google.com/workspace/drive/api/guides/api-specific-auth
-OAuth production readiness and verification:
-https://developers.google.com/identity/protocols/oauth2/production-readiness/policy-compliance
+
+Android authorization and local token behavior:
+https://developer.android.com/identity/authorization
+
+Android AuthorizationClient reference:
+https://developers.google.com/android/reference/com/google/android/gms/auth/api/identity/AuthorizationClient
+
+OAuth client types:
+https://developers.google.com/identity/protocols/oauth2
