@@ -338,6 +338,7 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
       }
       final email = (identity['email'] as String).trim();
       final displayName = identity['displayName'] as String? ?? email;
+      if (!mounted) return;
       final accepted = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -371,7 +372,10 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
   Future<void> _loadFiles(String slotId, {String? pageToken}) async {
     final response = await _channel.invokeMapMethod<String, dynamic>(
       'listDriveFiles',
-      {'slotId': slotId, if (pageToken != null) 'pageToken': pageToken},
+      {
+        'slotId': slotId,
+        ...?(pageToken == null ? null : {'pageToken': pageToken}),
+      },
     );
     if (response == null || response['files'] is! List) {
       throw const FormatException('Google Drive returned an invalid file listing.');
