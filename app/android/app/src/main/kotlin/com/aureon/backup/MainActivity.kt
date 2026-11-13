@@ -195,6 +195,7 @@ class MainActivity : FlutterActivity() {
                     .appendQueryParameter("pageSize", "100")
                     .appendQueryParameter("orderBy", "name")
                     .appendQueryParameter("spaces", "drive")
+                    .appendQueryParameter("corpora", "allDrives")
                     .appendQueryParameter("supportsAllDrives", "true")
                     .appendQueryParameter("includeItemsFromAllDrives", "true")
                     .appendQueryParameter(
