@@ -456,7 +456,6 @@ export default {
         return json({ ready: configured && db?.ok === 1 }, configured && db?.ok === 1 ? 200 : 503);
       }
       const sensitive = url.pathname === "/v1/vault/envelope" || url.pathname === "/v1/vault/recovery/challenge" || url.pathname === "/v1/vault/recovery/rewrap";
-      const sensitive = url.pathname === "/v1/vault/envelope" || url.pathname === "/v1/vault/recovery/challenge" || url.pathname === "/v1/vault/recovery/rewrap";
       const identity = await authenticate(request, env, sensitive);
       if (url.pathname === "/v1/drive/slots" && request.method === "GET") {
         return await getDriveConnectionSlots(env, identity);
