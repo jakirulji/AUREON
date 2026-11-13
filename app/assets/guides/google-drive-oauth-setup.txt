@@ -42,7 +42,9 @@ PLATFORM FLOWS
 --------------
 Android:
 - Use Google's Android AuthorizationClient / supported Android authorization
-  APIs to request Drive authorization on-device.
+  APIs to request Drive authorization on-device. The current Android flow
+  explicitly requests the account picker so multiple Google accounts can be
+  connected to separate AUREON slots.
 - Request the minimum runtime scope needed for the user's action. For AUREON's
   full existing-Drive management requirement, the intended scope is:
   https://www.googleapis.com/auth/drive
