@@ -1,5 +1,6 @@
 .read migrations/0001_vault_recovery.sql
 .read migrations/0002_recovery_challenge_rate_limit_index.sql
+.read migrations/0003_drive_connection_slots.sql
 
 CREATE TEMP TABLE migration_assertions (
   assertion TEXT PRIMARY KEY,
@@ -21,6 +22,14 @@ FROM sqlite_master WHERE type = 'table' AND name = 'recovery_cooldowns';
 INSERT INTO migration_assertions
 SELECT 'security_audit_events table', COUNT(*) = 1
 FROM sqlite_master WHERE type = 'table' AND name = 'security_audit_events';
+
+INSERT INTO migration_assertions
+SELECT 'Drive connection slot table', COUNT(*) = 1
+FROM sqlite_master WHERE type = 'table' AND name = 'drive_connection_slots';
+
+INSERT INTO migration_assertions
+SELECT 'Drive connection slot owner/order index', COUNT(*) = 1
+FROM sqlite_master WHERE type = 'index' AND name = 'drive_connection_slots_user_order_idx';
 
 INSERT INTO migration_assertions
 SELECT 'challenge rate-limit index', COUNT(*) = 1
