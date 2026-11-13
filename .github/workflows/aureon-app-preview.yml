@@ -144,6 +144,14 @@ jobs:
             sleep $((attempt * 20))
           done
 
+      - name: Upload Android test APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: AUREON-Android-Test-APK
+          path: ${{ runner.temp }}/aureon-android/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Enable KVM access for Android emulator
         shell: bash
         run: |
@@ -291,43 +299,6 @@ jobs:
             throw "Expected AUREON executable was not produced: $releaseDir/aureon.exe"
           }
           Get-ChildItem $releaseDir -Recurse | Select-Object FullName, Length
-
-      - name: Package Windows preview ZIP
-        shell: pwsh
-        working-directory: ${{ runner.temp }}/aureon-windows
-        run: |
-          $releaseDir = Join-Path (Get-Location) "build/windows/x64/runner/Release"
-          $exe = Join-Path $releaseDir "aureon.exe"
-          $appPayload = Join-Path $releaseDir "data/app.so"
-          if (-not (Test-Path $exe)) { throw "AUREON executable is missing from the Windows release directory." }
-          if (-not (Test-Path $appPayload)) { throw "Flutter application payload data/app.so is missing from the Windows release directory." }
-          if ((Get-Item $exe).Length -lt 64KB) { throw "AUREON Windows launcher executable is unexpectedly small." }
-          if ((Get-Item $appPayload).Length -lt 1MB) { throw "Flutter application payload is unexpectedly small." }
-          $previewDir = Join-Path $env:RUNNER_TEMP "aureon-windows-preview"
-          New-Item -ItemType Directory -Force $previewDir | Out-Null
-          $zipPath = Join-Path $previewDir "AUREON-Windows-Preview.zip"
-          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-          Compress-Archive -Path (Join-Path $releaseDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-          try {
-            $entry = $archive.Entries | Where-Object { $_.FullName -ieq "aureon.exe" } | Select-Object -First 1
-            $payload = $archive.Entries | Where-Object { $_.FullName -ieq "data/app.so" } | Select-Object -First 1
-            if (-not $entry) { throw "Windows preview ZIP does not contain aureon.exe at its root." }
-            if ($entry.Length -lt 64KB) { throw "AUREON launcher executable inside the preview ZIP is unexpectedly small." }
-            if (-not $payload -or $payload.Length -lt 1MB) { throw "Windows preview ZIP does not contain a valid Flutter application payload." }
-          } finally {
-            $archive.Dispose()
-          }
-          Get-Item $zipPath | Select-Object FullName, Length
-
-      - name: Upload Windows preview ZIP
-        uses: actions/upload-artifact@v6
-        with:
-          name: AUREON-Windows-Preview-ZIP
-          path: ${{ runner.temp }}/aureon-windows-preview/AUREON-Windows-Preview.zip
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Build Windows installer EXE
         shell: pwsh
