@@ -78,18 +78,43 @@ SCOPES AND USER REQUIREMENTS
 - Do not request both drive and drive.readonly; drive already covers the
   read/write operations. Do not request broader scopes for unrelated features.
 
-DATA AND CROSS-DEVICE BEHAVIOR
-------------------------------
-- Drive file content and Drive-derived metadata/indexes remain local to each
-  device.
-- AUREON Master Account sign-in does not silently transfer Google authorization
-  between devices. Each device obtains its own local Google authorization.
-- Do not promise automatic restoration of Google tokens on a new device.
-- A portable AUREON metadata backup may be exported/imported as a user-
-  controlled encrypted file. It must not be uploaded to the AUREON Worker.
-  Any future cloud sync of Drive-derived metadata requires a separate policy
-  review before implementation.
-- Google Drive originals must never be deleted automatically after upload.
+MASTER ACCOUNT-ASSISTED RESTORATION
+-----------------------------------
+The Master Account should restore the setup workflow, not Google credentials
+or Drive data.
+
+Allowed Master Account backend data:
+- Stable connection-slot IDs created by AUREON.
+- User-entered labels such as "Personal Drive" or "Archive".
+- User-selected slot order and a configured/not-configured state.
+- These fields must be user-managed. Never fill them from Google Drive API
+  responses or Google account profile data without a separate policy review.
+
+Not allowed in the AUREON backend/Worker:
+- Google email addresses or Google account IDs.
+- OAuth grants, authorization codes, access tokens, or refresh tokens.
+- Drive file IDs/names/content, folder hierarchy, file-to-account mapping,
+  indexes, sync records, or any other Drive-derived metadata.
+
+New-device flow:
+1. User signs in to the same AUREON Master Account.
+2. AUREON restores the user-defined connection slots and labels.
+3. For each slot, AUREON asks the user to connect a Google account.
+4. Google's native authorization UI lets the user choose the account and
+   grant access on that device.
+5. The user confirms which restored slot the authorized account belongs to.
+6. AUREON scans that Drive locally and rebuilds its local index.
+
+This is guided reconnection, not silent token transfer. Each device obtains
+its own Google authorization. AUREON must not claim that a slot proves the
+same Google account has been reconnected.
+
+Drive-derived virtual folder structure, indexes, and file-to-account mappings
+remain local. To migrate them, provide a user-controlled encrypted
+export/import recovery package that the user transfers (for example, by USB
+or their own storage). Do NOT upload this package to the AUREON Worker.
+Client-side encryption alone is not an approved reason to sync this data to
+AUREON servers. Any future cloud sync requires separate written policy review.
 
 OWNER SETUP
 -----------
