@@ -120,6 +120,7 @@ class MainActivity : FlutterActivity() {
         }
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(DRIVE_SCOPE)))
+            .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
             .build()
         Identity.getAuthorizationClient(this)
             .authorize(request)
@@ -194,6 +195,8 @@ class MainActivity : FlutterActivity() {
                     .appendQueryParameter("pageSize", "100")
                     .appendQueryParameter("orderBy", "name")
                     .appendQueryParameter("spaces", "drive")
+                    .appendQueryParameter("supportsAllDrives", "true")
+                    .appendQueryParameter("includeItemsFromAllDrives", "true")
                     .appendQueryParameter(
                         "fields",
                         "nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,webViewLink)"
