@@ -9,9 +9,6 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -30,7 +27,6 @@ class MainActivity : FlutterActivity() {
     // the on-device token cache and can issue a fresh short-lived token later.
     private val driveTokens = ConcurrentHashMap<String, String>()
     private val ioExecutor = Executors.newSingleThreadExecutor()
-    private var authorizationLauncher: ActivityResultLauncher<IntentSenderRequest>? = null
     private var pendingDriveSlotId: String? = null
     private var pendingDriveResult: MethodChannel.Result? = null
 
@@ -38,29 +34,29 @@ class MainActivity : FlutterActivity() {
         private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
         private const val GOOGLE_DRIVE_ABOUT =
             "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress,displayName)"
+        private const val DRIVE_AUTHORIZATION_REQUEST_CODE = 7401
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        authorizationLauncher = registerForActivityResult(
-            ActivityResultContracts.StartIntentSenderForResult()
-        ) { activityResult ->
-            val slotId = pendingDriveSlotId
-            val result = pendingDriveResult
-            pendingDriveSlotId = null
-            pendingDriveResult = null
-            if (slotId == null || result == null) return@registerForActivityResult
-            if (activityResult.resultCode != Activity.RESULT_OK) {
-                result.error("AUTHORIZATION_CANCELLED", "Google Drive authorization was cancelled.", null)
-                return@registerForActivityResult
-            }
-            try {
-                val authorization = Identity.getAuthorizationClient(this)
-                    .getAuthorizationResultFromIntent(activityResult.data)
-                completeDriveAuthorization(slotId, authorization, result)
-            } catch (error: Exception) {
-                result.error("AUTHORIZATION_FAILED", safeMessage(error), null)
-            }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != DRIVE_AUTHORIZATION_REQUEST_CODE) return
+
+        val slotId = pendingDriveSlotId
+        val result = pendingDriveResult
+        pendingDriveSlotId = null
+        pendingDriveResult = null
+        if (slotId == null || result == null) return
+
+        if (resultCode != Activity.RESULT_OK) {
+            result.error("AUTHORIZATION_CANCELLED", "Google Drive authorization was cancelled.", null)
+            return
+        }
+        try {
+            val authorization = Identity.getAuthorizationClient(this)
+                .getAuthorizationResultFromIntent(data)
+            completeDriveAuthorization(slotId, authorization, result)
+        } catch (error: Exception) {
+            result.error("AUTHORIZATION_FAILED", safeMessage(error), null)
         }
     }
 
@@ -127,15 +123,20 @@ class MainActivity : FlutterActivity() {
             .addOnSuccessListener { authorization ->
                 if (authorization.hasResolution()) {
                     val pendingIntent = authorization.pendingIntent
-                    if (pendingIntent == null || authorizationLauncher == null) {
+                    if (pendingIntent == null) {
                         result.error("AUTHORIZATION_FAILED", "Google did not provide an authorization prompt.", null)
                         return@addOnSuccessListener
                     }
                     pendingDriveSlotId = slotId
                     pendingDriveResult = result
                     try {
-                        authorizationLauncher!!.launch(
-                            IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                        startIntentSenderForResult(
+                            pendingIntent.intentSender,
+                            DRIVE_AUTHORIZATION_REQUEST_CODE,
+                            null,
+                            0,
+                            0,
+                            0
                         )
                     } catch (error: Exception) {
                         pendingDriveSlotId = null
