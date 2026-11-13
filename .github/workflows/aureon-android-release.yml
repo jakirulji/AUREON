@@ -183,6 +183,14 @@ jobs:
           "$APKSIGNER" verify --verbose "$APK"
           echo "Signed APK verification passed."
 
+      - name: Print Android OAuth signing certificate fingerprint
+        shell: bash
+        run: |
+          APK="$RUNNER_TEMP/aureon-android/build/app/outputs/flutter-apk/app-release.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          echo "Register this SHA-1 in the Google Auth Platform Android OAuth client for package com.aureon.backup:"
+          "$APKSIGNER" verify --print-certs "$APK" | grep -E "Signer #1 certificate SHA-1 digest:"
+
       - name: Upload signed release APK
         uses: actions/upload-artifact@v6
         with:
