@@ -174,14 +174,6 @@ class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
         const Expanded(child: Text('Virtual folders', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
         IconButton(tooltip: 'Refresh', onPressed: _loading ? null : _refresh, icon: const Icon(Icons.refresh)),
         OutlinedButton.icon(
-          onPressed: _loading || widget.auth == null ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Scaffold(
-            appBar: AppBar(title: const Text('Google Drive connections')),
-            body: AureonGoogleDrivePage(auth: widget.auth!),
-          ))),
-          icon: const Icon(Icons.cloud_sync_outlined),
-          label: const Text('Google Drive accounts'),
-        ),
-        OutlinedButton.icon(
           onPressed: _loading ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AureonFolderOrganizerPage())),
           icon: const Icon(Icons.account_tree_outlined),
           label: const Text('Folder organizer'),
@@ -191,6 +183,18 @@ class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
       ]),
       const SizedBox(height: 6),
       const Text('One AUREON folder can organize references from multiple cloud accounts. Membership never changes the original cloud location.', style: TextStyle(color: Color(0xFF9AA8BD), fontSize: 12)),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: _loading || widget.auth == null ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Google Drive connections')),
+            body: AureonGoogleDrivePage(auth: widget.auth!),
+          ))),
+          icon: const Icon(Icons.cloud_sync_outlined),
+          label: const Text('Google Drive accounts'),
+        ),
+      ),
       const SizedBox(height: 12),
       Container(
         width: double.infinity,
