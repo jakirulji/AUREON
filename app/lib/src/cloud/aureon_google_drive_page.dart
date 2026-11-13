@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -207,6 +208,7 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
   final Map<String, String?> _nextPageTokens = {};
   bool _loading = true;
   bool _busy = false;
+  bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   String? _error;
 
   @override
@@ -423,7 +425,7 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
       const Text('Google Drive connections', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
       const SizedBox(height: 6),
       const Text(
-        'Your AUREON Master Account restores these named connection slots. On each device, connect the matching Google account again.',
+        'Your AUREON Master Account restores these named connection slots. Android can reconnect and browse Drive now; Windows support will follow.',
         style: TextStyle(color: Color(0xFF9AA8BD), fontSize: 12),
       ),
       const SizedBox(height: 12),
@@ -474,7 +476,7 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
         leading: Icon(account == null ? Icons.cloud_off_outlined : Icons.cloud_done_outlined,
           color: account == null ? null : const Color(0xFF64E6C2)),
         title: Text(slot.label),
-        subtitle: Text(account?.email ?? 'Not connected on this device'),
+        subtitle: Text(account?.email ?? (_isAndroid ? 'Not connected on this device' : 'Google Drive connection is Android-only for now')),
         trailing: PopupMenuButton<String>(
           onSelected: (action) {
             if (action == 'rename') _renameSlot(slot);
@@ -490,7 +492,7 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Row(children: [
               FilledButton.tonalIcon(
-                onPressed: _busy ? null : () => _connect(slot),
+                onPressed: _busy || !_isAndroid ? null : () => _connect(slot),
                 icon: const Icon(Icons.link),
                 label: Text(account == null ? 'Connect Google' : 'Reconnect'),
               ),
