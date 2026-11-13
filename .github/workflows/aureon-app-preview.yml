@@ -101,7 +101,7 @@ jobs:
           source += '\ninclude(":aureon_storage")\nproject(":aureon_storage").projectDir = file("aureon_storage")\n'
           settings.write_text(source)
           app_gradle = root / 'app' / 'build.gradle.kts'
-          app_gradle.write_text(app_gradle.read_text() + '\ndependencies { implementation(project(":aureon_storage")) }\n')
+          app_gradle.write_text(app_gradle.read_text() + '\ndependencies { implementation(project(":aureon_storage")); implementation("com.google.android.gms:play-services-auth:22.0.0") }\n')
           PY
       - name: Test native plugin Dart contract
         working-directory: packages/aureon_local_files
