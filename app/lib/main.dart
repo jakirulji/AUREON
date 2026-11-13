@@ -6,6 +6,7 @@ import 'package:aureon/src/home/aureon_home_page.dart';
 import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
+import 'package:aureon/src/cloud/aureon_google_drive_page.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'src/media/aureon_media_viewer.dart';
@@ -341,7 +342,7 @@ class _AureonHomeState extends State<AureonHome> {
       case 1:
         return AureonFilesPage(initialCategory: _fileCategory);
       case 2:
-        return const AureonVirtualFoldersPage();
+        return AureonVirtualFoldersPage(auth: _auth);
       case 3:
         return _settingsPage();
       default:
