@@ -340,10 +340,7 @@ class _AureonGoogleDrivePageState extends State<AureonGoogleDrivePage> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Confirm Google account'),
-          content: Text('Google selected:
-$email
-
-Connect this account to the AUREON slot "${slot.label}"? The email and Drive data remain on this device.'),
+          content: Text('Google selected:\n$email\n\nConnect this account to the AUREON slot "${slot.label}"? The email and Drive data remain on this device.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Not this account')),
             FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Confirm account')),
