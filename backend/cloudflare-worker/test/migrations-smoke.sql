@@ -31,6 +31,17 @@ INSERT INTO migration_assertions
 SELECT 'Drive connection slot owner/order index', COUNT(*) = 1
 FROM sqlite_master WHERE type = 'index' AND name = 'drive_connection_slots_user_order_idx';
 
+-- Slot IDs are scoped by Firebase UID; two users may choose the same ID.
+INSERT INTO drive_connection_slots
+  (user_id,slot_id,label,sort_order,created_at_ms,updated_at_ms)
+VALUES
+  ('user-a','slot_shared_123456789','Personal Drive',0,1800000000000,1800000000000),
+  ('user-b','slot_shared_123456789','Archive',0,1800000000000,1800000000000);
+
+INSERT INTO migration_assertions
+SELECT 'connection slots are isolated by owner UID', COUNT(*) = 2
+FROM drive_connection_slots WHERE slot_id='slot_shared_123456789';
+
 INSERT INTO migration_assertions
 SELECT 'challenge rate-limit index', COUNT(*) = 1
 FROM sqlite_master
