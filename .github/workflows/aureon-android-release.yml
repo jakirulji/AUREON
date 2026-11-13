@@ -103,7 +103,7 @@ jobs:
           settings.write_text(source)
           app_gradle = root / "app" / "build.gradle.kts"
           gradle = app_gradle.read_text()
-          gradle += '\n\ndependencies { implementation(project(":aureon_storage")) }\n'
+          gradle += '\n\ndependencies { implementation(project(":aureon_storage")); implementation("com.google.android.gms:play-services-auth:22.0.0") }\n'
           gradle += """
           android {
               signingConfigs {
