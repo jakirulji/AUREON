@@ -33,7 +33,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Virtual folders'), findsOneWidget);
-    expect(find.textContaining('live cloud account browsing'), findsOneWidget);
+    expect(find.textContaining('Connect Google Drive accounts to browse existing files'), findsOneWidget);
+    expect(find.text('Google Drive accounts'), findsOneWidget);
     expect(find.text('New folder'), findsOneWidget);
   });
 }
