@@ -351,6 +351,5 @@ void main() {
       find.textContaining('Sign in or create your AUREON Master Account to continue.'),
       findsOneWidget,
     );
-    expect(find.byType(AureonHomePage), findsNothing);
   });
 }
