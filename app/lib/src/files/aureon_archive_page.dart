@@ -65,6 +65,7 @@ class _AureonArchivePageState extends State<AureonArchivePage> {
     final baseName = p.basenameWithoutExtension(widget.archivePath);
     final destination = Directory(p.join(parent, '${baseName}_extracted'));
     if (await destination.exists()) {
+      if (!mounted) return;
       final proceed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
