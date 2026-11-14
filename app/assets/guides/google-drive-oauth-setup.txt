@@ -3,9 +3,12 @@ AUREON — GOOGLE DRIVE OAUTH SETUP & SECURITY GUIDE
 
 STATUS
 ------
-Google Drive OAuth and Drive API calls are NOT implemented in the current app
-build. This guide records the approved zero-server-access design. Do not treat
-these instructions as proof that Connect Google Drive already works.
+Android Google Drive OAuth and paginated file listing are implemented in the
+current feature branch. Upload/download, resumable transfer execution,
+background synchronization, and Windows Google OAuth are NOT implemented yet.
+This guide records the approved zero-server-access design. A successful CI
+build proves compilation and tests, not live Google OAuth approval or a
+production-ready transfer workflow.
 
 SECURITY DECISION — GOOGLE DRIVE DATA MUST STAY ON THE DEVICE
 -------------------------------------------------------------
