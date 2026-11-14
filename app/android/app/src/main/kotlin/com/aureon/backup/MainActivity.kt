@@ -3,6 +3,9 @@ package com.aureon.backup
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.provider.Settings
 import android.os.Bundle
 import com.aureon.storage.AureonStoragePlugin
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
@@ -21,6 +24,7 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
     private var openWithChannel: MethodChannel? = null
     private var driveChannel: MethodChannel? = null
+    private var networkAccessChannel: MethodChannel? = null
     private var pendingOpen: Map<String, String>? = null
 
     // Access tokens exist only in this process. Google Identity Services owns
@@ -71,6 +75,41 @@ class MainActivity : FlutterActivity() {
                 pendingOpen = null
             } else {
                 result.notImplemented()
+            }
+        }
+
+        networkAccessChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aureon/network_access")
+        networkAccessChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openAppSettings" -> {
+                    try {
+                        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:$packageName")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(settingsIntent)
+                        result.success(true)
+                    } catch (error: Exception) {
+                        result.error("SETTINGS_UNAVAILABLE", safeMessage(error), null)
+                    }
+                }
+                "getNetworkStatus" -> {
+                    try {
+                        val connectivity = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+                        val network = connectivity.activeNetwork
+                        val capabilities = network?.let { connectivity.getNetworkCapabilities(it) }
+                        result.success(mapOf(
+                            "connected" to (network != null),
+                            "hasInternet" to (capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true),
+                            "validated" to (capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true),
+                            "metered" to connectivity.isActiveNetworkMetered,
+                            "restrictBackgroundStatus" to connectivity.restrictBackgroundStatus
+                        ))
+                    } catch (error: Exception) {
+                        result.error("NETWORK_STATUS_UNAVAILABLE", safeMessage(error), null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
 
