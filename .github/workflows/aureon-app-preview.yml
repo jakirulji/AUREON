@@ -322,7 +322,7 @@ jobs:
           Get-Item $zipPath | Select-Object FullName, Length
 
       - name: Upload Windows preview ZIP
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: AUREON-Windows-Preview-ZIP
           path: ${{ runner.temp }}/aureon-windows-preview/AUREON-Windows-Preview.zip
@@ -383,7 +383,7 @@ jobs:
           Get-Item $installer | Select-Object FullName, Length
 
       - name: Upload Windows installer EXE
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: AUREON-Windows-Setup-EXE
           path: ${{ runner.temp }}/aureon-windows-installer/AUREON-Setup-*.exe
