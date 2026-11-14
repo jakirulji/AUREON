@@ -4,9 +4,10 @@ import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
 
 class AureonAccountPage extends StatefulWidget {
-  const AureonAccountPage({super.key, required this.auth});
+  const AureonAccountPage({super.key, required this.auth, this.onAuthChanged});
 
   final AureonFirebaseAuthService auth;
+  final VoidCallback? onAuthChanged;
 
   @override
   State<AureonAccountPage> createState() => _AureonAccountPageState();
@@ -86,6 +87,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     setState(() => _busy = true);
     try {
       await action();
+      widget.onAuthChanged?.call();
     } catch (error) {
       if (mounted) {
         setState(() => _status = error.toString());
@@ -113,6 +115,14 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
               : 'Signed in as ${user.email}. AUREON Central Backend is connected. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
+        }
+      });
+
+  Future<void> _sendPasswordReset() => _run(() async {
+        final email = _email.text.trim();
+        await widget.auth.sendPasswordResetEmail(email: email);
+        if (mounted) {
+          setState(() => _status = 'If an AUREON account exists for $email, a password-reset email has been sent. Check your inbox and spam folder.');
         }
       });
 
@@ -223,6 +233,13 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           _field(_email, 'Email address', keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 10),
           _field(_password, 'Password', obscure: _obscure),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: widget.auth.isConfigured && !_busy ? _sendPasswordReset : null,
+              child: const Text('Forgot password?'),
+            ),
+          ),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
