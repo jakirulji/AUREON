@@ -83,10 +83,18 @@ class _AureonArchivePageState extends State<AureonArchivePage> {
 
     setState(() => _extracting = true);
     var extracted = 0;
+    var totalExpandedBytes = 0;
     try {
       for (final entry in archive) {
         if (entry.isSymbolicLink) continue;
-        final normalized = entry.name.replaceAll('\\\\', '/');
+        if (entry.size < 0 || entry.size > 1024 * 1024 * 1024) {
+          throw FormatException('Archive entry exceeds the 1 GB per-file safety limit: ${entry.name}');
+        }
+        totalExpandedBytes += entry.size;
+        if (totalExpandedBytes > 8 * 1024 * 1024 * 1024) {
+          throw const FormatException('Archive exceeds the 8 GB total extraction safety limit.');
+        }
+        final normalized = entry.name.replaceAll('\\', '/');
         final segments = normalized.split('/');
         if (normalized.startsWith('/') ||
             RegExp(r'^[A-Za-z]:').hasMatch(normalized) ||
