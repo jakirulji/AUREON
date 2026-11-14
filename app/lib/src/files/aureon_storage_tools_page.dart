@@ -58,7 +58,7 @@ class _AureonStorageToolsPageState extends State<AureonStorageToolsPage> {
         continue;
       }
       for (final entry in children) {
-        if (entry.name == '.AUREON Trash (AUREON)' || entry.name == 'Android') continue;
+        if (entry.name == '.AUREON Trash (AUREON)') continue;
         if (entry.isDirectory) {
           if (visited.add(entry.id)) queue.add((id: entry.id, depth: current.depth + 1));
         } else if ((entry.sizeBytes ?? 0) > 0) {
