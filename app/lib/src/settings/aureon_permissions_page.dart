@@ -34,22 +34,30 @@ class _AureonPermissionsPageState extends State<AureonPermissionsPage>
 
   Future<void> _refresh() async {
     if (!Platform.isAndroid) {
-      if (mounted) setState(() => _message = 'Android runtime permissions are not used on this platform.');
+      if (mounted) {
+        setState(() => _message = 'Android runtime permissions are not used on this platform.');
+      }
       return;
     }
     try {
       final status = await Permission.notification.status;
-      if (mounted) setState(() {
-        _notificationStatus = status;
-        _message = null;
-      });
+      if (mounted) {
+        setState(() {
+          _notificationStatus = status;
+          _message = null;
+        });
+      }
     } catch (error) {
-      if (mounted) setState(() => _message = 'Could not read permission status: $error');
+      if (mounted) {
+        setState(() => _message = 'Could not read permission status: $error');
+      }
     }
   }
 
   Future<void> _requestNotification() async {
-    if (!Platform.isAndroid || _busy) return;
+    if (!Platform.isAndroid || _busy) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       final status = await Permission.notification.request();
@@ -63,9 +71,13 @@ class _AureonPermissionsPageState extends State<AureonPermissionsPage>
                 : 'Notifications remain disabled. You can enable them at any time.';
       });
     } catch (error) {
-      if (mounted) setState(() => _message = 'Could not request notification permission: $error');
+      if (mounted) {
+        setState(() => _message = 'Could not request notification permission: $error');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -76,7 +88,9 @@ class _AureonPermissionsPageState extends State<AureonPermissionsPage>
         setState(() => _message = 'Android could not open AUREON App Info settings.');
       }
     } catch (error) {
-      if (mounted) setState(() => _message = 'Could not open Android settings: $error');
+      if (mounted) {
+        setState(() => _message = 'Could not open Android settings: $error');
+      }
     }
   }
 
