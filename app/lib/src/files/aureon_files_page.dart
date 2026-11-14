@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'aureon_operation_history.dart';
 import 'aureon_archive_page.dart';
+import 'aureon_storage_tools_page.dart';
 
 enum _FileSort { name, largest, newest, type }
 class AureonFilesPage extends StatefulWidget {
@@ -470,6 +471,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     await _load();
   }
 
+  Future<void> _openStorageTools() async {
+    final root = _root;
+    if (root == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => AureonStorageToolsPage(root: root, files: _files),
+    ));
+  }
+
   Future<void> _openHistory() async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => const AureonOperationHistoryPage(),
@@ -714,6 +723,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           IconButton(tooltip: 'AUREON setup guide', onPressed: _openSetupGuide, icon: const Icon(Icons.menu_book_outlined)),
           Expanded(child: Text(_activeCategory == null ? 'Files' : _categoryTitle(_activeCategory!), style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
           IconButton(tooltip: 'Operation history', onPressed: _openHistory, icon: const Icon(Icons.history)),
+          if (_root != null) IconButton(tooltip: 'Storage analyzer and duplicate finder', onPressed: _loading ? null : _openStorageTools, icon: const Icon(Icons.analytics_outlined)),
           if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
           OutlinedButton.icon(onPressed: _loading ? null : _choose,
             icon: const Icon(Icons.create_new_folder_outlined), label: Text(Platform.isAndroid ? 'Storage access' : 'Choose folder')),
