@@ -289,7 +289,7 @@ class AureonFirebaseAuthService {
     }
     final response = await _transport.post(
       _identityUri('accounts:signUp'),
-      body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
+      body: {'email': email.trim(), 'password': password, 'returnSecureToken': true},
     );
     final initialSession = await _sessionFromResponse(response);
     final profileResponse = await _transport.post(
@@ -312,7 +312,7 @@ class AureonFirebaseAuthService {
     _requireConfiguration();
     final response = await _transport.post(
       _identityUri('accounts:signInWithPassword'),
-      body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
+      body: {'email': email.trim(), 'password': password, 'returnSecureToken': true},
     );
     return _sessionFromResponse(response);
   }
