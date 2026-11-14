@@ -24,14 +24,6 @@ class AureonNetworkAccess {
       final response = await request.close().timeout(timeout);
       await response.drain<void>();
       return true;
-    } on SocketException {
-      return false;
-    } on HttpException {
-      return false;
-    } on HandshakeException {
-      return false;
-    } on TlsException {
-      return false;
     } on IOException {
       return false;
     } on Exception {
