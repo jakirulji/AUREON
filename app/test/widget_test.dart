@@ -5,7 +5,6 @@ import 'package:aureon/main.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
 import 'package:aureon/src/files/aureon_operation_history.dart';
-import 'package:aureon/src/home/aureon_home_page.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -342,37 +341,16 @@ void main() {
     expect(find.textContaining('Documents / notes-copy.txt'), findsOneWidget);
   });
 
-  testWidgets('AUREON opens the active local file manager on Home', (tester) async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'pickRoot') return null;
-      if (call.method == 'listChildren') return <Map<String, Object?>>[];
-      return null;
-    });
+  testWidgets('AUREON requires Master Account sign-in before opening Home', (tester) async {
     await tester.pumpWidget(const AureonApp());
-    // The app contains periodic/background activity, so settling every frame can
-    // time out even when the Home screen is ready. Pump the UI transitions only.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(AureonHomePage), findsOneWidget);
-    expect(find.text('Browse Categories'), findsOneWidget);
-    for (final category in ['Images', 'Videos', 'Audio', 'Documents', 'Downloads', 'APKs', 'Archives', 'Other']) {
-      expect(find.text(category), findsOneWidget);
-    }
-    await tester.tap(find.text('Videos').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(AureonFilesPage), findsOneWidget);
-    await tester.tap(find.text('Home').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Browse').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(AureonFilesPage), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(AureonHomePage), findsOneWidget);
+
+    expect(find.text('Welcome to AUREON'), findsOneWidget);
+    expect(
+      find.textContaining('Sign in or create your AUREON Master Account to continue.'),
+      findsOneWidget,
+    );
+    expect(find.byType(AureonHomePage), findsNothing);
   });
 }
