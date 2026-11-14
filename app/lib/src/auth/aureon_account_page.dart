@@ -389,17 +389,18 @@ class _AureonAccountPageState extends State<AureonAccountPage> with WidgetsBindi
                   alignment: Alignment.centerRight,
                   child: OutlinedButton.icon(
                     onPressed: _busy ? null : () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       try {
                         await AureonNetworkAccess.openAppSettings();
                       } on PlatformException catch (error) {
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             SnackBar(content: Text('Could not open app settings: ${error.message ?? error.code}')),
                           );
                         }
                       } on MissingPluginException {
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             const SnackBar(content: Text('App network settings are available on Android.')),
                           );
                         }
