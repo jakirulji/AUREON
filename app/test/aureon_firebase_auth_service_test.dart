@@ -74,6 +74,24 @@ void main() {
     expect(transport.calls.last.body['requestType'], 'VERIFY_EMAIL');
   });
 
+  test('password reset sends Firebase PASSWORD_RESET action for normalized email', () async {
+    transport.responses.add({'email': 'owner@example.com'});
+    await auth.sendPasswordResetEmail(email: ' owner@example.com ');
+    expect(transport.calls.single.uri.path, '/v1/accounts:sendOobCode');
+    expect(transport.calls.single.body, {
+      'requestType': 'PASSWORD_RESET',
+      'email': 'owner@example.com',
+    });
+  });
+
+  test('password reset rejects malformed email before contacting Firebase', () async {
+    await expectLater(
+      auth.sendPasswordResetEmail(email: 'not-an-email'),
+      throwsArgumentError,
+    );
+    expect(transport.calls, isEmpty);
+  });
+
   test('passwordless sign-in requests a Firebase email action link', () async {
     transport.responses.add({'email': 'owner@example.com'});
     await auth.sendPasswordlessSignInLink(email: ' owner@example.com ');
