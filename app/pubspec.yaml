@@ -8,6 +8,8 @@ dependencies:
   material_ui: ^1.11.0
   flutter:
     sdk: flutter
+  archive: ^4.7.1
+  path: ^1.9.1
   aureon_local_files:
     path: ../packages/aureon_local_files
   shared_preferences: ^2.5.3
