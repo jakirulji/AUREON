@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import '../network/aureon_network_access.dart';
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
 
@@ -13,7 +14,7 @@ class AureonAccountPage extends StatefulWidget {
   State<AureonAccountPage> createState() => _AureonAccountPageState();
 }
 
-class _AureonAccountPageState extends State<AureonAccountPage> {
+class _AureonAccountPageState extends State<AureonAccountPage> with WidgetsBindingObserver {
   final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -24,6 +25,9 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   bool _obscure = true;
   bool _duplicateEmail = false;
   String _status = 'Checking saved AUREON session…';
+  bool _networkUnavailable = false;
+  bool _networkCheckRunning = false;
+  bool _restoreInProgress = false;
 
   bool get _hasStrongPassword =>
       _password.text.length >= 8 &&
@@ -45,7 +49,76 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _email.addListener(_fieldChanged);
     _password.addListener(_fieldChanged);
     _confirmPassword.addListener(_fieldChanged);
-    _restore();
+    WidgetsBinding.instance.addObserver(this);
+    _checkNetworkAccess().then((reachable) {
+      if (reachable) {
+        _restore();
+      } else if (mounted) {
+        setState(() => _status = 'AUREON needs network access. Allow data for this app, then retry.');
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkNetworkAccess().then((reachable) {
+        if (reachable && mounted && widget.auth.currentUser == null) _restore();
+      });
+    }
+  }
+
+  Future<bool> _checkNetworkAccess() async {
+    if (_networkCheckRunning) return !_networkUnavailable;
+    _networkCheckRunning = true;
+    try {
+      final reachable = await AureonNetworkAccess.canReachFirebase();
+      if (mounted) setState(() => _networkUnavailable = !reachable);
+      return reachable;
+    } finally {
+      _networkCheckRunning = false;
+    }
+  }
+
+  Future<void> _showNetworkHelpDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('AUREON network access is blocked'),
+        content: const Text(
+          'AUREON cannot reach Firebase Authentication. Check this app’s Mobile data and Background data settings. If Data Saver is enabled, allow unrestricted data access for AUREON. Android requires you to change these switches manually.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Later'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await AureonNetworkAccess.openAppSettings();
+              } on PlatformException catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open app settings: ${error.message ?? error.code}')),
+                  );
+                }
+              } on MissingPluginException {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('App network settings are available on Android.')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('Open App Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _fieldChanged() {
@@ -59,6 +132,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     _password.dispose();
     _confirmPassword.dispose();
     _emailLink.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -83,6 +157,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   }
 
   Future<void> _restore() async {
+    if (_restoreInProgress) return;
+    _restoreInProgress = true;
     try {
       final profile = AureonBackendProfile.shared;
       if (!widget.auth.isConfigured) {
@@ -99,6 +175,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       }
     } catch (error) {
       if (mounted) setState(() => _status = 'AUREON connection needs attention: $error');
+    } finally {
+      _restoreInProgress = false;
     }
   }
 
@@ -108,23 +186,38 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     return bound;
   }
 
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _run(
+    Future<void> Function() action, {
+    bool requiresNetwork = true,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      if (requiresNetwork && !await _checkNetworkAccess()) {
+        await _showNetworkHelpDialog();
+        return;
+      }
       await action();
       widget.onAuthChanged?.call();
     } catch (error) {
       if (mounted) {
         final duplicateEmail = error is AureonFirebaseAuthException &&
             error.code.startsWith('EMAIL_EXISTS');
+        final networkFailure = error.toString().contains('SocketException') ||
+            error.toString().contains('Failed host lookup') ||
+            error.toString().contains('Connection timed out');
         setState(() {
           _duplicateEmail = duplicateEmail;
+          _networkUnavailable = networkFailure || _networkUnavailable;
           _status = duplicateEmail
               ? 'Already registered with this email, please'
-              : error.toString();
+              : networkFailure
+                  ? 'AUREON cannot reach Firebase. Check this app’s data access in Android Settings.'
+                  : error.toString();
         });
-        if (!duplicateEmail) {
+        if (networkFailure) {
+          await _showNetworkHelpDialog();
+        } else if (!duplicateEmail) {
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(error.toString())));
         }
@@ -267,6 +360,58 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           'One AUREON identity for your linked cloud accounts, encrypted vault and device sessions.',
           style: TextStyle(color: Color(0xFF9AA8BD)),
         ),
+        if (_networkUnavailable) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3A2028),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF8A4654)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(children: [
+                  Icon(Icons.wifi_off_rounded, color: Color(0xFFFFA6AE)),
+                  SizedBox(width: 9),
+                  Expanded(child: Text('Network access needs attention',
+                    style: TextStyle(fontWeight: FontWeight.w700))),
+                ]),
+                const SizedBox(height: 7),
+                const Text(
+                  'AUREON cannot reach Firebase. Allow Mobile data and Background data for AUREON in Android App Settings. Return here and the app will check again.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFD7C2C7)),
+                ),
+                const SizedBox(height: 9),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : () async {
+                      try {
+                        await AureonNetworkAccess.openAppSettings();
+                      } on PlatformException catch (error) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Could not open app settings: ${error.message ?? error.code}')),
+                          );
+                        }
+                      } on MissingPluginException {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('App network settings are available on Android.')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('Open App Settings'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         const SizedBox(height: 10),
         _notice(Icons.cloud_done_outlined, 'AUREON Central Backend', 'Securely connected to the official AUREON Firebase and Cloudflare services. No backend setup is required.'),
@@ -477,7 +622,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
                 : () => _run(() async {
                       await widget.auth.signOut();
                       if (mounted) setState(() => _status = 'Signed out locally on this device. Firebase server-side refresh-token revocation is not performed by this action.');
-                    }),
+                    }, requiresNetwork: false),
             icon: const Icon(Icons.logout),
             label: const Text('Sign out'),
           ),
