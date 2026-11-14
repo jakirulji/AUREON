@@ -91,20 +91,23 @@ class AureonIoFirebaseAuthTransport implements AureonFirebaseAuthTransport {
       throw ArgumentError('Firebase Authentication must use HTTPS.');
     }
     final request = await _client.postUrl(uri).timeout(const Duration(seconds: 20));
+    // HttpClientRequest headers become immutable as soon as the body is
+    // written. Configure every header before writing either request body.
+    request.headers
+      ..contentType = formEncoded
+          ? ContentType('application', 'x-www-form-urlencoded', charset: 'utf-8')
+          : ContentType.json
+      ..set(HttpHeaders.acceptHeader, 'application/json')
+      ..set(HttpHeaders.cacheControlHeader, 'no-store');
+
     if (formEncoded) {
-      request.headers.contentType =
-          ContentType('application', 'x-www-form-urlencoded', charset: 'utf-8');
       request.write(body.entries
           .map((entry) =>
               '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value.toString())}')
           .join('&'));
     } else {
-      request.headers.contentType = ContentType.json;
       request.write(jsonEncode(body));
     }
-    request.headers
-      ..set(HttpHeaders.acceptHeader, 'application/json')
-      ..set(HttpHeaders.cacheControlHeader, 'no-store');
     final response = await request.close().timeout(const Duration(seconds: 30));
     final bytes = await response.fold<List<int>>(
       <int>[],
