@@ -103,7 +103,7 @@ jobs:
           settings.write_text(source)
           app_gradle = root / "app" / "build.gradle.kts"
           gradle = app_gradle.read_text()
-          gradle += '\n\ndependencies { implementation(project(":aureon_storage")) }\n'
+          gradle += '\n\ndependencies { implementation(project(":aureon_storage")); implementation("com.google.android.gms:play-services-auth:22.0.0") }\n'
           gradle += """
           android {
               signingConfigs {
@@ -188,8 +188,16 @@ jobs:
         run: |
           APK="$RUNNER_TEMP/aureon-android/build/app/outputs/flutter-apk/app-release.apk"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          echo "Register this SHA-1 in the Google Auth Platform Android OAuth client for package com.aureon.backup:"
-          "$APKSIGNER" verify --print-certs "$APK" | grep -E "Signer #1 certificate SHA-1 digest:"
+          echo "Android OAuth signing certificate details for package com.aureon.backup:"
+          CERT_INFO="$("$APKSIGNER" verify --print-certs "$APK")"
+          printf '%s\\n' "$CERT_INFO"
+          SHA1="$(printf '%s\\n' "$CERT_INFO" | sed -nE 's/.*SHA-1 digest:[[:space:]]*([[:xdigit:]:]+).*/\\1/p' | head -n 1)"
+          if [ -n "$SHA1" ]; then
+            echo "Register this SHA-1 in the Google Auth Platform Android OAuth client:"
+            echo "$SHA1"
+          else
+            echo "::warning::Could not parse the SHA-1 fingerprint from apksigner output; continuing because APK signature verification already passed."
+          fi
 
       - name: Upload signed release APK
         uses: actions/upload-artifact@v6

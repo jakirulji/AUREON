@@ -2,12 +2,15 @@ import 'package:aureon_contracts/aureon_contracts.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'aureon_virtual_folder_store.dart';
+import '../auth/aureon_firebase_auth_service.dart';
+import '../cloud/aureon_google_drive_page.dart';
 import '../backup/aureon_folder_organizer_page.dart';
 
 class AureonVirtualFoldersPage extends StatefulWidget {
-  const AureonVirtualFoldersPage({super.key, this.store});
+  const AureonVirtualFoldersPage({super.key, this.store, this.auth});
 
   final AureonVirtualFolderStore? store;
+  final AureonFirebaseAuthService? auth;
 
   @override
   State<AureonVirtualFoldersPage> createState() => _AureonVirtualFoldersPageState();
@@ -180,6 +183,18 @@ class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
       ]),
       const SizedBox(height: 6),
       const Text('One AUREON folder can organize references from multiple cloud accounts. Membership never changes the original cloud location.', style: TextStyle(color: Color(0xFF9AA8BD), fontSize: 12)),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: _loading || widget.auth == null ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Google Drive connections')),
+            body: AureonGoogleDrivePage(auth: widget.auth!),
+          ))),
+          icon: const Icon(Icons.cloud_sync_outlined),
+          label: const Text('Google Drive accounts'),
+        ),
+      ),
       const SizedBox(height: 12),
       Container(
         width: double.infinity,
@@ -188,7 +203,7 @@ class _AureonVirtualFoldersPageState extends State<AureonVirtualFoldersPage> {
         child: const Row(children: [
           Icon(Icons.info_outline, color: Color(0xFFFFD27A)),
           SizedBox(width: 10),
-          Expanded(child: Text('Prototype: live cloud account browsing and OAuth are not connected yet. You can create folders and register stable cloud-file references for contract testing.', style: TextStyle(color: Color(0xFFFFE4B0), fontSize: 12))),
+          Expanded(child: Text('Connect Google Drive accounts to browse existing files. OAuth tokens and Drive metadata remain on this device.', style: TextStyle(color: Color(0xFFFFE4B0), fontSize: 12))),
         ]),
       ),
       const SizedBox(height: 12),

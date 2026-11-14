@@ -14,12 +14,16 @@ class _FakeSecrets implements AureonAuthSecretStore {
 class _FakeTransport implements AureonFirebaseAuthTransport {
   final calls = <({Uri uri, Map<String, Object?> body, bool form})>[];
   final responses = <Map<String, Object?>>[];
+  Object? nextError;
   @override
   Future<Map<String, Object?>> post(Uri uri, {
     required Map<String, Object?> body,
     bool formEncoded = false,
   }) async {
     calls.add((uri: uri, body: body, form: formEncoded));
+    final error = nextError;
+    nextError = null;
+    if (error != null) throw error;
     if (responses.isEmpty) throw StateError('No fake Firebase response queued.');
     return responses.removeAt(0);
   }
@@ -65,13 +69,54 @@ void main() {
   test('create account requests email verification', () async {
     transport.responses
       ..add(signInResponse())
+      ..add(signInResponse())
       ..add({'email': 'owner@example.com'});
-    await auth.createAccount(email: 'owner@example.com', password: 'correct horse');
+    await auth.createAccount(
+      email: 'owner@example.com',
+      password: 'correct horse',
+      displayName: 'AureonUser',
+    );
     expect(transport.calls.map((call) => call.uri.path), [
       '/v1/accounts:signUp',
+      '/v1/accounts:update',
       '/v1/accounts:sendOobCode',
     ]);
+    expect(transport.calls[1].body['displayName'], 'AureonUser');
     expect(transport.calls.last.body['requestType'], 'VERIFY_EMAIL');
+  });
+
+  test('duplicate email registration preserves Firebase EMAIL_EXISTS code', () async {
+    transport.nextError = const AureonFirebaseAuthException(
+      'EMAIL_EXISTS',
+      'This email is already registered.',
+    );
+    await expectLater(
+      auth.createAccount(email: 'owner@example.com', password: 'correct horse', displayName: 'AureonUser'),
+      throwsA(isA<AureonFirebaseAuthException>().having(
+        (error) => error.code,
+        'code',
+        'EMAIL_EXISTS',
+      )),
+    );
+    expect(transport.calls.single.uri.path, '/v1/accounts:signUp');
+  });
+
+  test('password reset sends Firebase PASSWORD_RESET action for normalized email', () async {
+    transport.responses.add({'email': 'owner@example.com'});
+    await auth.sendPasswordResetEmail(email: ' owner@example.com ');
+    expect(transport.calls.single.uri.path, '/v1/accounts:sendOobCode');
+    expect(transport.calls.single.body, {
+      'requestType': 'PASSWORD_RESET',
+      'email': 'owner@example.com',
+    });
+  });
+
+  test('password reset rejects malformed email before contacting Firebase', () async {
+    await expectLater(
+      auth.sendPasswordResetEmail(email: 'not-an-email'),
+      throwsArgumentError,
+    );
+    expect(transport.calls, isEmpty);
   });
 
   test('passwordless sign-in requests a Firebase email action link', () async {

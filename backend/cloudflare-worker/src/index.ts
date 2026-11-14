@@ -367,6 +367,80 @@ async function recoverVault(request: Request, env: Env, identity: FirebaseIdenti
   }
   return json({ vaultId, generation: row.generation, deviceBoundEnvelope });
 }
+
+interface DriveConnectionSlot {
+  slotId: string;
+  label: string;
+  sortOrder: number;
+}
+const MAX_DRIVE_CONNECTION_SLOTS = 20;
+
+/** Only user-created labels and AUREON-generated slot IDs are accepted.
+ * Reject every extra field so Google account identities, tokens and Drive
+ * metadata cannot accidentally enter this registry.
+ */
+export function validateDriveConnectionSlots(input: unknown): DriveConnectionSlot[] {
+  if (!Array.isArray(input) || input.length > MAX_DRIVE_CONNECTION_SLOTS) {
+    throw new HttpError(400, "Drive connection slot count is invalid.");
+  }
+  const ids = new Set<string>();
+  const orders = new Set<number>();
+  return input.map((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new HttpError(400, "Invalid Drive connection slot.");
+    }
+    const slot = value as Record<string, unknown>;
+    const keys = Object.keys(slot).sort();
+    if (keys.join(",") !== "label,slotId,sortOrder") {
+      throw new HttpError(400, "Drive slots may contain only slotId, label and sortOrder.");
+    }
+    const slotId = requiredString(slot.slotId, "slotId", 64);
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(slotId) || ids.has(slotId)) {
+      throw new HttpError(400, "Drive connection slot ID is invalid or duplicated.");
+    }
+    const label = requiredString(slot.label, "slot label", 48).trim();
+    if (!label || label.length > 48) throw new HttpError(400, "Drive connection slot label is invalid.");
+    const sortOrder = slot.sortOrder;
+    if (!Number.isSafeInteger(sortOrder) || (sortOrder as number) < 0 ||
+        (sortOrder as number) >= MAX_DRIVE_CONNECTION_SLOTS || orders.has(sortOrder as number)) {
+      throw new HttpError(400, "Drive connection slot order is invalid or duplicated.");
+    }
+    ids.add(slotId);
+    orders.add(sortOrder as number);
+    return { slotId, label, sortOrder: sortOrder as number };
+  }).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+async function getDriveConnectionSlots(env: Env, identity: FirebaseIdentity): Promise<Response> {
+  const rows = await env.DB.prepare(
+    "SELECT slot_id,label,sort_order FROM drive_connection_slots WHERE user_id=? ORDER BY sort_order ASC,slot_id ASC"
+  ).bind(identity.uid).all<{ slot_id: string; label: string; sort_order: number }>();
+  return json({
+    slots: (rows.results ?? []).map((row) => ({
+      slotId: row.slot_id, label: row.label, sortOrder: row.sort_order,
+    })),
+  });
+}
+
+async function replaceDriveConnectionSlots(
+  request: Request, env: Env, identity: FirebaseIdentity
+): Promise<Response> {
+  const body = await readJson(request);
+  const slots = validateDriveConnectionSlots(body.slots);
+  const now = Date.now();
+  const statements = [
+    env.DB.prepare("DELETE FROM drive_connection_slots WHERE user_id=?").bind(identity.uid),
+    ...slots.map((slot) => env.DB.prepare(
+      "INSERT INTO drive_connection_slots (user_id,slot_id,label,sort_order,created_at_ms,updated_at_ms) VALUES (?,?,?,?,?,?)"
+    ).bind(identity.uid, slot.slotId, slot.label, slot.sortOrder, now, now)),
+  ];
+  const results = await env.DB.batch(statements);
+  if (results.length !== statements.length || results.some((item) => !item.success)) {
+    throw new HttpError(503, "Drive connection slots could not be saved.");
+  }
+  return json({ saved: slots.length });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -383,6 +457,12 @@ export default {
       }
       const sensitive = url.pathname === "/v1/vault/envelope" || url.pathname === "/v1/vault/recovery/challenge" || url.pathname === "/v1/vault/recovery/rewrap";
       const identity = await authenticate(request, env, sensitive);
+      if (url.pathname === "/v1/drive/slots" && request.method === "GET") {
+        return await getDriveConnectionSlots(env, identity);
+      }
+      if (url.pathname === "/v1/drive/slots" && request.method === "PUT") {
+        return await replaceDriveConnectionSlots(request, env, identity);
+      }
       if (url.pathname === "/v1/vault/envelope" && request.method === "POST") {
         const body = await readJson(request), vaultId = requiredString(body.vaultId, "vaultId");
         const generation = positiveInteger(body.generation, "generation"), dek = fromBase64Url(requiredString(body.dek, "dek", 128));

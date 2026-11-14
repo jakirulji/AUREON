@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Environment
+import android.os.PowerManager
+import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -69,6 +71,10 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
         when (call.method) {
             "hasAllFilesAccess" -> result.success(hasAllFilesAccess())
             "requestAllFilesAccess" -> requestAllFilesAccess(result)
+            "hasBatteryOptimizationExemption" -> result.success(hasBatteryOptimizationExemption())
+            "requestBatteryOptimizationExemption" -> requestBatteryOptimizationExemption(result)
+            "canInstallPackages" -> result.success(canInstallPackages())
+            "requestInstallPackagesAccess" -> requestInstallPackagesAccess(result)
             "defaultRoot" -> result.success(defaultRoot())
             "pickRoot" -> pickRoot(result)
             "listChildren" -> listChildren(call, result)
@@ -90,6 +96,67 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
     private fun hasAllFilesAccess(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager()
         else true
+
+    private fun hasBatteryOptimizationExemption(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val power = activityBinding?.activity?.getSystemService(Activity.POWER_SERVICE) as? PowerManager
+            ?: return false
+        return power.isIgnoringBatteryOptimizations(activityBinding?.activity?.packageName ?: return false)
+    }
+
+    private fun requestBatteryOptimizationExemption(result: MethodChannel.Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.error("no_activity", "AUREON needs an active screen to open battery settings.", null)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || hasBatteryOptimizationExemption()) {
+            result.success(true)
+            return
+        }
+        try {
+            activity.startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:${activity.packageName}")
+                }
+            )
+            result.success(true)
+        } catch (_: Exception) {
+            try {
+                activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                result.success(true)
+            } catch (error: Exception) {
+                result.error("battery_settings_unavailable", error.message ?: "Battery settings could not be opened.", null)
+            }
+        }
+    }
+
+    private fun canInstallPackages(): Boolean {
+        val activity = activityBinding?.activity ?: return false
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity.packageManager.canRequestPackageInstalls()
+    }
+
+    private fun requestInstallPackagesAccess(result: MethodChannel.Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.error("no_activity", "AUREON needs an active screen to open install settings.", null)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || canInstallPackages()) {
+            result.success(true)
+            return
+        }
+        try {
+            activity.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${activity.packageName}")
+                }
+            )
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("install_settings_unavailable", error.message ?: "Install permission settings could not be opened.", null)
+        }
+    }
 
     private fun requestAllFilesAccess(result: MethodChannel.Result) {
         if (hasAllFilesAccess()) {
@@ -491,6 +558,22 @@ class AureonLocalFilesPlugin : FlutterPlugin, ActivityAware,
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             val extension = file.extension.lowercase()
+            if (extension == "apk") {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.packageManager.canRequestPackageInstalls()) {
+                    activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${activity.packageName}")
+                    })
+                    result.error("install_permission_required", "Allow AUREON to install apps, then open this APK again.", null)
+                    return
+                }
+                val installer = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                activity.startActivity(installer)
+                result.success(null)
+                return
+            }
             val kind = when (extension) {
                 in VIDEO_EXTENSIONS -> "video"
                 in AUDIO_EXTENSIONS -> "audio"
