@@ -9,6 +9,7 @@ class AureonNetworkAccess {
 
   static const MethodChannel _channel = MethodChannel('aureon/network_access');
   static const String firebaseAuthHost = 'identitytoolkit.googleapis.com';
+  static bool get isAndroid => Platform.isAndroid;
 
   /// A response of any HTTP status (including 404) proves DNS, TLS and
   /// outbound HTTPS connectivity to Firebase Authentication are working.
