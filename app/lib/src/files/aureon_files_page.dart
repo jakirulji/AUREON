@@ -829,7 +829,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                             style: const TextStyle(fontWeight: FontWeight.w600))),
                             if (!categoryMode) PopupMenuButton<String>(padding: EdgeInsets.zero, iconSize: 19,
                               onSelected: (action) {
-                                if (action == 'details') _showDetails(e);\n                                if (action == 'rename') _rename(e);
+                                if (action == 'details') _showDetails(e);
+                                if (action == 'rename') _rename(e);
                                 if (action == 'copy' && !e.isDirectory) _copyFile(e);
                                 if (action == 'move_up' && _levels.length > 1) _moveToParent(e);
                                 if (action == 'trash') _moveToTrash(e);
@@ -863,7 +864,8 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   trailing: categoryMode ? null : PopupMenuButton<String>(
                     tooltip: 'Item actions',
                     onSelected: (action) {
-                      if (action == 'details') { _showDetails(e); }\n                      if (action == 'rename') { _rename(e); }
+                      if (action == 'details') { _showDetails(e); }
+                      if (action == 'rename') { _rename(e); }
                       if (action == 'copy' && !e.isDirectory) { _copyFile(e); }
                       if (action == 'move_up' && _levels.length > 1) { _moveToParent(e); }
                       if (action == 'trash') { _moveToTrash(e); }
