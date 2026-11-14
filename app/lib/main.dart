@@ -7,10 +7,13 @@ import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:material_ui/material_ui.dart';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'src/media/aureon_media_viewer.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'src/settings/aureon_permissions_page.dart';
 
 final GlobalKey<NavigatorState> _aureonNavigatorKey = GlobalKey<NavigatorState>();
 const MethodChannel _openWithChannel = MethodChannel('aureon/open_with');
@@ -152,6 +155,37 @@ class _AureonHomeState extends State<AureonHome> {
     super.initState();
     _auth.configureProfile(AureonBackendProfile.shared);
     _restoreSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requestNotificationPermissionOnFirstLaunch());
+  }
+
+  Future<void> _requestNotificationPermissionOnFirstLaunch() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('aureon.notification_permission_prompted.v1') == true) return;
+      final status = await Permission.notification.status;
+      if (status.isGranted) {
+        await prefs.setBool('aureon.notification_permission_prompted.v1', true);
+        return;
+      }
+      if (!mounted) return;
+      final shouldAsk = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Allow AUREON notifications?'),
+          content: const Text('Notifications can keep you informed about important AUREON activity, including transfer updates. You can change this permission later in Settings.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Not now')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Continue')),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      await prefs.setBool('aureon.notification_permission_prompted.v1', true);
+      if (shouldAsk == true) await Permission.notification.request();
+    } catch (_) {
+      // Permission prompts are best-effort; users can manage them in Settings.
+    }
   }
 
   Future<void> _restoreSession() async {
@@ -338,6 +372,18 @@ class _AureonHomeState extends State<AureonHome> {
           subtitle: const Text('Sign in and manage your account'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: _openAccount,
+        )),
+        Card(child: ListTile(
+          leading: Icon(Icons.security_rounded, color: scheme.primary),
+          title: const Text('App Permissions'),
+          subtitle: const Text('Review and manage notification access'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('App Permissions')),
+              body: const AureonPermissionsPage(),
+            ),
+          )),
         )),
         Card(child: ListTile(
           leading: Icon(Icons.backup_rounded, color: scheme.primary),
