@@ -628,6 +628,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   @override
   void initState() {
     super.initState();
+    _username.addListener(_passwordChanged);
+    _email.addListener(_passwordChanged);
     _password.addListener(_passwordChanged);
     _confirmPassword.addListener(_passwordChanged);
     _restore();
