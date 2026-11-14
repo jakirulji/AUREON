@@ -141,6 +141,7 @@ class _AureonHomeState extends State<AureonHome> {
   final _auth = AureonFirebaseAuthService();
   int selected = 0;
   String? _fileCategory;
+  bool _authReady = false;
 
   @override
   void initState() {
@@ -154,11 +155,40 @@ class _AureonHomeState extends State<AureonHome> {
       await _auth.restoreSession();
       final user = await _auth.reloadUser();
       _auth.acceptBoundProfile(AureonBackendProfile.shared.bindToUid(user.localId));
-      if (mounted) setState(() {});
     } catch (_) {
-      // First launch or temporary network issue; Account page offers sign-in.
+      // No valid saved session: require the user to sign in before entering AUREON.
+    } finally {
+      if (mounted) setState(() => _authReady = true);
     }
   }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    setState(() {});
+    if (_auth.currentUser == null && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Widget _loginGate() => Scaffold(
+    body: SafeArea(
+      child: Column(children: [
+        const SizedBox(height: 34),
+        const Icon(Icons.all_inclusive, size: 48, color: Color(0xFF8B7CFF)),
+        const SizedBox(height: 10),
+        const Text('AUREON', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800, letterSpacing: 3)),
+        const SizedBox(height: 5),
+        const Text('YOUR DIGITAL UNIVERSE', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Color(0xFF9AA8BD))),
+        const SizedBox(height: 18),
+        const Text('Welcome to AUREON', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(28, 8, 28, 12),
+          child: Text('Sign in or create your AUREON Master Account to continue. Your local files stay on this device.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF9AA8BD), fontSize: 13)),
+        ),
+        Expanded(child: AureonAccountPage(auth: _auth, onAuthChanged: _onAuthChanged)),
+      ]),
+    ),
+  );
 
   static const labels = ['Home', 'Browse', 'Cloud', 'Settings'];
   static const icons = [
@@ -169,7 +199,12 @@ class _AureonHomeState extends State<AureonHome> {
   ];
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
+  Widget build(BuildContext context) {
+    if (!_authReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_auth.currentUser == null) return _loginGate();
+    return LayoutBuilder(builder: (context, constraints) {
     final wide = constraints.maxWidth >= 760;
     return PopScope<Object?>(
       canPop: selected == 0,
@@ -198,6 +233,7 @@ class _AureonHomeState extends State<AureonHome> {
       ),
     );
   });
+  }
 
   Widget _sidebar() {
     final scheme = Theme.of(context).colorScheme;
@@ -262,7 +298,7 @@ class _AureonHomeState extends State<AureonHome> {
   void _openAccount() => Navigator.of(context).push(MaterialPageRoute<void>(
     builder: (_) => Scaffold(
       appBar: AppBar(title: const Text('AUREON Account')),
-      body: AureonAccountPage(auth: _auth),
+      body: AureonAccountPage(auth: _auth, onAuthChanged: _onAuthChanged),
     ),
   ));
 
