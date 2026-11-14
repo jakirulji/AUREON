@@ -1,37 +1,139 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import '../network/aureon_network_access.dart';
 import 'aureon_firebase_auth_service.dart';
 import 'aureon_backend_profile.dart';
 
 class AureonAccountPage extends StatefulWidget {
-  const AureonAccountPage({super.key, required this.auth});
+  const AureonAccountPage({super.key, required this.auth, this.onAuthChanged});
 
   final AureonFirebaseAuthService auth;
+  final VoidCallback? onAuthChanged;
 
   @override
   State<AureonAccountPage> createState() => _AureonAccountPageState();
 }
 
-class _AureonAccountPageState extends State<AureonAccountPage> {
+class _AureonAccountPageState extends State<AureonAccountPage> with WidgetsBindingObserver {
+  final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   final _emailLink = TextEditingController();
   bool _busy = false;
   bool _createMode = false;
   bool _obscure = true;
+  bool _duplicateEmail = false;
   String _status = 'Checking saved AUREON session…';
+  bool _networkUnavailable = false;
+  bool _networkCheckRunning = false;
+  bool _restoreInProgress = false;
+
+  bool get _hasStrongPassword =>
+      _password.text.length >= 8 &&
+      RegExp(r'[A-Z]').hasMatch(_password.text) &&
+      RegExp(r'[a-z]').hasMatch(_password.text) &&
+      RegExp(r'[0-9]').hasMatch(_password.text) &&
+      RegExp(r'[^A-Za-z0-9]').hasMatch(_password.text);
+
+  bool get _passwordsMatch =>
+      _confirmPassword.text.isNotEmpty && _password.text == _confirmPassword.text;
+
+  bool get _validUsername =>
+      RegExp(r'^[A-Za-z0-9_]{3,24}$').hasMatch(_username.text.trim());
 
   @override
   void initState() {
     super.initState();
-    _restore();
+    _username.addListener(_fieldChanged);
+    _email.addListener(_fieldChanged);
+    _password.addListener(_fieldChanged);
+    _confirmPassword.addListener(_fieldChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _checkNetworkAccess().then((reachable) {
+      if (reachable) {
+        _restore();
+      } else if (mounted) {
+        setState(() => _status = 'AUREON cannot reach Firebase. Check your internet connection and this app’s data access.');
+        if (AureonNetworkAccess.isAndroid) _showNetworkHelpDialog();
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkNetworkAccess().then((reachable) {
+        if (reachable && mounted && widget.auth.currentUser == null) _restore();
+      });
+    }
+  }
+
+  Future<bool> _checkNetworkAccess() async {
+    if (_networkCheckRunning) return !_networkUnavailable;
+    _networkCheckRunning = true;
+    try {
+      final reachable = await AureonNetworkAccess.canReachFirebase();
+      if (mounted) setState(() => _networkUnavailable = !reachable);
+      return reachable;
+    } finally {
+      _networkCheckRunning = false;
+    }
+  }
+
+  Future<void> _showNetworkHelpDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('AUREON network access is blocked'),
+        content: const Text(
+          'AUREON cannot reach Firebase Authentication. Check that your phone has internet access, then check this app’s Mobile data and Background data settings. If Data Saver is enabled, allow unrestricted data access for AUREON. Android requires you to change these switches manually.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Later'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await AureonNetworkAccess.openAppSettings();
+              } on PlatformException catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open app settings: ${error.message ?? error.code}')),
+                  );
+                }
+              } on MissingPluginException {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('App network settings are available on Android.')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('Open App Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _fieldChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _username.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     _emailLink.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -56,6 +158,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   }
 
   Future<void> _restore() async {
+    if (_restoreInProgress) return;
+    _restoreInProgress = true;
     try {
       final profile = AureonBackendProfile.shared;
       if (!widget.auth.isConfigured) {
@@ -72,6 +176,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       }
     } catch (error) {
       if (mounted) setState(() => _status = 'AUREON connection needs attention: $error');
+    } finally {
+      _restoreInProgress = false;
     }
   }
 
@@ -81,16 +187,41 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
     return bound;
   }
 
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _run(
+    Future<void> Function() action, {
+    bool requiresNetwork = true,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      if (requiresNetwork && !await _checkNetworkAccess()) {
+        await _showNetworkHelpDialog();
+        return;
+      }
       await action();
+      widget.onAuthChanged?.call();
     } catch (error) {
       if (mounted) {
-        setState(() => _status = error.toString());
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+        final duplicateEmail = error is AureonFirebaseAuthException &&
+            error.code.startsWith('EMAIL_EXISTS');
+        final networkFailure = error.toString().contains('SocketException') ||
+            error.toString().contains('Failed host lookup') ||
+            error.toString().contains('Connection timed out');
+        setState(() {
+          _duplicateEmail = duplicateEmail;
+          _networkUnavailable = networkFailure || _networkUnavailable;
+          _status = duplicateEmail
+              ? 'Already registered with this email, please'
+              : networkFailure
+                  ? 'AUREON cannot reach Firebase. Check this app’s data access in Android Settings.'
+                  : error.toString();
+        });
+        if (networkFailure) {
+          await _showNetworkHelpDialog();
+        } else if (!duplicateEmail) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(error.toString())));
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -103,16 +234,40 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         if (email.isEmpty || password.isEmpty) {
           throw StateError('Enter both email and password.');
         }
-        _password.clear();
+        if (_createMode) {
+          if (!_validUsername) {
+            throw StateError('Username must be 3–24 characters and use only letters, numbers or underscore.');
+          }
+          if (!_hasStrongPassword) {
+            throw StateError('Complete every password requirement before creating your account.');
+          }
+          if (!_passwordsMatch) {
+            throw StateError('The two passwords do not match.');
+          }
+        }
         final session = _createMode
-            ? await widget.auth.createAccount(email: email, password: password)
+            ? await widget.auth.createAccount(
+                email: email,
+                password: password,
+                displayName: _username.text.trim(),
+              )
             : await widget.auth.signIn(email: email, password: password);
+        _password.clear();
+        _confirmPassword.clear();
         final user = await widget.auth.reloadUser();
         await _bindProfile(user.localId);
         if (mounted) {
           setState(() => _status = _createMode
               ? 'AUREON account created for ${session.user.email}. A verification email has been requested. Verify it, then tap Refresh verification status.'
               : 'Signed in as ${user.email}. AUREON Central Backend is connected. ${user.emailVerified ? "Email verified." : "Verify your email before cloud recovery."}');
+        }
+      });
+
+  Future<void> _sendPasswordReset() => _run(() async {
+        final email = _email.text.trim();
+        await widget.auth.sendPasswordResetEmail(email: email);
+        if (mounted) {
+          setState(() => _status = 'If an AUREON account exists for $email, a password-reset email has been sent. Check your inbox and spam folder.');
         }
       });
 
@@ -206,6 +361,59 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           'One AUREON identity for your linked cloud accounts, encrypted vault and device sessions.',
           style: TextStyle(color: Color(0xFF9AA8BD)),
         ),
+        if (_networkUnavailable) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3A2028),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF8A4654)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(children: [
+                  Icon(Icons.wifi_off_rounded, color: Color(0xFFFFA6AE)),
+                  SizedBox(width: 9),
+                  Expanded(child: Text('Network access needs attention',
+                    style: TextStyle(fontWeight: FontWeight.w700))),
+                ]),
+                const SizedBox(height: 7),
+                const Text(
+                  'AUREON cannot reach Firebase. Check your internet connection and allow Mobile data and Background data for AUREON in Android App Settings. Return here and the app will check again.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFD7C2C7)),
+                ),
+                const SizedBox(height: 9),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await AureonNetworkAccess.openAppSettings();
+                      } on PlatformException catch (error) {
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Could not open app settings: ${error.message ?? error.code}')),
+                          );
+                        }
+                      } on MissingPluginException {
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('App network settings are available on Android.')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('Open App Settings'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         const SizedBox(height: 10),
         _notice(Icons.cloud_done_outlined, 'AUREON Central Backend', 'Securely connected to the official AUREON Firebase and Cloudflare services. No backend setup is required.'),
@@ -220,61 +428,172 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
         const Text('Master Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
         if (user == null) ...[
-          _field(_email, 'Email address', keyboardType: TextInputType.emailAddress),
-          const SizedBox(height: 10),
-          _field(_password, 'Password', obscure: _obscure),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => setState(() => _obscure = !_obscure),
-              icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-              label: Text(_obscure ? 'Show password' : 'Hide password'),
+          if (_createMode) ...[
+            _field(_username, 'Username', keyboardType: TextInputType.name),
+            const SizedBox(height: 5),
+            const Text(
+              '3–24 characters. Letters, numbers and underscore only.',
+              style: TextStyle(fontSize: 11, color: Color(0xFF9AA8BD)),
             ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: widget.auth.isConfigured && !_busy
-                ? _sendPasswordlessLink
-                : null,
-            icon: const Icon(Icons.mark_email_read_outlined),
-            label: const Text('Send passwordless sign-in link'),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 12),
+          ],
           TextField(
-            controller: _emailLink,
-            minLines: 2,
-            maxLines: 4,
-            keyboardType: TextInputType.url,
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
             autocorrect: false,
             decoration: const InputDecoration(
-              labelText: 'Paste sign-in link from email',
-              helperText: 'Use the same email address above. The link is one-time and expires.',
+              labelText: 'Gmail / Email address',
+              hintText: 'example@gmail.com',
+              hintStyle: TextStyle(color: Color(0xFF66758D)),
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 8),
-          FilledButton.tonalIcon(
-            onPressed: widget.auth.isConfigured && !_busy
-                ? _completePasswordlessSignIn
-                : null,
-            icon: const Icon(Icons.login),
-            label: const Text('Complete passwordless sign-in'),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _password,
+            obscureText: _obscure,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: _createMode ? 'Create password' : 'Password',
+              border: const OutlineInputBorder(),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: _createMode && !_hasStrongPassword
+                      ? const Color(0xFFE05260)
+                      : const Color(0xFF66758D),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: _createMode && !_hasStrongPassword
+                      ? const Color(0xFFE05260)
+                      : const Color(0xFF64E6C2),
+                  width: 1.6,
+                ),
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _createMode,
-            onChanged: widget.auth.isConfigured && !_busy
-                ? (value) => setState(() => _createMode = value)
-                : null,
-            title: const Text('Create a new AUREON account'),
-            subtitle: const Text('Otherwise, sign in to an existing account.'),
-          ),
-          FilledButton.icon(
-            onPressed: widget.auth.isConfigured && !_busy ? _submit : null,
-            icon: Icon(_createMode ? Icons.person_add_alt_1 : Icons.login),
-            label: Text(_createMode ? 'Create account' : 'Sign in'),
-          ),
+          if (_createMode) ...[
+            const SizedBox(height: 10),
+            _passwordCriteria(),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _confirmPassword,
+              obscureText: _obscure,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: 'Confirm password',
+                errorText: _confirmPassword.text.isEmpty || _passwordsMatch
+                    ? null
+                    : 'Passwords do not match',
+                border: const OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _confirmPassword.text.isNotEmpty && !_passwordsMatch
+                        ? const Color(0xFFE05260)
+                        : const Color(0xFF66758D),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _confirmPassword.text.isNotEmpty && !_passwordsMatch
+                        ? const Color(0xFFE05260)
+                        : const Color(0xFF64E6C2),
+                    width: 1.6,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _busy ? null : () => setState(() {
+                  _createMode = false;
+                  _duplicateEmail = false;
+                  _password.clear();
+                  _confirmPassword.clear();
+                }),
+                child: const Text('Back to sign in'),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: widget.auth.isConfigured &&
+                      !_busy &&
+                      _validUsername &&
+                      _hasStrongPassword &&
+                      _passwordsMatch &&
+                      _email.text.trim().contains('@')
+                  ? _submit
+                  : null,
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Create AUREON account'),
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: widget.auth.isConfigured && !_busy
+                      ? _sendPasswordReset
+                      : null,
+                  child: const Text('Forgot password?'),
+                ),
+                TextButton(
+                  onPressed: widget.auth.isConfigured && !_busy
+                      ? () => setState(() {
+                          _createMode = true;
+                          _duplicateEmail = false;
+                          _status = 'Create your AUREON Master Account.';
+                        })
+                      : null,
+                  child: const Text('Create account'),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                label: Text(_obscure ? 'Show password' : 'Hide password'),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: widget.auth.isConfigured && !_busy ? _submit : null,
+              icon: const Icon(Icons.login),
+              label: const Text('Sign in'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: widget.auth.isConfigured && !_busy
+                  ? _sendPasswordlessLink
+                  : null,
+              icon: const Icon(Icons.mark_email_read_outlined),
+              label: const Text('Send passwordless sign-in link'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _emailLink,
+              minLines: 2,
+              maxLines: 4,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Paste sign-in link from email',
+                helperText: 'Use the same email address above. The link is one-time and expires.',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: widget.auth.isConfigured && !_busy
+                  ? _completePasswordlessSignIn
+                  : null,
+              icon: const Icon(Icons.login),
+              label: const Text('Complete passwordless sign-in'),
+            ),
+          ],
         ] else ...[
           _notice(
             user.emailVerified ? Icons.verified_user_outlined : Icons.mark_email_unread_outlined,
@@ -305,7 +624,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
                 : () => _run(() async {
                       await widget.auth.signOut();
                       if (mounted) setState(() => _status = 'Signed out locally on this device. Firebase server-side refresh-token revocation is not performed by this action.');
-                    }),
+                    }, requiresNetwork: false),
             icon: const Icon(Icons.logout),
             label: const Text('Sign out'),
           ),
@@ -323,7 +642,37 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             children: [
               const Icon(Icons.info_outline, color: Color(0xFF64E6C2)),
               const SizedBox(width: 10),
-              Expanded(child: Text(_status, style: const TextStyle(fontSize: 12))),
+              Expanded(
+                child: _duplicateEmail
+                    ? Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(_status, style: const TextStyle(fontSize: 12)),
+                          InkWell(
+                            onTap: _busy ? null : () => setState(() {
+                              _createMode = false;
+                              _duplicateEmail = false;
+                              _password.clear();
+                              _status = 'Sign in to your existing AUREON account.';
+                            }),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+                              child: Text(
+                                'login',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF8B7CFF),
+                                  decoration: TextDecoration.underline,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Text('.', style: TextStyle(fontSize: 12)),
+                        ],
+                      )
+                    : Text(_status, style: const TextStyle(fontSize: 12)),
+              ),
             ],
           ),
         ),
@@ -332,6 +681,63 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
           child: LinearProgressIndicator(),
         ),
       ],
+    );
+  }
+
+  Widget _passwordCriteria() {
+    final password = _password.text;
+    final checks = <({String label, bool valid})>[
+      (label: 'At least 8 characters', valid: password.length >= 8),
+      (label: 'One uppercase letter (A–Z)', valid: RegExp(r'[A-Z]').hasMatch(password)),
+      (label: 'One lowercase letter (a–z)', valid: RegExp(r'[a-z]').hasMatch(password)),
+      (label: 'One number (0–9)', valid: RegExp(r'[0-9]').hasMatch(password)),
+      (label: 'One special character (!@#…)', valid: RegExp(r'[^A-Za-z0-9]').hasMatch(password)),
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111A2E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _hasStrongPassword
+              ? const Color(0xFF64E6C2)
+              : const Color(0xFFE05260),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Password requirements',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          const SizedBox(height: 7),
+          for (final check in checks)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    check.valid ? Icons.check_circle : Icons.cancel,
+                    size: 15,
+                    color: check.valid
+                        ? const Color(0xFF64E6C2)
+                        : const Color(0xFFE05260),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    check.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: check.valid
+                          ? const Color(0xFF64E6C2)
+                          : const Color(0xFFE05260),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 

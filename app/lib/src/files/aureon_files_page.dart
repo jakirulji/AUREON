@@ -7,6 +7,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'aureon_operation_history.dart';
+import 'aureon_archive_page.dart';
+import 'aureon_storage_tools_page.dart';
 
 enum _FileSort { name, largest, newest, type }
 class AureonFilesPage extends StatefulWidget {
@@ -469,6 +471,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     await _load();
   }
 
+  Future<void> _openStorageTools() async {
+    final root = _root;
+    if (root == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => AureonStorageToolsPage(root: root, files: _files),
+    ));
+  }
+
   Future<void> _openHistory() async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => const AureonOperationHistoryPage(),
@@ -505,10 +515,48 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     ));
   }
 
+  Future<void> _showDetails(AureonLocalEntry entry) async {
+    final root = _root;
+    final location = entry.id;
+    final type = entry.isDirectory ? 'Folder' : (_ext(entry.name).isEmpty ? 'File' : '${_ext(entry.name).toUpperCase()} file');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('File details'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(entry.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              SelectableText('Type: $type'),
+              SelectableText('Size: ${entry.isDirectory ? '—' : _size(entry.sizeBytes)}'),
+              SelectableText('Modified: ${_modified(entry.modifiedEpochMs)}'),
+              SelectableText('Hidden: ${entry.isHidden ? 'Yes' : 'No'}'),
+              SelectableText('Location: ${root?.displayName ?? 'Storage'}'),
+              const SizedBox(height: 6),
+              const Text('Full path', style: TextStyle(fontWeight: FontWeight.w700)),
+              SelectableText(location, style: const TextStyle(fontSize: 12)),
+            ]),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+      ),
+    );
+  }
+
   Future<void> _openFile(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null || entry.isDirectory) return;
     final location = '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}';
+    final extension = _ext(entry.name);
+    if (extension == 'zip' || extension == 'tar') {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => AureonArchivePage(archivePath: entry.id),
+      ));
+      _recordHistory(kind: 'browse_archive', itemName: entry.name, sourceLocation: location, succeeded: true);
+      return;
+    }
     try {
       await _files.openFile(root: root, fileId: entry.id);
       _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: true);
@@ -705,6 +753,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
           IconButton(tooltip: 'AUREON setup guide', onPressed: _openSetupGuide, icon: const Icon(Icons.menu_book_outlined)),
           Expanded(child: Text(_activeCategory == null ? 'Files' : _categoryTitle(_activeCategory!), style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700))),
           IconButton(tooltip: 'Operation history', onPressed: _openHistory, icon: const Icon(Icons.history)),
+          if (_root != null) IconButton(tooltip: 'Storage analyzer and duplicate finder', onPressed: _loading ? null : _openStorageTools, icon: const Icon(Icons.analytics_outlined)),
           if (Platform.isAndroid && _root != null) IconButton(tooltip: 'AUREON Trash', onPressed: _loading ? null : _openTrash, icon: const Icon(Icons.delete_outline)),
           OutlinedButton.icon(onPressed: _loading ? null : _choose,
             icon: const Icon(Icons.create_new_folder_outlined), label: Text(Platform.isAndroid ? 'Storage access' : 'Choose folder')),
@@ -780,11 +829,13 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                             style: const TextStyle(fontWeight: FontWeight.w600))),
                             if (!categoryMode) PopupMenuButton<String>(padding: EdgeInsets.zero, iconSize: 19,
                               onSelected: (action) {
+                                if (action == 'details') _showDetails(e);
                                 if (action == 'rename') _rename(e);
                                 if (action == 'copy' && !e.isDirectory) _copyFile(e);
                                 if (action == 'move_up' && _levels.length > 1) _moveToParent(e);
                                 if (action == 'trash') _moveToTrash(e);
                               }, itemBuilder: (_) => [
+                                const PopupMenuItem(value: 'details', child: Text('Details')),
                                 const PopupMenuItem(value: 'rename', child: Text('Rename')),
                                 const PopupMenuItem(value: 'trash', child: Text('Move to Trash')),
                                 if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
@@ -813,12 +864,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   trailing: categoryMode ? null : PopupMenuButton<String>(
                     tooltip: 'Item actions',
                     onSelected: (action) {
+                      if (action == 'details') { _showDetails(e); }
                       if (action == 'rename') { _rename(e); }
                       if (action == 'copy' && !e.isDirectory) { _copyFile(e); }
                       if (action == 'move_up' && _levels.length > 1) { _moveToParent(e); }
                       if (action == 'trash') { _moveToTrash(e); }
                     },
                     itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'details', child: Text('Details')),
                       const PopupMenuItem(value: 'rename', child: Text('Rename')),
                       const PopupMenuItem(value: 'trash', child: Text('Move to Trash / Recycle Bin')),
                       if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),

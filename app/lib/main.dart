@@ -7,10 +7,13 @@ import 'package:aureon/src/transfers/aureon_transfers_page.dart';
 import 'package:aureon/src/backup/aureon_backup_page.dart';
 import 'package:aureon/src/virtual_folders/aureon_virtual_folders_page.dart';
 import 'package:material_ui/material_ui.dart';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'src/media/aureon_media_viewer.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'src/settings/aureon_permissions_page.dart';
 
 final GlobalKey<NavigatorState> _aureonNavigatorKey = GlobalKey<NavigatorState>();
 const MethodChannel _openWithChannel = MethodChannel('aureon/open_with');
@@ -44,7 +47,9 @@ void main() {
 }
 
 class AureonApp extends StatefulWidget {
-  const AureonApp({super.key});
+  const AureonApp({super.key, this.auth});
+
+  final AureonFirebaseAuthService? auth;
 
   @override
   State<AureonApp> createState() => _AureonAppState();
@@ -123,6 +128,7 @@ class _AureonAppState extends State<AureonApp> {
       ),
     ),
     home: AureonHome(
+      auth: widget.auth,
       themeMode: _themeMode,
       onThemeChanged: _setThemeMode,
     ),
@@ -130,7 +136,8 @@ class _AureonAppState extends State<AureonApp> {
 }
 
 class AureonHome extends StatefulWidget {
-  const AureonHome({super.key, required this.themeMode, required this.onThemeChanged});
+  const AureonHome({super.key, this.auth, required this.themeMode, required this.onThemeChanged});
+  final AureonFirebaseAuthService? auth;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
   @override
@@ -138,15 +145,47 @@ class AureonHome extends StatefulWidget {
 }
 
 class _AureonHomeState extends State<AureonHome> {
-  final _auth = AureonFirebaseAuthService();
+  late final AureonFirebaseAuthService _auth = widget.auth ?? AureonFirebaseAuthService();
   int selected = 0;
   String? _fileCategory;
+  bool _authReady = false;
 
   @override
   void initState() {
     super.initState();
     _auth.configureProfile(AureonBackendProfile.shared);
     _restoreSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requestNotificationPermissionOnFirstLaunch());
+  }
+
+  Future<void> _requestNotificationPermissionOnFirstLaunch() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('aureon.notification_permission_prompted.v1') == true) return;
+      final status = await Permission.notification.status;
+      if (status.isGranted) {
+        await prefs.setBool('aureon.notification_permission_prompted.v1', true);
+        return;
+      }
+      if (!mounted) return;
+      final shouldAsk = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Allow AUREON notifications?'),
+          content: const Text('Notifications can keep you informed about important AUREON activity, including transfer updates. You can change this permission later in Settings.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Not now')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Continue')),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      await prefs.setBool('aureon.notification_permission_prompted.v1', true);
+      if (shouldAsk == true) await Permission.notification.request();
+    } catch (_) {
+      // Permission prompts are best-effort; users can manage them in Settings.
+    }
   }
 
   Future<void> _restoreSession() async {
@@ -154,11 +193,40 @@ class _AureonHomeState extends State<AureonHome> {
       await _auth.restoreSession();
       final user = await _auth.reloadUser();
       _auth.acceptBoundProfile(AureonBackendProfile.shared.bindToUid(user.localId));
-      if (mounted) setState(() {});
     } catch (_) {
-      // First launch or temporary network issue; Account page offers sign-in.
+      // No valid saved session: require the user to sign in before entering AUREON.
+    } finally {
+      if (mounted) setState(() => _authReady = true);
     }
   }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    setState(() {});
+    if (_auth.currentUser == null && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Widget _loginGate() => Scaffold(
+    body: SafeArea(
+      child: Column(children: [
+        const SizedBox(height: 34),
+        const Icon(Icons.all_inclusive, size: 48, color: Color(0xFF8B7CFF)),
+        const SizedBox(height: 10),
+        const Text('AUREON', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800, letterSpacing: 3)),
+        const SizedBox(height: 5),
+        const Text('YOUR DIGITAL UNIVERSE', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Color(0xFF9AA8BD))),
+        const SizedBox(height: 18),
+        const Text('Welcome to AUREON', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(28, 8, 28, 12),
+          child: Text('Sign in or create your AUREON Master Account to continue. Your local files stay on this device.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF9AA8BD), fontSize: 13)),
+        ),
+        Expanded(child: AureonAccountPage(auth: _auth, onAuthChanged: _onAuthChanged)),
+      ]),
+    ),
+  );
 
   static const labels = ['Home', 'Browse', 'Cloud', 'Settings'];
   static const icons = [
@@ -169,7 +237,12 @@ class _AureonHomeState extends State<AureonHome> {
   ];
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
+  Widget build(BuildContext context) {
+    if (!_authReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_auth.currentUser == null) return _loginGate();
+    return LayoutBuilder(builder: (context, constraints) {
     final wide = constraints.maxWidth >= 760;
     return PopScope<Object?>(
       canPop: selected == 0,
@@ -198,6 +271,7 @@ class _AureonHomeState extends State<AureonHome> {
       ),
     );
   });
+  }
 
   Widget _sidebar() {
     final scheme = Theme.of(context).colorScheme;
@@ -262,7 +336,7 @@ class _AureonHomeState extends State<AureonHome> {
   void _openAccount() => Navigator.of(context).push(MaterialPageRoute<void>(
     builder: (_) => Scaffold(
       appBar: AppBar(title: const Text('AUREON Account')),
-      body: AureonAccountPage(auth: _auth),
+      body: AureonAccountPage(auth: _auth, onAuthChanged: _onAuthChanged),
     ),
   ));
 
@@ -298,6 +372,18 @@ class _AureonHomeState extends State<AureonHome> {
           subtitle: const Text('Sign in and manage your account'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: _openAccount,
+        )),
+        Card(child: ListTile(
+          leading: Icon(Icons.security_rounded, color: scheme.primary),
+          title: const Text('App Permissions'),
+          subtitle: const Text('Review and manage notification access'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('App Permissions')),
+              body: const AureonPermissionsPage(),
+            ),
+          )),
         )),
         Card(child: ListTile(
           leading: Icon(Icons.backup_rounded, color: scheme.primary),
@@ -341,7 +427,7 @@ class _AureonHomeState extends State<AureonHome> {
       case 1:
         return AureonFilesPage(initialCategory: _fileCategory);
       case 2:
-        return const AureonVirtualFoldersPage();
+        return AureonVirtualFoldersPage(auth: _auth);
       case 3:
         return _settingsPage();
       default:

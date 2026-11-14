@@ -451,3 +451,41 @@ For each new idea:
 - Owner confirmed Firebase Email/Password and Email Link providers are enabled for project `aureon-7f612`.
 - Added passwordless Email Link as an explicit A2 requirement, including Android/Windows deep-link handling, Firebase Identity Toolkit completion, security checks and acceptance tests.
 - Status remains **PLANNED / NOT IMPLEMENTED**; Firebase Console provider enablement alone is not implementation evidence.
+
+## 19. Master Account deletion and free email-OTP confirmation
+
+**Status: PROPOSED — planning only; not implemented.** This feature must remain within the owner's zero-cost requirement. Do not add a paid email provider, paid sending domain, subscription, or developer-hosted shared mail service.
+
+### Required user flow
+1. From the signed-in AUREON account page, the user explicitly chooses permanent account deletion and sees a clear, irreversible-action warning plus a summary of data that will be deleted or retained.
+2. AUREON requests a separate, cryptographically random six-digit email OTP and delivers it to the Master Account email address through a verified, zero-cost sending route.
+3. The user enters the OTP in AUREON. The OTP is short-lived, single-use, rate-limited, and stored server-side only as a secure hash; never log or expose it.
+4. The user also re-authenticates with the current Master Account password. A fresh Firebase authentication result/token is required; do not accept a stale session as password proof.
+5. The deletion operation proceeds only after both OTP verification and fresh password re-authentication succeed for the same account and pending deletion request.
+6. Delete the Firebase identity and all eligible AUREON-owned user records according to a documented deletion/retention policy. Handle retries idempotently and prevent partial deletion from being reported as complete.
+7. Sign out/revoke local sessions and clear local account-bound secrets and metadata only after the server confirms the defined deletion outcome. Explain any provider-side files that AUREON cannot delete or control.
+
+### Security and acceptance requirements
+- Bind the OTP challenge to Firebase UID, verified email, purpose (account deletion), and a unique pending request.
+- Use a cryptographically secure generator; enforce a short expiry (initial proposal: five minutes), one successful use, resend cooldown, per-account and per-network rate limits, and a small failed-attempt ceiling.
+- Store only a keyed/secure hash of the OTP; compare in constant time where applicable. Never put OTPs, passwords, Firebase ID/refresh tokens, or secrets in logs, analytics, crash reports, or client persistent storage.
+- Require Firebase email verification and fresh password re-authentication; ensure both proofs refer to the same UID and request.
+- Protect against replay, brute force, account switching, race conditions, duplicate submissions and resend invalidation.
+- Define and test deletion ordering, retry/idempotency, orphan cleanup, and behavior if Firebase deletion or database cleanup fails. Do not claim atomicity across Firebase and D1 unless it is actually guaranteed; use a durable deletion state machine/outbox or equivalent recovery process.
+- Inventory all user-scoped tables, KV/object storage and local data before implementation. Retain only legally/operationally necessary minimal audit evidence, preferably de-identified, with an explicit retention period and disclosure.
+- Add tests for wrong/expired/reused OTP, wrong password, stale auth, rate limits, account mismatch, interrupted deletion, duplicate request, partial backend failure and successful end-to-end deletion.
+
+### Zero-cost email delivery decision gate
+- First investigate whether a secure, owner-controlled Gmail API OAuth sender can deliver the OTP without a paid plan or custom domain. If feasible, send only from an explicitly configured owner-controlled mailbox, use least-privilege OAuth, obtain explicit consent, and document sender availability, token storage, revocation and operational dependency. Never embed Gmail passwords or app passwords in the app or Worker.
+- Also evaluate any genuinely free transactional-email route whose current terms permit sending to arbitrary verified user addresses without requiring a paid plan or a paid custom domain.
+- Do not assume Cloudflare Workers can send arbitrary email natively. Do not use Firebase's standard verification email link as a substitute: the required UX is a distinct six-digit OTP.
+- If no secure and policy-compliant zero-cost delivery route is available, keep the feature blocked at the decision gate and present the exact constraint and viable choices to the owner. Do not ship a non-delivering OTP UI, fake success, or an insecure workaround.
+- Re-check provider quotas, terms, domain/sender verification requirements and free-tier status immediately before implementation; free-tier offers can change.
+
+### Suggested delivery milestone
+Add **A2.x — Secure Master Account Deletion** after the Master Account authentication flow is stable and before public/beta release. Implement the email sender integration only after the owner approves a viable zero-cost route. Feature completion requires passing all security and end-to-end acceptance tests above.
+
+### 2026-11-15 — Account deletion requirement added (proposed)
+- Recorded the owner's request for permanent Master Account deletion protected by a distinct six-digit email OTP plus current-password re-authentication; both must succeed before deletion.
+- Added security, rate-limit, expiry, replay, idempotency, partial-failure, data-retention and end-to-end test requirements.
+- Owner requires a fully free solution: no paid email provider, paid domain or mandatory subscription. A secure zero-cost sender is an explicit implementation gate; no fake OTP flow or insecure credential workaround is permitted.
