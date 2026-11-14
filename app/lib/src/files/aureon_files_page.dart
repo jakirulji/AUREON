@@ -515,6 +515,36 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     ));
   }
 
+  Future<void> _showDetails(AureonLocalEntry entry) async {
+    final root = _root;
+    final location = entry.id;
+    final type = entry.isDirectory ? 'Folder' : (_ext(entry.name).isEmpty ? 'File' : '${_ext(entry.name).toUpperCase()} file');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('File details'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(entry.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              SelectableText('Type: $type'),
+              SelectableText('Size: ${entry.isDirectory ? '—' : _size(entry.sizeBytes)}'),
+              SelectableText('Modified: ${_modified(entry.modifiedEpochMs)}'),
+              SelectableText('Hidden: ${entry.isHidden ? 'Yes' : 'No'}'),
+              SelectableText('Location: ${root?.displayName ?? 'Storage'}'),
+              const SizedBox(height: 6),
+              const Text('Full path', style: TextStyle(fontWeight: FontWeight.w700)),
+              SelectableText(location, style: const TextStyle(fontSize: 12)),
+            ]),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+      ),
+    );
+  }
+
   Future<void> _openFile(AureonLocalEntry entry) async {
     final root = _root;
     if (root == null || entry.isDirectory) return;
@@ -799,7 +829,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                             style: const TextStyle(fontWeight: FontWeight.w600))),
                             if (!categoryMode) PopupMenuButton<String>(padding: EdgeInsets.zero, iconSize: 19,
                               onSelected: (action) {
-                                if (action == 'rename') _rename(e);
+                                if (action == 'details') _showDetails(e);\n                                if (action == 'rename') _rename(e);
                                 if (action == 'copy' && !e.isDirectory) _copyFile(e);
                                 if (action == 'move_up' && _levels.length > 1) _moveToParent(e);
                                 if (action == 'trash') _moveToTrash(e);
@@ -832,7 +862,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                   trailing: categoryMode ? null : PopupMenuButton<String>(
                     tooltip: 'Item actions',
                     onSelected: (action) {
-                      if (action == 'rename') { _rename(e); }
+                      if (action == 'details') { _showDetails(e); }\n                      if (action == 'rename') { _rename(e); }
                       if (action == 'copy' && !e.isDirectory) { _copyFile(e); }
                       if (action == 'move_up' && _levels.length > 1) { _moveToParent(e); }
                       if (action == 'trash') { _moveToTrash(e); }
