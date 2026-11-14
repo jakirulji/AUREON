@@ -14,12 +14,16 @@ class _FakeSecrets implements AureonAuthSecretStore {
 class _FakeTransport implements AureonFirebaseAuthTransport {
   final calls = <({Uri uri, Map<String, Object?> body, bool form})>[];
   final responses = <Map<String, Object?>>[];
+  Object? nextError;
   @override
   Future<Map<String, Object?>> post(Uri uri, {
     required Map<String, Object?> body,
     bool formEncoded = false,
   }) async {
     calls.add((uri: uri, body: body, form: formEncoded));
+    final error = nextError;
+    nextError = null;
+    if (error != null) throw error;
     if (responses.isEmpty) throw StateError('No fake Firebase response queued.');
     return responses.removeAt(0);
   }
@@ -72,6 +76,22 @@ void main() {
       '/v1/accounts:sendOobCode',
     ]);
     expect(transport.calls.last.body['requestType'], 'VERIFY_EMAIL');
+  });
+
+  test('duplicate email registration preserves Firebase EMAIL_EXISTS code', () async {
+    transport.nextError = const AureonFirebaseAuthException(
+      'EMAIL_EXISTS',
+      'This email is already registered.',
+    );
+    await expectLater(
+      auth.createAccount(email: 'owner@example.com', password: 'correct horse'),
+      throwsA(isA<AureonFirebaseAuthException>().having(
+        (error) => error.code,
+        'code',
+        'EMAIL_EXISTS',
+      )),
+    );
+    expect(transport.calls.single.uri.path, '/v1/accounts:signUp');
   });
 
   test('password reset sends Firebase PASSWORD_RESET action for normalized email', () async {
