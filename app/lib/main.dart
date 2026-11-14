@@ -44,7 +44,9 @@ void main() {
 }
 
 class AureonApp extends StatefulWidget {
-  const AureonApp({super.key});
+  const AureonApp({super.key, this.auth});
+
+  final AureonFirebaseAuthService? auth;
 
   @override
   State<AureonApp> createState() => _AureonAppState();
@@ -123,6 +125,7 @@ class _AureonAppState extends State<AureonApp> {
       ),
     ),
     home: AureonHome(
+      auth: widget.auth,
       themeMode: _themeMode,
       onThemeChanged: _setThemeMode,
     ),
@@ -130,7 +133,8 @@ class _AureonAppState extends State<AureonApp> {
 }
 
 class AureonHome extends StatefulWidget {
-  const AureonHome({super.key, required this.themeMode, required this.onThemeChanged});
+  const AureonHome({super.key, this.auth, required this.themeMode, required this.onThemeChanged});
+  final AureonFirebaseAuthService? auth;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
   @override
@@ -138,7 +142,7 @@ class AureonHome extends StatefulWidget {
 }
 
 class _AureonHomeState extends State<AureonHome> {
-  final _auth = AureonFirebaseAuthService();
+  late final AureonFirebaseAuthService _auth = widget.auth ?? AureonFirebaseAuthService();
   int selected = 0;
   String? _fileCategory;
   bool _authReady = false;
