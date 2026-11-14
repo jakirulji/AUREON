@@ -3,12 +3,24 @@ import 'dart:io';
 
 import 'package:aureon/main.dart';
 import 'package:aureon_local_files/aureon_local_files.dart';
+import 'package:aureon/src/auth/aureon_firebase_auth_service.dart';
 import 'package:aureon/src/files/aureon_files_page.dart';
 import 'package:aureon/src/files/aureon_operation_history.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _EmptyAuthSecretStore implements AureonAuthSecretStore {
+  @override
+  Future<String?> read(String key) async => null;
+
+  @override
+  Future<void> write(String key, String value) async {}
+
+  @override
+  Future<void> delete(String key) async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -342,7 +354,9 @@ void main() {
   });
 
   testWidgets('AUREON requires Master Account sign-in before opening Home', (tester) async {
-    await tester.pumpWidget(const AureonApp());
+    await tester.pumpWidget(AureonApp(
+      auth: AureonFirebaseAuthService(secretStore: _EmptyAuthSecretStore()),
+    ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
