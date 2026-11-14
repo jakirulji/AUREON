@@ -32,11 +32,13 @@ class AureonFirebaseUser {
     required this.localId,
     required this.email,
     required this.emailVerified,
+    this.displayName = '',
   });
 
   final String localId;
   final String email;
   final bool emailVerified;
+  final String displayName;
 }
 
 class AureonFirebaseSession {
@@ -257,6 +259,7 @@ class AureonFirebaseAuthService {
         localId: localId,
         email: email,
         emailVerified: verified,
+        displayName: response['displayName'] is String ? response['displayName'] as String : '',
       ),
       idToken: idToken,
       refreshToken: refreshToken,
@@ -272,6 +275,7 @@ class AureonFirebaseAuthService {
   Future<AureonFirebaseSession> createAccount({
     required String email,
     required String password,
+    required String displayName,
   }) async {
     _requireConfiguration();
     if (password.length < 8) {
@@ -284,7 +288,16 @@ class AureonFirebaseAuthService {
       _identityUri('accounts:signUp'),
       body: {'email': email.trim(), 'password': password, 'returnSecureToken': 'true'},
     );
-    final session = await _sessionFromResponse(response);
+    final initialSession = await _sessionFromResponse(response);
+    final profileResponse = await _transport.post(
+      _identityUri('accounts:update'),
+      body: {
+        'idToken': initialSession.idToken,
+        'displayName': displayName.trim(),
+        'returnSecureToken': true,
+      },
+    );
+    final session = await _sessionFromResponse(profileResponse);
     await sendVerificationEmail();
     return session;
   }
@@ -423,6 +436,7 @@ class AureonFirebaseAuthService {
       localId: localId,
       email: email,
       emailVerified: user['emailVerified'] == true,
+      displayName: user['displayName'] is String ? user['displayName'] as String : '',
     );
     final old = _session;
     if (old != null) {
