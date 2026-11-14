@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'aureon_operation_history.dart';
+import 'aureon_archive_page.dart';
 
 enum _FileSort { name, largest, newest, type }
 class AureonFilesPage extends StatefulWidget {
@@ -509,6 +510,14 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
     final root = _root;
     if (root == null || entry.isDirectory) return;
     final location = '${_levels.map((x) => x.name).join(' / ')} / ${entry.name}';
+    final extension = _ext(entry.name);
+    if (extension == 'zip' || extension == 'tar') {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => AureonArchivePage(archivePath: entry.id),
+      ));
+      _recordHistory(kind: 'browse_archive', itemName: entry.name, sourceLocation: location, succeeded: true);
+      return;
+    }
     try {
       await _files.openFile(root: root, fileId: entry.id);
       _recordHistory(kind: 'open', itemName: entry.name, sourceLocation: location, succeeded: true);
