@@ -175,7 +175,7 @@ class _AureonPermissionsPageState extends State<AureonPermissionsPage>
           status: _status(_allFilesAccess),
           description: 'Browse, organize, copy, move, rename and manage shared internal-storage files. Android may still protect Android/data and Android/obb.',
           actionLabel: 'Manage all files access',
-          onAction: () => _runAction(_files.requestAllFilesAccess, 'Returned from All files access settings.'),
+          onAction: () => _runAction(() async { await _files.requestAllFilesAccess(); }, 'Returned from All files access settings.'),
           granted: allFilesGranted,
           showAction: !allFilesGranted,
         ),
