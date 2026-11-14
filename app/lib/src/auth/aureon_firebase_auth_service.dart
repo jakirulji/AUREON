@@ -301,6 +301,30 @@ class AureonFirebaseAuthService {
     return _sessionFromResponse(response);
   }
 
+  /// Sends a Firebase password-reset email without revealing whether an
+  /// address is registered. Firebase delivers the one-time reset link.
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    _requireConfiguration();
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty || !normalizedEmail.contains('@')) {
+      throw ArgumentError('Enter a valid email address.');
+    }
+    try {
+      await _transport.post(
+        _identityUri('accounts:sendOobCode'),
+        body: {
+          'requestType': 'PASSWORD_RESET',
+          'email': normalizedEmail,
+        },
+      );
+    } on AureonFirebaseAuthException catch (error) {
+      // Avoid account enumeration: unknown addresses receive the same UI result.
+      if (error.code.startsWith('EMAIL_NOT_FOUND') ||
+          error.code.startsWith('USER_NOT_FOUND')) return;
+      rethrow;
+    }
+  }
+
   /// Sends a Firebase passwordless sign-in email. The project default
   /// Firebase Hosting action domain is used; the app accepts the full link
   /// pasted from the email so this flow does not depend on OS deep-link setup.
