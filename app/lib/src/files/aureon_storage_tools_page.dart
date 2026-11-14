@@ -85,11 +85,13 @@ class _AureonStorageToolsPageState extends State<AureonStorageToolsPage> {
         final category = _category(file.name);
         totals[category] = (totals[category] ?? 0) + size;
       }
-      if (mounted) setState(() {
-        _visitedFiles = files.length;
-        _totalBytes = bytes;
-        _categoryBytes = totals;
-      });
+      if (mounted) {
+        setState(() {
+          _visitedFiles = files.length;
+          _totalBytes = bytes;
+          _categoryBytes = totals;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
