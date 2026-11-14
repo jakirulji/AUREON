@@ -54,7 +54,8 @@ class _AureonAccountPageState extends State<AureonAccountPage> with WidgetsBindi
       if (reachable) {
         _restore();
       } else if (mounted) {
-        setState(() => _status = 'AUREON needs network access. Allow data for this app, then retry.');
+        setState(() => _status = 'AUREON cannot reach Firebase. Check your internet connection and this app’s data access.');
+        if (AureonNetworkAccess.isAndroid) _showNetworkHelpDialog();
       }
     });
   }
@@ -87,7 +88,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> with WidgetsBindi
       builder: (dialogContext) => AlertDialog(
         title: const Text('AUREON network access is blocked'),
         content: const Text(
-          'AUREON cannot reach Firebase Authentication. Check this app’s Mobile data and Background data settings. If Data Saver is enabled, allow unrestricted data access for AUREON. Android requires you to change these switches manually.',
+          'AUREON cannot reach Firebase Authentication. Check that your phone has internet access, then check this app’s Mobile data and Background data settings. If Data Saver is enabled, allow unrestricted data access for AUREON. Android requires you to change these switches manually.',
         ),
         actions: [
           TextButton(
@@ -380,7 +381,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> with WidgetsBindi
                 ]),
                 const SizedBox(height: 7),
                 const Text(
-                  'AUREON cannot reach Firebase. Allow Mobile data and Background data for AUREON in Android App Settings. Return here and the app will check again.',
+                  'AUREON cannot reach Firebase. Check your internet connection and allow Mobile data and Background data for AUREON in Android App Settings. Return here and the app will check again.',
                   style: TextStyle(fontSize: 12, color: Color(0xFFD7C2C7)),
                 ),
                 const SizedBox(height: 9),
