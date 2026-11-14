@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
@@ -35,6 +38,12 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
   bool _shuffle = false;
   bool _repeat = false;
   double _pitch = 1;
+  bool _controlsVisible = true;
+  bool _locked = false;
+  BoxFit _videoFit = BoxFit.contain;
+  Timer? _controlsTimer;
+  Timer? _sleepTimer;
+  String? _sleepLabel;
   String? _error;
 
   @override
@@ -55,6 +64,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
       } else {
         await _player.open(Media(widget.filePath, extras: {'title': widget.fileName}));
       }
+      _scheduleControlsHide();
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     }
@@ -62,6 +72,8 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
 
   @override
   void dispose() {
+    _controlsTimer?.cancel();
+    _sleepTimer?.cancel();
     _player.dispose();
     super.dispose();
   }
@@ -72,6 +84,160 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
     return hours > 0
         ? '${two(hours)}:${two(value.inMinutes.remainder(60))}:${two(value.inSeconds.remainder(60))}'
         : '${two(value.inMinutes)}:${two(value.inSeconds.remainder(60))}';
+  }
+
+  void _scheduleControlsHide() {
+    _controlsTimer?.cancel();
+    if (!widget.isVideo || !_controlsVisible || !_player.state.playing || _locked) return;
+    _controlsTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _controlsVisible = false);
+    });
+  }
+
+  void _toggleControls() {
+    if (_locked) return;
+    setState(() => _controlsVisible = !_controlsVisible);
+    _scheduleControlsHide();
+  }
+
+  Future<void> _seekBy(int seconds) async {
+    final duration = _player.state.duration;
+    final current = _player.state.position;
+    final next = (current.inMilliseconds + seconds * 1000)
+        .clamp(0, duration.inMilliseconds > 0 ? duration.inMilliseconds : 1 << 30);
+    await _player.seek(Duration(milliseconds: next.toInt()));
+    _scheduleControlsHide();
+  }
+
+  Future<void> _pickSubtitle() async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['srt', 'ass', 'ssa', 'vtt', 'sub'],
+    );
+    if (files.isEmpty || files.single.path == null) return;
+    final subtitle = files.single;
+    await _player.setSubtitleTrack(SubtitleTrack.uri(
+      Uri.file(subtitle.path!).toString(),
+      title: subtitle.name,
+    ));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Loaded subtitle: ${subtitle.name}')),
+      );
+    }
+  }
+
+  Future<void> _showSleepTimer() async {
+    final minutes = await showModalBottomSheet<int>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const ListTile(title: Text('Sleep timer')),
+          for (final value in [15, 30, 45, 60, 90, 120])
+            ListTile(
+              leading: const Icon(Icons.timer_outlined),
+              title: Text('$value minutes'),
+              onTap: () => Navigator.pop(sheetContext, value),
+            ),
+          ListTile(
+            leading: const Icon(Icons.timer_off_outlined),
+            title: const Text('Cancel timer'),
+            onTap: () => Navigator.pop(sheetContext, 0),
+          ),
+        ]),
+      ),
+    );
+    if (minutes == null) return;
+    _sleepTimer?.cancel();
+    if (minutes == 0) {
+      setState(() => _sleepLabel = null);
+      return;
+    }
+    setState(() => _sleepLabel = '${minutes}m');
+    _sleepTimer = Timer(Duration(minutes: minutes), () async {
+      await _player.pause();
+      if (mounted) setState(() => _sleepLabel = null);
+    });
+  }
+
+  Future<void> _showVideoSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const ListTile(title: Text('Video settings')),
+          ListTile(
+            leading: const Icon(Icons.fit_screen_outlined),
+            title: const Text('Aspect ratio / fit'),
+            subtitle: Text(_videoFit == BoxFit.contain ? 'Fit' :
+                _videoFit == BoxFit.cover ? 'Crop to fill' : 'Stretch'),
+            onTap: () async {
+              final fit = await showModalBottomSheet<BoxFit>(
+                context: sheetContext,
+                builder: (context) => SafeArea(child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(title: const Text('Fit to screen'), onTap: () => Navigator.pop(context, BoxFit.contain)),
+                    ListTile(title: const Text('Crop to fill'), onTap: () => Navigator.pop(context, BoxFit.cover)),
+                    ListTile(title: const Text('Stretch'), onTap: () => Navigator.pop(context, BoxFit.fill)),
+                  ],
+                )),
+              );
+              if (fit != null && mounted) setState(() => _videoFit = fit);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.subtitles_outlined),
+            title: const Text('Load external subtitle'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              _pickSubtitle();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Sleep timer'),
+            subtitle: Text(_sleepLabel ?? 'Off'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              _showSleepTimer();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.volume_up_rounded),
+            title: const Text('Playback volume'),
+            subtitle: Text('${_player.state.volume.round()}%'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              showModalBottomSheet<void>(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                    child: StreamBuilder<double>(
+                      stream: _player.stream.volume,
+                      initialData: _player.state.volume,
+                      builder: (context, snapshot) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Playback volume'),
+                          Slider(
+                            value: (snapshot.data ?? 100).clamp(0, 100).toDouble(),
+                            max: 100,
+                            onChanged: _player.setVolume,
+                          ),
+                          Text('${(snapshot.data ?? 100).round()}%'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ]),
+      ),
+    );
   }
 
   Future<void> _showTracks({required bool subtitles}) async {
@@ -124,6 +290,185 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
     );
   }
 
+  Widget _buildVideoSurface() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Video(
+          controller: _videoController,
+          controls: NoVideoControls,
+          fit: _videoFit,
+          fill: const Color(0xFF05070D),
+        ),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _toggleControls,
+          onDoubleTapDown: (details) {
+            if (_locked) return;
+            final width = MediaQuery.of(context).size.width;
+            _seekBy(details.localPosition.dx < width / 2 ? -10 : 10);
+          },
+          child: const SizedBox.expand(),
+        ),
+        if (_player.state.buffering)
+          const Center(child: CircularProgressIndicator(color: Color(0xFF9A8BFF))),
+        if (_controlsVisible && !_locked)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x99000000), Colors.transparent, Color(0xCC000000)],
+                  stops: [0, .42, 1],
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          tooltip: 'Lock controls',
+                          color: Colors.white,
+                          onPressed: () => setState(() { _locked = true; _controlsVisible = false; }),
+                          icon: const Icon(Icons.lock_open_rounded),
+                        ),
+                        IconButton(
+                          tooltip: 'Video settings',
+                          color: Colors.white,
+                          onPressed: _showVideoSettings,
+                          icon: const Icon(Icons.more_vert_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        tooltip: 'Back 10 seconds',
+                        color: Colors.white,
+                        iconSize: 34,
+                        onPressed: () => _seekBy(-10),
+                        icon: const Icon(Icons.replay_10_rounded),
+                      ),
+                      const SizedBox(width: 28),
+                      StreamBuilder<bool>(
+                        stream: _player.stream.playing,
+                        initialData: _player.state.playing,
+                        builder: (context, snapshot) => IconButton.filled(
+                          tooltip: snapshot.data == true ? 'Pause' : 'Play',
+                          onPressed: _player.playOrPause,
+                          iconSize: 38,
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFF8067F4),
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: Icon(snapshot.data == true ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                        ),
+                      ),
+                      const SizedBox(width: 28),
+                      IconButton(
+                        tooltip: 'Forward 10 seconds',
+                        color: Colors.white,
+                        iconSize: 34,
+                        onPressed: () => _seekBy(10),
+                        icon: const Icon(Icons.forward_10_rounded),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                    child: Column(
+                      children: [
+                        StreamBuilder<Duration>(
+                          stream: _player.stream.position,
+                          initialData: _player.state.position,
+                          builder: (context, positionSnapshot) {
+                            final position = positionSnapshot.data ?? Duration.zero;
+                            return StreamBuilder<Duration>(
+                              stream: _player.stream.duration,
+                              initialData: _player.state.duration,
+                              builder: (context, durationSnapshot) {
+                                final duration = durationSnapshot.data ?? Duration.zero;
+                                final max = duration.inMilliseconds.toDouble().clamp(1.0, double.infinity).toDouble();
+                                return Slider(
+                                  value: position.inMilliseconds.toDouble().clamp(0, max).toDouble(),
+                                  max: max,
+                                  onChanged: (value) => _player.seek(Duration(milliseconds: value.round())),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                        Row(
+                          children: [
+                            StreamBuilder<Duration>(
+                              stream: _player.stream.position,
+                              initialData: _player.state.position,
+                              builder: (context, snapshot) => Text(
+                                _time(snapshot.data ?? Duration.zero),
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ),
+                            const Spacer(),
+                            PopupMenuButton<double>(
+                              tooltip: 'Playback speed',
+                              initialValue: _player.state.rate,
+                              color: const Color(0xFF171C2B),
+                              onSelected: (speed) async {
+                                await _player.setRate(speed);
+                                if (mounted) setState(() {});
+                              },
+                              itemBuilder: (_) => [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0, 4.0]
+                                  .map((speed) => PopupMenuItem(
+                                    value: speed,
+                                    child: Text('$speed×', style: const TextStyle(color: Colors.white)),
+                                  )).toList(),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                child: Text('${_player.state.rate.toStringAsFixed(2)}×',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            StreamBuilder<Duration>(
+                              stream: _player.stream.duration,
+                              initialData: _player.state.duration,
+                              builder: (context, snapshot) => Text(
+                                _time(snapshot.data ?? Duration.zero),
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_locked)
+          Positioned(
+            right: 14,
+            bottom: 18,
+            child: FloatingActionButton.small(
+              heroTag: 'aureon-video-unlock',
+              backgroundColor: const Color(0xCC20243A),
+              foregroundColor: Colors.white,
+              onPressed: () => setState(() { _locked = false; _controlsVisible = true; }),
+              child: const Icon(Icons.lock_open_rounded),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -155,7 +500,7 @@ class _AureonMediaViewerPageState extends State<AureonMediaViewerPage> {
               Expanded(
                 child: Center(
                   child: _error == null
-                      ? Video(controller: _videoController)
+                      ? _buildVideoSurface()
                       : Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(_error!, style: const TextStyle(color: Colors.white)),

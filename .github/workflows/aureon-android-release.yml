@@ -1,16 +1,6 @@
 name: AUREON Signed Android APK
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "app/**"
-      - "android-spike/storage/**"
-      - "android-spike/pigeon/**"
-      - "packages/aureon_local_files/**"
-      - "shared/aureon_contracts/**"
-      - ".github/workflows/aureon-android-release.yml"
-      - ".github/workflows/aureon-app-preview.yml"
   workflow_dispatch:
 
 permissions:
