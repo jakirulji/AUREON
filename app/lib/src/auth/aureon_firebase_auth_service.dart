@@ -320,7 +320,9 @@ class AureonFirebaseAuthService {
     } on AureonFirebaseAuthException catch (error) {
       // Avoid account enumeration: unknown addresses receive the same UI result.
       if (error.code.startsWith('EMAIL_NOT_FOUND') ||
-          error.code.startsWith('USER_NOT_FOUND')) return;
+          error.code.startsWith('USER_NOT_FOUND')) {
+        return;
+      }
       rethrow;
     }
   }
