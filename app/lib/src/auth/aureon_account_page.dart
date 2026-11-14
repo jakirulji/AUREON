@@ -628,14 +628,14 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   @override
   void initState() {
     super.initState();
-    _username.addListener(_passwordChanged);
-    _email.addListener(_passwordChanged);
-    _password.addListener(_passwordChanged);
-    _confirmPassword.addListener(_passwordChanged);
+    _username.addListener(_fieldChanged);
+    _email.addListener(_fieldChanged);
+    _password.addListener(_fieldChanged);
+    _confirmPassword.addListener(_fieldChanged);
     _restore();
   }
 
-  void _passwordChanged() {
+  void _fieldChanged() {
     if (mounted) setState(() {});
   }
 
