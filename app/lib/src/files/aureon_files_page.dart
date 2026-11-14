@@ -834,6 +834,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                                 if (action == 'move_up' && _levels.length > 1) _moveToParent(e);
                                 if (action == 'trash') _moveToTrash(e);
                               }, itemBuilder: (_) => [
+                                const PopupMenuItem(value: 'details', child: Text('Details')),
                                 const PopupMenuItem(value: 'rename', child: Text('Rename')),
                                 const PopupMenuItem(value: 'trash', child: Text('Move to Trash')),
                                 if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
@@ -868,6 +869,7 @@ class _AureonFilesPageState extends State<AureonFilesPage> {
                       if (action == 'trash') { _moveToTrash(e); }
                     },
                     itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'details', child: Text('Details')),
                       const PopupMenuItem(value: 'rename', child: Text('Rename')),
                       const PopupMenuItem(value: 'trash', child: Text('Move to Trash / Recycle Bin')),
                       if (!e.isDirectory) const PopupMenuItem(value: 'copy', child: Text('Copy')),
