@@ -69,12 +69,19 @@ void main() {
   test('create account requests email verification', () async {
     transport.responses
       ..add(signInResponse())
+      ..add(signInResponse())
       ..add({'email': 'owner@example.com'});
-    await auth.createAccount(email: 'owner@example.com', password: 'correct horse');
+    await auth.createAccount(
+      email: 'owner@example.com',
+      password: 'correct horse',
+      displayName: 'AureonUser',
+    );
     expect(transport.calls.map((call) => call.uri.path), [
       '/v1/accounts:signUp',
+      '/v1/accounts:update',
       '/v1/accounts:sendOobCode',
     ]);
+    expect(transport.calls[1].body['displayName'], 'AureonUser');
     expect(transport.calls.last.body['requestType'], 'VERIFY_EMAIL');
   });
 
@@ -84,7 +91,7 @@ void main() {
       'This email is already registered.',
     );
     await expectLater(
-      auth.createAccount(email: 'owner@example.com', password: 'correct horse'),
+      auth.createAccount(email: 'owner@example.com', password: 'correct horse', displayName: 'AureonUser'),
       throwsA(isA<AureonFirebaseAuthException>().having(
         (error) => error.code,
         'code',
