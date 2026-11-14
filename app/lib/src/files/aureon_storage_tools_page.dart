@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:aureon_local_files/aureon_local_files.dart';
-import 'package:cryptography/cryptography.dart';
+import 'package:crypto/crypto.dart';
 import 'package:material_ui/material_ui.dart';
 
 class AureonStorageToolsPage extends StatefulWidget {
@@ -105,15 +105,15 @@ class _AureonStorageToolsPageState extends State<AureonStorageToolsPage> {
       final bySize = <int, List<AureonLocalEntry>>{};
       for (final file in files) {
         final size = file.sizeBytes ?? 0;
-        if (size > 0) (bySize[size] ??= []).add(file);
+        if (size > 0) { (bySize[size] ??= []).add(file); }
       }
       final candidates = bySize.values.where((group) => group.length > 1).expand((group) => group).toList();
       final hashes = <String, List<AureonLocalEntry>>{};
       var checked = 0;
       for (final file in candidates) {
         try {
-          final digest = await const Sha256().hashStream(File(file.id).openRead());
-          final key = '${file.sizeBytes}:${digest.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
+          final digest = await File(file.id).openRead().transform(sha256).first;
+          final key = '${file.sizeBytes}:$digest';
           (hashes[key] ??= []).add(file);
         } catch (_) {
           // An inaccessible file is skipped; it is never modified.
@@ -161,7 +161,7 @@ class _AureonStorageToolsPageState extends State<AureonStorageToolsPage> {
           if (_categoryBytes.isNotEmpty) ...[
             const SizedBox(height: 18),
             Text('Storage analysis', style: Theme.of(context).textTheme.titleLarge),
-            Text('${_visitedFiles} files · ${_formatBytes(_totalBytes)} total scanned'),
+            Text('$_visitedFiles files · ${_formatBytes(_totalBytes)} total scanned'),
             for (final item in sorted)
               ListTile(
                 contentPadding: EdgeInsets.zero,
