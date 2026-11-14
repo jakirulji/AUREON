@@ -7,6 +7,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.provider.Settings
 import android.os.Bundle
+import android.os.Build
 import com.aureon.storage.AureonStoragePlugin
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
@@ -103,7 +104,7 @@ class MainActivity : FlutterActivity() {
                             "hasInternet" to (capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true),
                             "validated" to (capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true),
                             "metered" to connectivity.isActiveNetworkMetered,
-                            "restrictBackgroundStatus" to connectivity.restrictBackgroundStatus
+                            "restrictBackgroundStatus" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) connectivity.restrictBackgroundStatus else 0
                         ))
                     } catch (error: Exception) {
                         result.error("NETWORK_STATUS_UNAVAILABLE", safeMessage(error), null)
