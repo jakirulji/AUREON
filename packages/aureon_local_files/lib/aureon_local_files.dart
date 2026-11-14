@@ -96,6 +96,28 @@ class AureonLocalFiles {
     return value == true;
   }
 
+  /// Whether Android has exempted AUREON from Doze battery optimization.
+  Future<bool> hasBatteryOptimizationExemption() async {
+    final value = await _channel.invokeMethod<Object?>('hasBatteryOptimizationExemption');
+    return value == true;
+  }
+
+  /// Opens Android's user-controlled battery optimization exemption prompt.
+  Future<void> requestBatteryOptimizationExemption() async {
+    await _channel.invokeMethod<void>('requestBatteryOptimizationExemption');
+  }
+
+  /// Whether Android allows AUREON to request APK installations.
+  Future<bool> canInstallPackages() async {
+    final value = await _channel.invokeMethod<Object?>('canInstallPackages');
+    return value == true;
+  }
+
+  /// Opens the per-app "Install unknown apps" settings screen.
+  Future<void> requestInstallPackagesAccess() async {
+    await _channel.invokeMethod<void>('requestInstallPackagesAccess');
+  }
+
   Future<AureonLocalRoot?> defaultRoot() async {
     final value = await _channel.invokeMethod<Object?>('defaultRoot');
     if (value == null) return null;
