@@ -20,6 +20,7 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
   bool _busy = false;
   bool _createMode = false;
   bool _obscure = true;
+  bool _duplicateEmail = false;
   String _status = 'Checking saved AUREON session…';
 
   @override
@@ -90,9 +91,18 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
       widget.onAuthChanged?.call();
     } catch (error) {
       if (mounted) {
-        setState(() => _status = error.toString());
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+        final duplicateEmail = error is AureonFirebaseAuthException &&
+            error.code.startsWith('EMAIL_EXISTS');
+        setState(() {
+          _duplicateEmail = duplicateEmail;
+          _status = duplicateEmail
+              ? 'Already registered with this email, please'
+              : error.toString();
+        });
+        if (!duplicateEmail) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(error.toString())));
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -282,7 +292,10 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             contentPadding: EdgeInsets.zero,
             value: _createMode,
             onChanged: widget.auth.isConfigured && !_busy
-                ? (value) => setState(() => _createMode = value)
+                ? (value) => setState(() {
+                    _createMode = value;
+                    _duplicateEmail = false;
+                  })
                 : null,
             title: const Text('Create a new AUREON account'),
             subtitle: const Text('Otherwise, sign in to an existing account.'),
@@ -340,7 +353,37 @@ class _AureonAccountPageState extends State<AureonAccountPage> {
             children: [
               const Icon(Icons.info_outline, color: Color(0xFF64E6C2)),
               const SizedBox(width: 10),
-              Expanded(child: Text(_status, style: const TextStyle(fontSize: 12))),
+              Expanded(
+                child: _duplicateEmail
+                    ? Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(_status, style: const TextStyle(fontSize: 12)),
+                          InkWell(
+                            onTap: _busy ? null : () => setState(() {
+                              _createMode = false;
+                              _duplicateEmail = false;
+                              _password.clear();
+                              _status = 'Sign in to your existing AUREON account.';
+                            }),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+                              child: Text(
+                                'login',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF8B7CFF),
+                                  decoration: TextDecoration.underline,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Text('.', style: TextStyle(fontSize: 12)),
+                        ],
+                      )
+                    : Text(_status, style: const TextStyle(fontSize: 12)),
+              ),
             ],
           ),
         ),
