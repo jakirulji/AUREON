@@ -18,7 +18,7 @@ This directory contains the shared Flutter application layer. Android and Window
 
 ## Validation
 
-The app validation workflow runs Flutter dependency resolution, static analysis, widget tests and platform compilation for Android and Windows. It does **not** upload or retain APK/EXE artifacts. Final installable builds will be produced once the agreed implementation scope is complete.
+The `AUREON App Preview Builds` workflow runs Flutter dependency resolution, static analysis, Dart contract tests, app tests and platform compilation. A successful run publishes an Android debug APK (`AUREON-Android-Debug-Preview-APK`), a Windows preview ZIP containing `aureon.exe` and its runtime payload (`AUREON-Windows-Preview-ZIP`), and a Windows installer EXE (`AUREON-Windows-Setup-EXE`). The Android job also runs the transfer-bridge integration test on a hosted emulator before uploading the debug APK. A separate signed-APK workflow publishes the Android release APK when its signing configuration is available. These are CI preview/installable artifacts, not evidence of physical-device testing or production-ready cloud integration; check each Actions run for its artifact links and expiry.
 
 ## Important limitations
 
